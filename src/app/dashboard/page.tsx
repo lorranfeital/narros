@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,32 +10,33 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { VariantProps } from "class-variance-authority";
 import { badgeVariants } from "@/components/ui/badge";
+import { Workspace, WorkspaceStatus } from "@/lib/firestore-types";
 
 type BadgeVariant = VariantProps<typeof badgeVariants>["variant"];
 
-function getStatusBadgeVariant(status: string): BadgeVariant {
+function getStatusBadgeVariant(status: WorkspaceStatus): BadgeVariant {
   switch (status) {
-    case 'published':
+    case WorkspaceStatus.PUBLISHED:
       return 'success';
-    case 'sync_pending':
+    case WorkspaceStatus.SYNC_PENDING:
       return 'processing';
-    case 'draft':
+    case WorkspaceStatus.DRAFT_READY:
       return 'default';
-    case 'never_published':
+    case WorkspaceStatus.NEVER_PUBLISHED:
     default:
       return 'secondary';
   }
 }
 
-function getStatusText(status: string) {
+function getStatusText(status: WorkspaceStatus) {
     switch (status) {
-        case 'published':
+        case WorkspaceStatus.PUBLISHED:
             return 'Publicado';
-        case 'draft':
+        case WorkspaceStatus.DRAFT_READY:
             return 'Rascunho pronto';
-        case 'sync_pending':
+        case WorkspaceStatus.SYNC_PENDING:
             return 'Atualização pendente';
-        case 'never_published':
+        case WorkspaceStatus.NEVER_PUBLISHED:
         default:
             return 'Nunca publicado';
     }
@@ -55,7 +57,7 @@ export default function DashboardPage() {
         return query(collection(firestore, 'workspaces'), where('members', 'array-contains', user.uid));
     }, [user, firestore]);
 
-    const { data: workspaces, isLoading } = useCollection<any>(workspacesQuery);
+    const { data: workspaces, isLoading } = useCollection<Workspace>(workspacesQuery);
 
     return (
         <div className="p-12">
@@ -87,8 +89,8 @@ export default function DashboardPage() {
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <Badge variant={getStatusBadgeVariant(ws.knowledgeStatus)}>
-                                    {getStatusText(ws.knowledgeStatus)}
+                                <Badge variant={getStatusBadgeVariant(ws.status)}>
+                                    {getStatusText(ws.status)}
                                 </Badge>
                             </CardContent>
                         </Card>

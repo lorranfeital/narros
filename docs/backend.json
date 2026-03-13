@@ -1,583 +1,249 @@
+
 {
   "entities": {
     "User": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "User",
       "type": "object",
-      "description": "Represents a user account in the Narros platform, used for authentication and identifying workspace owners/members.",
+      "description": "Represents a user account in the Narros platform.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the User entity."
-        },
-        "name": {
-          "type": "string",
-          "description": "The user's full name as registered or obtained from the authentication provider."
-        },
-        "email": {
-          "type": "string",
-          "description": "The user's email address, used for identification and communication.",
-          "format": "email"
-        },
-        "plan": {
-          "type": "string",
-          "description": "The user's subscription plan, determining access to features and quotas.",
-          "items": {
-            "type": "string"
-          }
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp indicating when the user account was created.",
-          "format": "date-time"
-        }
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "plan": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": [
-        "id",
-        "name",
-        "email",
-        "plan",
-        "createdAt"
-      ]
+      "required": ["id", "name", "email", "plan", "createdAt"]
     },
     "Workspace": {
       "title": "Workspace",
-      "description": "Defines a workspace with its name, type, sector, owner, and explicit member list.",
       "type": "object",
       "properties": {
-        "name": {
-          "type": "string",
-          "description": "The name of the workspace."
-        },
-        "type": {
-          "type": "string",
-          "enum": [
-            "empresa",
-            "grupo",
-            "franquia",
-            "rede",
-            "loja",
-            "clínica",
-            "escritório",
-            "outro"
-          ],
-          "description": "The type of the workspace."
-        },
-        "sector": {
-          "type": "string",
-          "description": "The business sector of the workspace.",
-          "enum": [
-            "Agricultura",
-            "Alimentação",
-            "Construção",
-            "Contabilidade",
-            "Consultoria",
-            "Educação",
-            "Engenharia",
-            "Financeiro",
-            "Imobiliário",
-            "Jurídico",
-            "Marketing e Publicidade",
-            "Mídia e Entretenimento",
-            "Saúde",
-            "Serviços",
-            "Tecnologia",
-            "Transporte e Logística",
-            "Turismo e Hotelaria",
-            "Varejo",
-            "Outro"
-          ]
-        },
-        "logoUrl": {
-          "type": "string",
-          "format": "uri",
-          "description": "URL for the workspace's custom logo."
-        },
-        "ownerId": {
-          "type": "string",
-          "description": "The UID of the user who owns the workspace."
-        },
-        "members": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "A list of UIDs of users who are members of the workspace."
-        },
-        "knowledgeStatus": {
-          "type": "string",
-          "enum": [
-            "never_published",
-            "draft",
-            "published",
-            "sync_pending"
-          ],
-          "description": "The current status of the workspace's knowledge base."
-        },
-        "publishedAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Timestamp of when the knowledge base was first published."
-        },
-        "lastSyncAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Timestamp of the last knowledge base synchronization."
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Timestamp indicating when the workspace was created."
-        }
+        "name": { "type": "string" },
+        "slug": { "type": "string" },
+        "logoUrl": { "type": "string", "format": "uri" },
+        "type": { "type": "string", "enum": ["empresa", "grupo", "franquia", "rede", "loja", "clínica", "escritório", "outro"] },
+        "sector": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "members": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["never_published", "draft_ready", "published", "sync_pending", "archived"] },
+        "ingestionState": { "type": "string", "enum": ["idle", "ingesting", "processing"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "lastPublishedAt": { "type": "string", "format": "date-time" },
+        "lastProcessedAt": { "type": "string", "format": "date-time" },
+        "pendingSyncCount": { "type": "number" },
+        "visibility": { "type": "string", "enum": ["public", "private"] }
       },
-      "required": [
-        "name",
-        "type",
-        "sector",
-        "ownerId",
-        "knowledgeStatus",
-        "createdAt"
-      ]
+      "required": ["name", "type", "sector", "ownerId", "members", "status", "ingestionState", "createdAt"]
     },
-    "Analysis": {
-      "title": "Analysis",
-      "description": "Stores details of content analyses performed.",
+    "Source": {
+      "title": "Source",
       "type": "object",
       "properties": {
-        "workspaceId": {
-          "type": "string"
-        },
-        "rawContentUrl": {
-          "type": "string"
-        },
-        "rawTextPreview": {
-          "type": "string"
-        },
-        "wordCount": {
-          "type": "number"
-        },
-        "status": {
-          "type": "string",
-          "enum": [
-            "processing",
-            "draft",
-            "sync_pending",
-            "published",
-            "error"
-          ]
-        },
-        "errorMessage": {
-          "type": "string"
-        },
-        "empresa": {
-          "type": "object",
-          "properties": {
-            "nome": {
-              "type": "string"
-            },
-            "tipo": {
-              "type": "string"
-            },
-            "setor": {
-              "type": "string"
-            }
-          }
-        },
-        "publishedAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        }
+        "type": { "type": "string", "enum": ["text", "file", "audio", "integration"] },
+        "sourceName": { "type": "string" },
+        "mimeType": { "type": "string" },
+        "storagePath": { "type": "string" },
+        "rawText": { "type": "string" },
+        "extractedText": { "type": "string" },
+        "transcript": { "type": "string" },
+        "processingStatus": { "type": "string", "enum": ["pending", "processing", "completed", "error"] },
+        "batchId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" },
+        "notes": { "type": "string" }
       },
-      "required": [
-        "workspaceId",
-        "rawContentUrl",
-        "status",
-        "createdAt"
-      ]
+      "required": ["type", "processingStatus", "createdAt", "createdBy"]
     },
-    "Knowledge": {
-      "title": "Knowledge",
-      "description": "Represents a structured knowledge category and its items.",
-      "type": "object",
-      "properties": {
-        "analysisId": {
-          "type": "string"
+    "DraftKnowledge": {
+        "title": "Draft Knowledge",
+        "type": "object",
+        "properties": {
+            "categories": { "type": "array", "items": { "$ref": "#/backend/entities/KnowledgeCategory" }},
+            "generatedAt": { "type": "string", "format": "date-time"},
+            "sourceBatchId": { "type": "string" },
+            "version": { "type": "number" },
+            "status": { "type": "string", "enum": ["draft", "under_review"] }
         },
-        "workspaceId": {
-          "type": "string"
-        },
-        "publishedVersion": {
-          "type": "boolean"
-        },
-        "categoria": {
-          "type": "string"
-        },
-        "icone": {
-          "type": "string"
-        },
-        "itens": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "titulo": {
-                "type": "string"
-              },
-              "descricao": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "titulo",
-              "descricao"
-            ]
-          }
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "analysisId",
-        "workspaceId",
-        "publishedVersion",
-        "categoria",
-        "itens",
-        "createdAt"
-      ]
+        "required": ["categories", "generatedAt", "sourceBatchId", "version", "status"]
     },
-    "Training": {
-      "title": "Training",
-      "description": "Stores individual training modules generated from an analysis.",
-      "type": "object",
-      "properties": {
-        "analysisId": {
-          "type": "string"
+    "PublishedKnowledge": {
+        "title": "Published Knowledge",
+        "type": "object",
+        "properties": {
+            "categories": { "type": "array", "items": { "$ref": "#/backend/entities/KnowledgeCategory" }},
+            "publishedAt": { "type": "string", "format": "date-time"},
+            "version": { "type": "number" },
+            "publishedBy": { "type": "string" }
         },
-        "workspaceId": {
-          "type": "string"
+        "required": ["categories", "publishedAt", "version", "publishedBy"]
+    },
+    "KnowledgeCategory": {
+        "title": "Knowledge Category",
+        "type": "object",
+        "properties": {
+            "categoria": { "type": "string" },
+            "icone": { "type": "string" },
+            "itens": { "type": "array", "items": {
+                "type": "object",
+                "properties": {
+                    "titulo": { "type": "string" },
+                    "descricao": { "type": "string" }
+                },
+                "required": ["titulo", "descricao"]
+            }}
         },
-        "publishedVersion": {
-          "type": "boolean"
-        },
-        "modulo": {
-          "type": "number"
-        },
-        "titulo": {
-          "type": "string"
-        },
-        "duracao": {
-          "type": "string"
-        },
-        "objetivo": {
-          "type": "string"
-        },
-        "topicos": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "formato": {
-          "type": "string",
-          "enum": [
-            "presencial",
-            "vídeo",
-            "slides",
-            "prático"
-          ]
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "analysisId",
-        "workspaceId",
-        "publishedVersion",
-        "modulo",
-        "titulo",
-        "objetivo",
-        "formato",
-        "createdAt"
-      ]
+        "required": ["categoria", "itens"]
     },
     "Playbook": {
-      "title": "Playbook",
-      "description": "Stores operational playbooks generated from an analysis.",
+        "title": "Playbook",
+        "type": "object",
+        "properties": {
+            "processo": { "type": "string" },
+            "passos": { "type": "array", "items": {
+                "type": "object",
+                "properties": {
+                    "numero": { "type": "number" },
+                    "titulo": { "type": "string" },
+                    "descricao": { "type": "string" }
+                },
+                "required": ["numero", "titulo", "descricao"]
+            }},
+            "sourceRefs": { "type": "array", "items": { "type": "string" }},
+            "status": { "type": "string", "enum": ["draft", "published"] },
+            "createdAt": { "type": "string", "format": "date-time" },
+            "updatedAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["processo", "passos", "status", "createdAt"]
+    },
+    "TrainingModule": {
+      "title": "Training Module",
       "type": "object",
       "properties": {
-        "analysisId": {
-          "type": "string"
-        },
-        "workspaceId": {
-          "type": "string"
-        },
-        "publishedVersion": {
-          "type": "boolean"
-        },
-        "processo": {
-          "type": "string"
-        },
-        "passos": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "numero": {
-                "type": "number"
-              },
-              "titulo": {
-                "type": "string"
-              },
-              "descricao": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "numero",
-              "titulo",
-              "descricao"
-            ]
-          }
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        }
+        "modulo": { "type": "number" },
+        "titulo": { "type": "string" },
+        "duracao": { "type": "string" },
+        "objetivo": { "type": "string" },
+        "topicos": { "type": "array", "items": { "type": "string" } },
+        "formato": { "type": "string", "enum": ["presencial", "vídeo", "slides", "prático"] },
+        "sourceRefs": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["draft", "published"] }
       },
-      "required": [
-        "analysisId",
-        "workspaceId",
-        "publishedVersion",
-        "processo",
-        "passos",
-        "createdAt"
-      ]
+      "required": ["modulo", "titulo", "objetivo", "formato", "status"]
     },
     "Insight": {
-      "title": "Insight",
-      "description": "Stores identified gaps, opportunities, or risks from an analysis.",
-      "type": "object",
-      "properties": {
-        "analysisId": {
-          "type": "string"
+        "title": "Insight",
+        "type": "object",
+        "properties": {
+            "texto": { "type": "string" },
+            "tipo": { "type": "string", "enum": ["gap", "oportunidade", "risco"] },
+            "sourceRefs": { "type": "array", "items": { "type": "string" }},
+            "resolved": { "type": "boolean" },
+            "createdAt": { "type": "string", "format": "date-time" }
         },
-        "workspaceId": {
-          "type": "string"
-        },
-        "texto": {
-          "type": "string"
-        },
-        "tipo": {
-          "type": "string",
-          "enum": [
-            "gap",
-            "oportunidade",
-            "risco"
-          ]
-        },
-        "resolved": {
-          "type": "boolean"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "analysisId",
-        "workspaceId",
-        "texto",
-        "tipo",
-        "resolved",
-        "createdAt"
-      ]
+        "required": ["texto", "tipo", "resolved", "createdAt"]
     },
-    "ChatMessage": {
-      "title": "Chat Message",
-      "description": "Stores individual chat messages for the AI assistant.",
+    "SyncProposal": {
+      "title": "Sync Proposal",
       "type": "object",
       "properties": {
-        "workspaceId": {
-          "type": "string"
-        },
-        "userId": {
-          "type": "string"
-        },
-        "role": {
-          "type": "string",
-          "enum": [
-            "user",
-            "assistant"
-          ]
-        },
-        "content": {
-          "type": "string"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        }
+        "type": { "type": "string", "enum": ["new", "updated", "conflict", "obsolete"] },
+        "entityType": { "type": "string", "enum": ["knowledge", "playbook", "training"] },
+        "entityId": { "type": "string" },
+        "before": { "type": "object" },
+        "after": { "type": "object" },
+        "sourceBatchId": { "type": "string" },
+        "approvalStatus": { "type": "string", "enum": ["pending", "approved", "rejected"] }
       },
-      "required": [
-        "workspaceId",
-        "userId",
-        "role",
-        "content",
-        "createdAt"
-      ]
+      "required": ["type", "entityType", "entityId", "sourceBatchId", "approvalStatus"]
+    },
+    "Version": {
+      "title": "Version",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["initial_publish", "sync_publish", "manual_edit"] },
+        "summary": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" },
+        "version": { "type": "number" }
+      },
+      "required": ["type", "summary", "createdAt", "createdBy", "version"]
+    },
+    "AssistantThread": {
+      "title": "Assistant Thread",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["title", "createdAt", "createdBy"]
+    },
+    "AssistantMessage": {
+      "title": "Assistant Message",
+      "type": "object",
+      "properties": {
+        "role": { "type": "string", "enum": ["user", "assistant"] },
+        "content": { "type": "string" },
+        "citations": { "type": "array", "items": { "type": "object" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["role", "content", "createdAt"]
     }
   },
   "auth": {
-    "providers": [
-      "password",
-      "anonymous",
-      "google.com",
-      "microsoft.com"
-    ]
+    "providers": ["password", "anonymous", "google.com", "microsoft.com"]
   },
   "firestore": {
     "structure": [
       {
         "path": "/users/{userId}",
-        "definition": {
-          "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "Stores user profile data. Authenticated users (`request.auth.uid`) can only read/write their own document.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user, corresponding to `request.auth.uid`."
-            }
-          ]
-        }
+        "definition": { "schema": { "$ref": "#/backend/entities/User" } }
       },
       {
         "path": "/workspaces/{workspaceId}",
-        "definition": {
-          "entityName": "Workspace",
-          "schema": {
-            "$ref": "#/backend/entities/Workspace"
-          },
-          "description": "Defines a workspace with its name, type, sector, owner, and explicit member list. Includes `ownerId` and `members` map for direct authorization on this document and subsequent denormalization into related entities.",
-          "params": [
-            {
-              "name": "workspaceId",
-              "description": "The unique identifier of the workspace."
-            }
-          ]
-        }
+        "definition": { "schema": { "$ref": "#/backend/entities/Workspace" } }
       },
       {
-        "path": "/analyses/{analysisId}",
-        "definition": {
-          "entityName": "Analysis",
-          "schema": {
-            "$ref": "#/backend/entities/Analysis"
-          },
-          "description": "Stores details of content analyses performed. Includes denormalized `workspaceId`, `ownerId`, and `members` map for authorization independence and QAPs.",
-          "params": [
-            {
-              "name": "analysisId",
-              "description": "The unique identifier of the analysis document."
-            }
-          ]
-        }
+        "path": "/workspaces/{workspaceId}/sources/{sourceId}",
+        "definition": { "schema": { "$ref": "#/backend/entities/Source" } }
       },
       {
-        "path": "/knowledge/{knowledgeId}",
-        "definition": {
-          "entityName": "Knowledge",
-          "schema": {
-            "$ref": "#/backend/entities/Knowledge"
-          },
-          "description": "Represents a structured knowledge category and its items generated from an analysis. Includes denormalized `workspaceId`, `ownerId`, and `members` map for authorization independence and QAPs.",
-          "params": [
-            {
-              "name": "knowledgeId",
-              "description": "The unique identifier for a knowledge category document."
-            }
-          ]
-        }
+        "path": "/workspaces/{workspaceId}/draft_knowledge/{draftId}",
+        "definition": { "schema": { "$ref": "#/backend/entities/DraftKnowledge" } }
       },
       {
-        "path": "/training/{moduleId}",
-        "definition": {
-          "entityName": "Training",
-          "schema": {
-            "$ref": "#/backend/entities/Training"
-          },
-          "description": "Stores individual training modules generated from an analysis. Includes denormalized `workspaceId`, `ownerId`, and `members` map for authorization independence and QAPs.",
-          "params": [
-            {
-              "name": "moduleId",
-              "description": "The unique identifier for a training module document."
-            }
-          ]
-        }
+        "path": "/workspaces/{workspaceId}/published_knowledge/{publishedId}",
+        "definition": { "schema": { "$ref": "#/backend/entities/PublishedKnowledge" } }
       },
       {
-        "path": "/playbooks/{playbookId}",
-        "definition": {
-          "entityName": "Playbook",
-          "schema": {
-            "$ref": "#/backend/entities/Playbook"
-          },
-          "description": "Stores operational playbooks generated from an analysis. Includes denormalized `workspaceId`, `ownerId`, and `members` map for authorization independence and QAPs.",
-          "params": [
-            {
-              "name": "playbookId",
-              "description": "The unique identifier for a playbook document."
-            }
-          ]
-        }
+        "path": "/workspaces/{workspaceId}/playbooks/{playbookId}",
+        "definition": { "schema": { "$ref": "#/backend/entities/Playbook" } }
       },
       {
-        "path": "/insights/{insightId}",
-        "definition": {
-          "entityName": "Insight",
-          "schema": {
-            "$ref": "#/backend/entities/Insight"
-          },
-          "description": "Stores identified gaps, opportunities, or risks from an analysis. Includes denormalized `workspaceId`, `ownerId`, and `members` map for authorization independence and QAPs.",
-          "params": [
-            {
-              "name": "insightId",
-              "description": "The unique identifier for an insight document."
-            }
-          ]
-        }
+        "path": "/workspaces/{workspaceId}/training_modules/{moduleId}",
+        "definition": { "schema": { "$ref": "#/backend/entities/TrainingModule" } }
       },
       {
-        "path": "/chatHistory/{messageId}",
-        "definition": {
-          "entityName": "ChatMessage",
-          "schema": {
-            "$ref": "#/backend/entities/ChatMessage"
-          },
-          "description": "Stores individual chat messages for the AI assistant. Includes denormalized `workspaceId`, `ownerId`, and `members` map for authorization independence, and `userId` of the sender for message ownership.",
-          "params": [
-            {
-              "name": "messageId",
-              "description": "The unique identifier for a chat message document."
-            }
-          ]
-        }
+        "path": "/workspaces/{workspaceId}/insights/{insightId}",
+        "definition": { "schema": { "$ref": "#/backend/entities/Insight" } }
+      },
+      {
+        "path": "/workspaces/{workspaceId}/sync_proposals/{proposalId}",
+        "definition": { "schema": { "$ref": "#/backend/entities/SyncProposal" } }
+      },
+      {
+        "path": "/workspaces/{workspaceId}/versions/{versionId}",
+        "definition": { "schema": { "$ref": "#/backend/entities/Version" } }
+      },
+      {
+        "path": "/workspaces/{workspaceId}/assistant_threads/{threadId}",
+        "definition": { "schema": { "$ref": "#/backend/entities/AssistantThread" } }
+      },
+      {
+        "path": "/workspaces/{workspaceId}/assistant_threads/{threadId}/messages/{messageId}",
+        "definition": { "schema": { "$ref": "#/backend/entities/AssistantMessage" } }
       }
-    ],
-    "reasoning": "The recommended Firestore structure prioritizes Authorization Independence and Query-Agnostic Permissions (QAPs) by refactoring subcollections into top-level collections and denormalizing authorization context into every document. This approach directly addresses the critical need to avoid hierarchical authorization dependencies and complex `get()` calls in Firestore Security Rules.\n\nSpecifically, each document within the `analyses`, `knowledge`, `training`, `playbooks`, `insights`, and `chatHistory` collections will now explicitly contain the `workspaceId` it belongs to, its `ownerId`, and a `members` map (`{[uid: string]: \"role\"}`).\n\n**Authorization Independence (CRITICAL):** By denormalizing the `ownerId` and `members` map into every document, security rules can directly evaluate access permissions based on the `resource.data` of the document being accessed. For example, a rule for `/analyses/{analysisId}` would check `request.auth.uid == resource.data.ownerId || request.auth.uid in resource.data.members`. This completely eliminates the need for `get(/workspaces/$(workspaceId))` calls, which are non-atomic, expensive, and difficult to debug. This also enables atomic creation/update of documents without needing to read parent permissions first, fulfilling Mandate A.\n\n**QAPs (Query-Agnostic Permissions):** Moving these collections to the top level (e.g., `/analyses` instead of `/workspaces/{workspaceId}/analyses`) and including the `workspaceId` as a field, allows for powerful and secure `list` queries. Clients can now query `/analyses` with `where('workspaceId', '==', someWorkspaceId).where('members.' + request.auth.uid, 'exists', true)`. The rules can then directly validate `resource.data.members[request.auth.uid] == 'owner' || resource.data.members[request.auth.uid] == 'member'`, ensuring that the client only receives documents it is authorized to access. This approach adheres to Mandate B (Structural Segregation) by ensuring that all documents within a given collection share the same authorization fields and, therefore, a consistent security posture, simplifying rule logic and improving query efficiency."
+    ]
   }
 }

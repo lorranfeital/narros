@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -24,6 +25,8 @@ import { useFirestore, useUser } from '@/firebase';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { IngestionState, WorkspaceStatus } from '@/lib/firestore-types';
+
 
 const sectorEnum = z.enum([
   'Agricultura',
@@ -77,8 +80,10 @@ export function CreateWorkspaceForm() {
         ...values,
         ownerId: user.uid,
         members: [user.uid],
-        knowledgeStatus: 'never_published',
+        status: WorkspaceStatus.NEVER_PUBLISHED,
+        ingestionState: IngestionState.IDLE,
         createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
 
       toast({
