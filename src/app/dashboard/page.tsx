@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { VariantProps } from "class-variance-authority";
 import { badgeVariants } from "@/components/ui/badge";
 import { Workspace, WorkspaceStatus } from "@/lib/firestore-types";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 type BadgeVariant = VariantProps<typeof badgeVariants>["variant"];
 
@@ -66,10 +66,15 @@ export default function DashboardPage() {
             
             <div className="mt-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {isLoading && Array.from({ length: 3 }).map((_, i) => (
-                    <Card key={i} className="h-[180px]">
-                        <CardHeader>
-                            <Skeleton className="h-6 w-3/4" />
-                            <Skeleton className="h-4 w-1/2 mt-2" />
+                    <Card key={i} className="h-full min-h-[180px]">
+                        <CardHeader className="flex-grow">
+                            <div className="flex items-start gap-4">
+                                <Skeleton className="h-10 w-10 rounded-full" />
+                                <div className="flex-1 space-y-2">
+                                    <Skeleton className="h-6 w-3/4" />
+                                    <Skeleton className="h-4 w-1/2" />
+                                </div>
+                            </div>
                         </CardHeader>
                         <CardContent>
                              <Skeleton className="h-6 w-1/3" />
@@ -81,12 +86,20 @@ export default function DashboardPage() {
                     <Link href={`/dashboard/${ws.id}`} key={ws.id}>
                         <Card className="h-full min-h-[180px] hover:border-primary/50 transition-colors flex flex-col">
                             <CardHeader className="flex-grow">
-                                <CardTitle className="text-xl font-body font-semibold">{ws.name}</CardTitle>
-                                <CardDescription className="flex items-center gap-2 pt-1">
-                                    <span>{capitalize(ws.type)}</span>
-                                    <span>&middot;</span>
-                                    <span>{ws.sector}</span>
-                                </CardDescription>
+                               <div className="flex items-start gap-4">
+                                    <Avatar className="h-10 w-10 border">
+                                        <AvatarImage src={ws.logoUrl} alt={`${ws.name} logo`} />
+                                        <AvatarFallback>{ws.name?.charAt(0)}</AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1">
+                                        <CardTitle className="text-xl font-body font-semibold">{ws.name}</CardTitle>
+                                        <CardDescription className="flex items-center gap-2 pt-1">
+                                            <span>{capitalize(ws.type)}</span>
+                                            <span>&middot;</span>
+                                            <span>{ws.sector}</span>
+                                        </CardDescription>
+                                    </div>
+                               </div>
                             </CardHeader>
                             <CardContent>
                                 <Badge variant={getStatusBadgeVariant(ws.status)}>
