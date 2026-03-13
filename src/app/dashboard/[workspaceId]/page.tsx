@@ -3,19 +3,20 @@
 import { useFirestore, useDoc, useMemoFirebase, useCollection, useStorage, useUser } from '@/firebase';
 import { doc, collection, query, where, deleteDoc } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, deleteObject } from 'firebase/storage';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Upload, FileText, Trash2, Loader2, Sparkles } from 'lucide-react';
+import { Upload, FileText, Trash2, Loader2, Sparkles, AlertTriangle, ArrowRight } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import React, { useState } from 'react';
-import { IngestionState, ProcessingStatus, Source, Workspace, SourceType } from '@/lib/firestore-types';
+import { IngestionState, ProcessingStatus, Source, Workspace, SourceType, WorkspaceStatus } from '@/lib/firestore-types';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { processContentBatch } from '@/lib/actions/workspace-actions';
+import Link from 'next/link';
 
 // Component to render a single source item
 function SourceItem({ source, onDelete }: { source: Source & {id: string}, onDelete: (sourceId: string, storagePath?: string) => void }) {
@@ -55,19 +56,22 @@ export default function WorkspacePage() {
     const storage = useStorage();
     const { user } = useUser();
     const params = useParams();
+    const router = useRouter();
     const { toast } = useToast();
     const workspaceId = params.workspaceId as string;
 
     const [rawText, setRawText] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [isProcessing, setIsProcessing] = useState(false);
-
+    
     // Workspace data
     const workspaceDocRef = useMemoFirebase(() => {
         if (!firestore || !workspaceId) return null;
         return doc(firestore, 'workspaces', workspaceId);
     }, [firestore, workspaceId]);
     const { data: workspace, isLoading: isWorkspaceLoading } = useDoc<Workspace>(workspaceDocRef);
+
+    // This state is now derived from the workspace doc
+    const isProcessing = workspace?.ingestionState === IngestionState.PROCESSING;
 
     // Sources queue
     const sourcesQuery = useMemoFirebase(() => {
@@ -81,7 +85,7 @@ export default function WorkspacePage() {
     const { data: sources, isLoading: isSourcesLoading } = useCollection<Source>(sourcesQuery);
 
     const handleAddText = async () => {
-        if (!rawText.trim() || !user || !workspaceId) return;
+        if (!rawText.trim() || !user || !workspaceId || !firestore) return;
         setIsSubmitting(true);
         try {
             const sourcesColRef = collection(firestore, `workspaces/${workspaceId}/sources`);
@@ -94,7 +98,7 @@ export default function WorkspacePage() {
                 batchId: batchId,
                 createdAt: new Date(),
                 createdBy: user.uid,
-            } as Omit<Source, 'id' | 'workspaceId' | 'createdAt'>);
+            });
 
             toast({ title: 'Texto adicionado à fila.' });
             setRawText('');
@@ -108,7 +112,7 @@ export default function WorkspacePage() {
     
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (!file || !user || !workspaceId || !storage) return;
+        if (!file || !user || !workspaceId || !storage || !firestore) return;
         setIsSubmitting(true);
         
         const sourcesColRef = collection(firestore, `workspaces/${workspaceId}/sources`);
@@ -123,7 +127,7 @@ export default function WorkspacePage() {
             // 2. Create source doc in Firestore
             const batchId = sources?.[0]?.batchId || doc(collection(firestore, 'temp')).id;
 
-            await addDocumentNonBlocking(doc(sourcesColRef, newSourceDocRef.id), {
+            await addDocumentNonBlocking(newSourceDocRef, {
                 type: SourceType.FILE,
                 sourceName: file.name,
                 mimeType: file.type,
@@ -132,7 +136,7 @@ export default function WorkspacePage() {
                 batchId: batchId,
                 createdAt: new Date(),
                 createdBy: user.uid,
-            } as Omit<Source, 'id' | 'workspaceId' | 'createdAt'>);
+            });
             
             toast({ title: 'Arquivo adicionado à fila.' });
         } catch (error) {
@@ -165,7 +169,7 @@ export default function WorkspacePage() {
 
     const handleFinalizeBatch = async () => {
         if (!workspace || sources?.length === 0 || !workspaceDocRef || !sources?.[0]?.batchId) return;
-        setIsProcessing(true);
+        
         toast({
             title: "Processamento iniciado!",
             description: "A IA está analisando seu conteúdo. Isso pode levar alguns minutos."
@@ -177,17 +181,17 @@ export default function WorkspacePage() {
                 title: "Rascunho gerado com sucesso!",
                 description: "Seu conteúdo foi processado e um novo rascunho está pronto para revisão."
             });
+            // Redirect to review page after successful processing
+            router.push(`/dashboard/${workspaceId}/review`);
         } catch (error) {
              console.error("Erro ao processar o lote:", error);
              toast({ variant: 'destructive', title: 'Erro ao processar conteúdo.', description: (error as Error).message });
-        } finally {
-            setIsProcessing(false);
         }
     }
     
     const isLoading = isWorkspaceLoading || isSourcesLoading;
     const isActionDisabled = isSubmitting || isProcessing;
-
+    
     if (isLoading) {
         return (
             <div className="p-12 space-y-10">
@@ -223,6 +227,21 @@ export default function WorkspacePage() {
                     Adicione conteúdo bruto à fila para que a IA possa organizá-lo.
                 </p>
             </div>
+
+            {workspace.status === WorkspaceStatus.DRAFT_READY && (
+                <Alert className="border-amber-500/50 text-amber-600 dark:text-amber-400 [&>svg]:text-amber-500">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle className="font-bold text-amber-700 dark:text-amber-300">Rascunho pronto para revisão</AlertTitle>
+                    <AlertDescription>
+                        Um novo rascunho foi gerado a partir do último lote de conteúdo.
+                        <Button variant="link" asChild className="p-0 pl-2 h-auto text-amber-600 dark:text-amber-400">
+                            <Link href={`/dashboard/${workspaceId}/review`}>
+                                Revisar agora <ArrowRight className="ml-2 h-4 w-4" />
+                            </Link>
+                        </Button>
+                    </AlertDescription>
+                </Alert>
+            )}
             
             <Card>
                 <CardHeader>
