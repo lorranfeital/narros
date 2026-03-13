@@ -53,9 +53,9 @@ service cloud.firestore {
     match /workspaces/{workspaceId} {
       // Allow creation if the user is the owner.
       allow create: if isOwner(request.resource.data.ownerId);
-      // Allow read for workspace members.
-      allow get: if isWorkspaceMember(workspaceId);
-      // Allow update for members or server processes, but delete only for the owner.
+      // Allow read for workspace members or server processes.
+      allow get: if isWorkspaceMember(workspaceId) || isServerProcess();
+      // Allow update for members or server processes.
       allow update: if isWorkspaceMember(workspaceId) || isServerProcess();
       allow delete: if isWorkspaceOwner(workspaceId);
       // Allow list for any signed-in user, client must filter.
@@ -65,10 +65,11 @@ service cloud.firestore {
       match /sources/{sourceId} {
         // Any workspace member can create a source.
         allow create: if isWorkspaceMember(workspaceId);
-        // Any workspace member can read sources.
-        allow read, list: if isWorkspaceMember(workspaceId);
-        // Allow members or server to update status, but only owner to delete.
+        // Members and server processes can read sources.
+        allow read, list: if isWorkspaceMember(workspaceId) || isServerProcess();
+        // Allow members or server to update status.
         allow update: if isWorkspaceMember(workspaceId) || isServerProcess();
+        // Only owner can delete sources.
         allow delete: if isWorkspaceOwner(workspaceId);
       }
 
@@ -78,24 +79,26 @@ service cloud.firestore {
         allow read, list, update, delete: if isWorkspaceMember(workspaceId) || isServerProcess();
       }
       match /published_knowledge/{publishedId} {
-        // Members can read published knowledge.
-        allow read, list: if isWorkspaceMember(workspaceId);
+        // Members and server can read published knowledge.
+        allow read, list: if isWorkspaceMember(workspaceId) || isServerProcess();
         // Only owners or server can publish/update/delete.
         allow create, update, delete: if isWorkspaceOwner(workspaceId) || isServerProcess();
       }
 
       // --- Playbooks Subcollection ---
       match /playbooks/{playbookId} {
-         // Server can create/update, members can read/update/delete
+        // Server creates/updates, members can read, server assistant can read
         allow create, update: if isServerProcess();
-        allow read, list, update, delete: if isWorkspaceMember(workspaceId);
+        allow read, list: if isWorkspaceMember(workspaceId) || isServerProcess();
+        allow delete: if isWorkspaceMember(workspaceId);
       }
 
       // --- Training Modules Subcollection ---
       match /training_modules/{moduleId} {
-        // Server can create/update, members can read/update/delete
+        // Server creates/updates, members can read, server assistant can read
         allow create, update: if isServerProcess();
-        allow read, list, update, delete: if isWorkspaceMember(workspaceId);
+        allow read, list: if isWorkspaceMember(workspaceId) || isServerProcess();
+        allow delete: if isWorkspaceMember(workspaceId);
       }
 
       // --- Insights Subcollection ---
@@ -107,10 +110,9 @@ service cloud.firestore {
 
       // --- Sync Proposals Subcollection ---
       match /sync_proposals/{proposalId} {
-        // Server creates proposals
+        // Server creates proposals, members and server can act on them.
         allow create: if isServerProcess();
-        // Members can read and act on them.
-        allow read, list, update, delete: if isWorkspaceMember(workspaceId);
+        allow read, list, update, delete: if isWorkspaceMember(workspaceId) || isServerProcess();
       }
 
       // --- Versions Subcollection ---
