@@ -1,16 +1,17 @@
 'use client';
 
-import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
+import { useUser, useFirestore, useMemoFirebase, useStorage } from '@/firebase';
 import { useDoc } from '@/firebase/firestore/use-doc';
 import { collection, doc, query, updateDoc, where } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import React from 'react';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -18,6 +19,9 @@ import { updateProfile } from 'firebase/auth';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { Label } from '@/components/ui/label';
 
 const profileFormSchema = z.object({
   name: z.string().min(2, { message: 'O nome deve ter pelo menos 2 caracteres.' }),
@@ -59,7 +63,11 @@ type WorkspaceFormValues = z.infer<typeof workspaceFormSchema>;
 export default function SettingsPage() {
   const { user } = useUser();
   const firestore = useFirestore();
+  const storage = useStorage();
   const { toast } = useToast();
+
+  const [logoFile, setLogoFile] = React.useState<File | null>(null);
+  const [isUploading, setIsUploading] = React.useState(false);
 
   // User Profile Form
   const userDocRef = useMemoFirebase(() => {
@@ -144,6 +152,37 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleLogoUpload() {
+    if (!logoFile || !currentWorkspace || !storage) return;
+
+    setIsUploading(true);
+    const logoStoragePath = `workspaces/${currentWorkspace.id}/logo`;
+    const logoStorageReference = storageRef(storage, logoStoragePath);
+    const workspaceDocRef = doc(firestore, 'workspaces', currentWorkspace.id);
+
+    try {
+      await uploadBytes(logoStorageReference, logoFile);
+      const downloadURL = await getDownloadURL(logoStorageReference);
+      await updateDoc(workspaceDocRef, { logoUrl: downloadURL });
+
+      toast({
+        title: 'Logo atualizado!',
+        description: 'O novo logo do seu workspace foi salvo com sucesso.',
+      });
+      setLogoFile(null);
+    } catch (error) {
+      console.error('Error uploading logo:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Uh oh! Algo deu errado.',
+        description: 'Não foi possível enviar o logo. Verifique as permissões de armazenamento.',
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
+
   return (
     <div className="p-12">
       <h1 className="text-4xl font-bold tracking-tight">Configurações</h1>
@@ -224,6 +263,7 @@ export default function SettingsPage() {
                   <Skeleton className="h-10 w-32" />
                 </div>
               ) : currentWorkspace ? (
+                <>
                 <Form {...workspaceForm}>
                   <form onSubmit={workspaceForm.handleSubmit(onWorkspaceSubmit)} className="space-y-8">
                     <FormField
@@ -293,6 +333,27 @@ export default function SettingsPage() {
                     </Button>
                   </form>
                 </Form>
+                <Separator className="my-8" />
+                <div className="space-y-4">
+                    <h3 className="font-medium leading-none tracking-tight">Logo do Workspace</h3>
+                    <div className="flex items-start gap-6 pt-2">
+                        <Avatar className="h-16 w-16">
+                            <AvatarImage src={currentWorkspace?.logoUrl} />
+                            <AvatarFallback>{currentWorkspace?.name?.charAt(0) ?? 'W'}</AvatarFallback>
+                        </Avatar>
+                        <div className="grid flex-1 gap-2">
+                            <Label htmlFor="logo-upload">Arquivo do logo</Label>
+                            <Input id="logo-upload" type="file" accept="image/png, image/jpeg, image/gif" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} />
+                            <FormDescription>Selecione uma imagem para ser o logo do seu workspace.</FormDescription>
+                        </div>
+                    </div>
+                     {logoFile && (
+                        <Button onClick={handleLogoUpload} disabled={isUploading} className="mt-2">
+                            {isUploading ? 'Enviando...' : 'Salvar logo'}
+                        </Button>
+                    )}
+                </div>
+                </>
               ) : (
                 <p className="text-sm text-muted-foreground">
                   Você ainda não possui um workspace. Crie um no seu dashboard para poder gerenciá-lo aqui.
@@ -305,5 +366,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-    
