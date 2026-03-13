@@ -12,29 +12,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Memoize the query to prevent re-renders
   const workspacesQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
-    // Query for workspaces where the user is a member.
-    // This requires a Firestore index on the 'members' array.
     return query(collection(firestore, 'workspaces'), where('members', 'array-contains', user.uid));
   }, [user, firestore]);
 
   const { data: workspaces, isLoading: isWorkspacesLoading, error: workspacesError } = useCollection(workspacesQuery);
 
   useEffect(() => {
-    console.log('[DashboardLayout] Effect triggered. State:', {
-        isUserLoading,
-        user: user ? { uid: user.uid, email: user.email } : null,
-        isWorkspacesLoading,
-        workspaces,
-        workspacesError,
-        pathname,
-    });
-
     // If auth is done and there's no user, redirect to login
     if (!isUserLoading && !user) {
-      console.log('[DashboardLayout] No user found, redirecting to /login');
       router.push('/login');
       return;
     }
@@ -43,13 +30,18 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         console.error('[DashboardLayout] Error fetching workspaces:', workspacesError);
     }
 
-    // If auth and workspace checks are done, and user has no workspaces, redirect to create one
+    // Logic to handle redirects based on workspace existence
     if (!isUserLoading && user && !isWorkspacesLoading) {
-      if ((!workspaces || workspaces.length === 0) && pathname !== '/dashboard/new-workspace') {
-        console.log('[DashboardLayout] No workspaces found, redirecting to /dashboard/new-workspace');
+      const hasWorkspaces = workspaces && workspaces.length > 0;
+      const isOnNewWorkspacePage = pathname === '/dashboard/new-workspace';
+
+      // If user has no workspaces and is not on the creation page, redirect them.
+      if (!hasWorkspaces && !isOnNewWorkspacePage) {
         router.push('/dashboard/new-workspace');
-      } else if (workspaces && workspaces.length > 0) {
-        console.log(`[DashboardLayout] Found ${workspaces.length} workspace(s). Not redirecting.`);
+      } 
+      // If user has workspaces but is stuck on the creation page, redirect to dashboard.
+      else if (hasWorkspaces && isOnNewWorkspacePage) {
+        router.push('/dashboard');
       }
     }
   }, [user, isUserLoading, workspaces, isWorkspacesLoading, workspacesError, router, pathname]);
@@ -71,9 +63,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     return null;
   }
   
-  // If we are on the new workspace page, render it without the sidebar layout.
+  // If we are on the new workspace page (and likely being redirected), show children (which is the loading page) or a loader.
   if (isNewWorkspacePage) {
-    return <>{children}</>;
+    // This allows the new-workspace page to be rendered while the redirect logic runs.
+     return <>{children}</>;
   }
   
   // If there was an error loading workspaces, show an error message
