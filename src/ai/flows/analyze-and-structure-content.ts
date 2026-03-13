@@ -31,7 +31,7 @@ const BrandKitSchema = z.object({
     typography: z.array(z.object({
         name: z.string().describe("Uso da fonte (ex: 'Títulos', 'Corpo de texto')"),
         family: z.string().describe("Nome da família da fonte (ex: 'Montserrat')"),
-        weight: z.string().optional().describe("Peso da fonte (ex: '700', 'Bold')"),
+        weight: z.string().optional().describe("O peso da fonte (e.g., '400', '700', 'Bold'). Extraia apenas UM peso por item."),
         example: z.string().optional().describe("Uma frase de exemplo curta (máx. 5 palavras) para demonstrar a fonte em uso.")
     })).optional().describe("Regras de tipografia."),
     toneOfVoice: z.array(z.string()).optional().describe("Lista de adjetivos ou frases que descrevem o tom de voz."),

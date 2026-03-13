@@ -1,6 +1,7 @@
 
 'use client';
 
+import React from 'react';
 import { useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, collection, query, where, orderBy } from 'firebase/firestore';
 import { useParams } from 'next/navigation';
@@ -19,6 +20,34 @@ import { cn } from '@/lib/utils';
 
 
 function BrandKitDisplay({ workspace, brandKit, isLoading }: { workspace: Workspace | null, brandKit: BrandKit | null, isLoading: boolean }) {
+    React.useEffect(() => {
+        if (!brandKit?.typography) return;
+
+        // Use a Set to avoid requesting the same font family multiple times
+        const fontFamilies = new Set(brandKit.typography.map(t => t.family.replace(/ /g, '+')));
+        
+        if (fontFamilies.size === 0) return;
+
+        const queryString = Array.from(fontFamilies).map(family => `family=${family}`).join('&');
+        const linkId = 'dynamic-google-fonts-stylesheet';
+        const newHref = `https://fonts.googleapis.com/css2?${queryString}&display=swap`;
+        
+        let link = document.getElementById(linkId) as HTMLLinkElement | null;
+        
+        // If the link doesn't exist, create it. If it exists, update its href.
+        if (link) {
+            if (link.href !== newHref) {
+                link.href = newHref;
+            }
+        } else {
+            link = document.createElement('link');
+            link.id = linkId;
+            link.rel = 'stylesheet';
+            link.href = newHref;
+            document.head.appendChild(link);
+        }
+    }, [brandKit]);
+
     if (isLoading) {
         return (
             <Card>
