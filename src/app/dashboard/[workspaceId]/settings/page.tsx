@@ -2,21 +2,21 @@
 
 import { useUser, useFirestore, useMemoFirebase, useStorage } from '@/firebase';
 import { useDoc } from '@/firebase/firestore/use-doc';
-import { collection, doc, query, updateDoc, where } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import React from 'react';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { useParams } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { updateProfile } from 'firebase/auth';
-import { useCollection } from '@/firebase/firestore/use-collection';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
@@ -65,6 +65,8 @@ export default function SettingsPage() {
   const firestore = useFirestore();
   const storage = useStorage();
   const { toast } = useToast();
+  const params = useParams();
+  const workspaceId = params.workspaceId as string;
 
   const [logoFile, setLogoFile] = React.useState<File | null>(null);
   const [isUploading, setIsUploading] = React.useState(false);
@@ -111,12 +113,12 @@ export default function SettingsPage() {
   }
 
   // Workspace Form
-  const workspacesQuery = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
-    return query(collection(firestore, 'workspaces'), where('ownerId', '==', user.uid));
-  }, [user, firestore]);
-  const { data: workspaces, isLoading: isWorkspacesLoading } = useCollection<any>(workspacesQuery);
-  const currentWorkspace = workspaces?.[0];
+  const workspaceDocRef = useMemoFirebase(() => {
+    if (!firestore || !workspaceId) return null;
+    return doc(firestore, 'workspaces', workspaceId);
+  }, [firestore, workspaceId]);
+  const { data: currentWorkspace, isLoading: isWorkspacesLoading } = useDoc<any>(workspaceDocRef);
+
 
   const workspaceForm = useForm<WorkspaceFormValues>({
     resolver: zodResolver(workspaceFormSchema),
@@ -134,8 +136,7 @@ export default function SettingsPage() {
   }, [currentWorkspace, workspaceForm]);
 
   async function onWorkspaceSubmit(data: WorkspaceFormValues) {
-    if (!firestore || !currentWorkspace) return;
-    const workspaceDocRef = doc(firestore, 'workspaces', currentWorkspace.id);
+    if (!firestore || !workspaceDocRef) return;
     try {
       await updateDoc(workspaceDocRef, data);
       toast({
@@ -153,12 +154,11 @@ export default function SettingsPage() {
   }
 
   async function handleLogoUpload() {
-    if (!logoFile || !currentWorkspace || !storage || !user) return;
+    if (!logoFile || !currentWorkspace || !storage || !user || !workspaceDocRef) return;
 
     setIsUploading(true);
     const logoStoragePath = `workspaces/${currentWorkspace.id}/logo`;
     const logoStorageReference = storageRef(storage, logoStoragePath);
-    const workspaceDocRef = doc(firestore, 'workspaces', currentWorkspace.id);
 
     try {
       const metadata = {
@@ -291,7 +291,7 @@ export default function SettingsPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Tipo</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Selecione o tipo de negócio" />
@@ -362,7 +362,7 @@ export default function SettingsPage() {
                 </>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Você ainda não possui um workspace. Crie um no seu dashboard para poder gerenciá-lo aqui.
+                  Workspace não encontrado ou você não tem permissão para vê-lo.
                 </p>
               )}
             </CardContent>

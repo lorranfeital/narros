@@ -13,17 +13,11 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuGroup } from "@/components/ui/dropdown-menu";
 import { useAuth, useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from "@/firebase";
 import { signOut } from "firebase/auth";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, usePathname } from "next/navigation";
 import { collection, doc, query, where } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import React from "react";
-
-const mainNavItems = [
-    { icon: Search, label: "Buscar", href: "#" },
-    { icon: Home, label: "Início", href: "/dashboard" },
-    { icon: Settings, label: "Configurações", href: "/dashboard/settings" },
-]
 
 export function Sidebar({ className }: { className?: string }) {
   const auth = useAuth();
@@ -31,6 +25,7 @@ export function Sidebar({ className }: { className?: string }) {
   const { user } = useUser();
   const firestore = useFirestore();
   const params = useParams();
+  const pathname = usePathname();
   const workspaceId = params.workspaceId as string;
 
   const handleLogout = () => {
@@ -59,6 +54,14 @@ export function Sidebar({ className }: { className?: string }) {
     }
     return workspaces[0];
   }, [workspaces, workspaceId]);
+
+  // This calculates the current page relative to the workspace root
+  // e.g. /dashboard/ws1/settings -> /settings
+  // e.g. /dashboard/ws1 -> ""
+  const subPath = React.useMemo(() => {
+    if (!workspaceId || !pathname.startsWith(`/dashboard/${workspaceId}`)) return '';
+    return pathname.substring(`/dashboard/${workspaceId}`.length);
+  }, [pathname, workspaceId]);
 
   const getPlanName = (plan: string | undefined) => {
     if (!plan) return '';
@@ -106,7 +109,7 @@ export function Sidebar({ className }: { className?: string }) {
                         )}
                         {workspaces?.map((ws) => (
                             <DropdownMenuItem key={ws.id} asChild>
-                                <Link href={`/dashboard/${ws.id}`}>
+                                <Link href={`/dashboard/${ws.id}${subPath}`}>
                                     <div className="flex items-center gap-2 w-full">
                                         <Avatar className="h-6 w-6">
                                             <AvatarImage src={ws.logoUrl} />
@@ -139,7 +142,7 @@ export function Sidebar({ className }: { className?: string }) {
                         </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                        <Link href="/dashboard/settings">
+                         <Link href={currentWorkspace?.id ? `/dashboard/${currentWorkspace.id}/settings` : '#'}>
                             <Settings className="mr-2 h-4 w-4" />
                             <span>Configurações</span>
                         </Link>
@@ -152,16 +155,33 @@ export function Sidebar({ className }: { className?: string }) {
             </DropdownMenu>
 
             <nav className="flex flex-col gap-0.5">
-                {mainNavItems.map((item) => (
-                    <Link
-                        key={item.label}
-                        href={item.href}
-                        className="flex items-center gap-3 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                    >
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.label}</span>
-                    </Link>
-                ))}
+                <Link
+                    href="/dashboard"
+                    className="flex items-center gap-3 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                >
+                    <Home className="h-4 w-4" />
+                    <span>Início</span>
+                </Link>
+                {/* Search is disabled for now */}
+                <span
+                    className="flex items-center gap-3 rounded-md px-2 py-1.5 text-sm text-muted-foreground opacity-50"
+                >
+                    <Search className="h-4 w-4" />
+                    <span>Buscar</span>
+                </span>
+
+                <Link
+                    href={currentWorkspace ? `/dashboard/${currentWorkspace.id}/settings` : '#'}
+                    className={cn(
+                        "flex items-center gap-3 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                        !currentWorkspace && "pointer-events-none opacity-50"
+                    )}
+                    aria-disabled={!currentWorkspace}
+                    tabIndex={!currentWorkspace ? -1 : undefined}
+                >
+                    <Settings className="h-4 w-4" />
+                    <span>Configurações</span>
+                </Link>
             </nav>
         </div>
 
