@@ -76,7 +76,7 @@ export default function DashboardPage() {
                 ))}
 
                 {!isLoading && workspaces?.map((ws) => (
-                    <Link href={'/dashboard'} key={ws.id}>
+                    <Link href={`/dashboard/${ws.id}`} key={ws.id}>
                         <Card className="h-full min-h-[180px] hover:border-primary/50 transition-colors flex flex-col">
                             <CardHeader className="flex-grow">
                                 <CardTitle className="text-xl font-body font-semibold">{ws.name}</CardTitle>
