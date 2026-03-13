@@ -15,10 +15,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   // Memoize the query to prevent re-renders
   const workspacesQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
-    // Query for workspaces where the user is the owner.
-    // This is a temporary fix to unblock the user from the redirect loop.
-    // A more robust solution for querying member workspaces will be implemented later.
-    return query(collection(firestore, 'workspaces'), where('ownerId', '==', user.uid));
+    // Query for workspaces where the user is a member.
+    // This requires a Firestore index on the 'members' array.
+    return query(collection(firestore, 'workspaces'), where('members', 'array-contains', user.uid));
   }, [user, firestore]);
 
   const { data: workspaces, isLoading: isWorkspacesLoading } = useCollection(workspacesQuery);
