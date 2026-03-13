@@ -1,7 +1,7 @@
 'use client';
 
 import { useFirestore, useDoc, useMemoFirebase, useCollection, useStorage, useUser } from '@/firebase';
-import { doc, collection, query, where, deleteDoc } from 'firebase/firestore';
+import { doc, collection, query, where, deleteDoc, getDoc } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, deleteObject } from 'firebase/storage';
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -308,7 +308,7 @@ export default function WorkspacePage() {
             </Card>
 
             <div>
-                <h2 className="text-2xl font-headline font-semibold">Fila de Ingestão</h2>
+                <h2 className="text-2xl font-headline font-semibold">Fila de Conteúdo</h2>
                 <p className="text-muted-foreground mt-1">Conteúdo aguardando processamento.</p>
 
                 <div className="mt-6 space-y-4">
@@ -348,5 +348,3 @@ export default function WorkspacePage() {
         </div>
     );
 }
-
-    

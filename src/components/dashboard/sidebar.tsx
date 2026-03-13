@@ -189,7 +189,7 @@ export function Sidebar({ className }: { className?: string }) {
                     )}
                 >
                     <Upload className="h-4 w-4" />
-                    <span>Ingestão</span>
+                    <span>Conteúdo</span>
                 </Link>
                 
                  <Link
@@ -260,5 +260,3 @@ export function Sidebar({ className }: { className?: string }) {
     </aside>
   );
 }
-
-    
