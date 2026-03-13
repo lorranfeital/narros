@@ -139,6 +139,8 @@ service cloud.firestore {
         allow create: if isWorkspaceMember(workspaceId);
         // Members can read/list their own threads. Client must enforce this.
         allow read, list: if isWorkspaceMember(workspaceId);
+        // Any member can update a thread (e.g., its title).
+        allow update: if isWorkspaceMember(workspaceId);
         // Only the thread creator or workspace owner can delete.
         allow delete: if isWorkspaceMember(workspaceId) && (isOwner(resource.data.createdBy) || isWorkspaceOwner(workspaceId));
 
