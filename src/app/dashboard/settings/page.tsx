@@ -153,7 +153,7 @@ export default function SettingsPage() {
   }
 
   async function handleLogoUpload() {
-    if (!logoFile || !currentWorkspace || !storage) return;
+    if (!logoFile || !currentWorkspace || !storage || !user) return;
 
     setIsUploading(true);
     const logoStoragePath = `workspaces/${currentWorkspace.id}/logo`;
@@ -161,7 +161,13 @@ export default function SettingsPage() {
     const workspaceDocRef = doc(firestore, 'workspaces', currentWorkspace.id);
 
     try {
-      await uploadBytes(logoStorageReference, logoFile);
+      const metadata = {
+        customMetadata: {
+          'ownerId': user.uid,
+        },
+      };
+
+      await uploadBytes(logoStorageReference, logoFile, metadata);
       const downloadURL = await getDownloadURL(logoStorageReference);
       await updateDoc(workspaceDocRef, { logoUrl: downloadURL });
 
@@ -175,7 +181,7 @@ export default function SettingsPage() {
       toast({
         variant: 'destructive',
         title: 'Uh oh! Algo deu errado.',
-        description: 'Não foi possível enviar o logo. Verifique as permissões de armazenamento.',
+        description: 'Não foi possível enviar o logo. Verifique as permissões de armazenamento (CORS).',
       });
     } finally {
       setIsUploading(false);
