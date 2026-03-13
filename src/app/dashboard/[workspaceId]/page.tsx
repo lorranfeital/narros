@@ -1,8 +1,8 @@
 'use client';
 
 import { useFirestore, useDoc, useMemoFirebase, useCollection, useStorage, useUser } from '@/firebase';
-import { doc, collection, addDoc, serverTimestamp, query, where, writeBatch, deleteDoc } from 'firebase/firestore';
-import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { doc, collection, query, where, deleteDoc } from 'firebase/firestore';
+import { ref as storageRef, uploadBytes, deleteObject } from 'firebase/storage';
 import { useParams } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,6 +14,8 @@ import { IngestionState, ProcessingStatus, Source, Workspace, SourceType } from 
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { processContentBatch } from '@/lib/actions/workspace-actions';
 
 // Component to render a single source item
 function SourceItem({ source, onDelete }: { source: Source & {id: string}, onDelete: (sourceId: string, storagePath?: string) => void }) {
@@ -58,6 +60,7 @@ export default function WorkspacePage() {
 
     const [rawText, setRawText] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
 
     // Workspace data
     const workspaceDocRef = useMemoFirebase(() => {
@@ -78,27 +81,20 @@ export default function WorkspacePage() {
     const { data: sources, isLoading: isSourcesLoading } = useCollection<Source>(sourcesQuery);
 
     const handleAddText = async () => {
-        if (!rawText.trim() || !user || !workspace || !workspaceDocRef) return;
+        if (!rawText.trim() || !user || !workspaceId) return;
         setIsSubmitting(true);
         try {
-            const batch = writeBatch(firestore);
+            const sourcesColRef = collection(firestore, `workspaces/${workspaceId}/sources`);
             const batchId = sources?.[0]?.batchId || doc(collection(firestore, 'temp')).id;
             
-            const newSourceRef = doc(collection(firestore, `workspaces/${workspaceId}/sources`));
-            batch.set(newSourceRef, {
+            await addDocumentNonBlocking(sourcesColRef, {
                 type: SourceType.TEXT,
                 rawText: rawText.trim(),
                 processingStatus: ProcessingStatus.PENDING,
                 batchId: batchId,
-                createdAt: serverTimestamp(),
+                createdAt: new Date(),
                 createdBy: user.uid,
-            } as Omit<Source, 'id' | 'workspaceId'>);
-
-            if (workspace.ingestionState !== IngestionState.INGESTING) {
-                batch.update(workspaceDocRef, { ingestionState: IngestionState.INGESTING });
-            }
-
-            await batch.commit();
+            } as Omit<Source, 'id' | 'workspaceId' | 'createdAt'>);
 
             toast({ title: 'Texto adicionado à fila.' });
             setRawText('');
@@ -112,38 +108,32 @@ export default function WorkspacePage() {
     
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (!file || !user || !workspace || !workspaceDocRef) return;
+        if (!file || !user || !workspaceId || !storage) return;
         setIsSubmitting(true);
         
-        const newSourceRef = doc(collection(firestore, `workspaces/${workspaceId}/sources`));
-        const filePath = `workspaces/${workspaceId}/sources/${newSourceRef.id}/${file.name}`;
+        const sourcesColRef = collection(firestore, `workspaces/${workspaceId}/sources`);
+        const newSourceDocRef = doc(sourcesColRef); // Create a new doc ref to get the ID
+        const filePath = `workspaces/${workspaceId}/sources/${newSourceDocRef.id}/${file.name}`;
         const fileStorageRef = storageRef(storage, filePath);
 
         try {
             // 1. Upload file to Storage
             await uploadBytes(fileStorageRef, file);
 
-            // 2. Create source doc in Firestore and update workspace state in a batch
-            const batch = writeBatch(firestore);
+            // 2. Create source doc in Firestore
             const batchId = sources?.[0]?.batchId || doc(collection(firestore, 'temp')).id;
 
-            batch.set(newSourceRef, {
+            await addDocumentNonBlocking(doc(sourcesColRef, newSourceDocRef.id), {
                 type: SourceType.FILE,
                 sourceName: file.name,
                 mimeType: file.type,
                 storagePath: filePath,
                 processingStatus: ProcessingStatus.PENDING,
                 batchId: batchId,
-                createdAt: serverTimestamp(),
+                createdAt: new Date(),
                 createdBy: user.uid,
-            } as Omit<Source, 'id' | 'workspaceId'>);
+            } as Omit<Source, 'id' | 'workspaceId' | 'createdAt'>);
             
-            if (workspace.ingestionState !== IngestionState.INGESTING) {
-                 batch.update(workspaceDocRef, { ingestionState: IngestionState.INGESTING });
-            }
-            
-            await batch.commit();
-
             toast({ title: 'Arquivo adicionado à fila.' });
         } catch (error) {
             console.error(error);
@@ -155,13 +145,13 @@ export default function WorkspacePage() {
     }
 
     const handleDeleteSource = async (sourceId: string, storagePath?: string) => {
-        if (!workspaceId) return;
+        if (!workspaceId || !firestore) return;
         try {
             // Delete Firestore document
             await deleteDoc(doc(firestore, `workspaces/${workspaceId}/sources`, sourceId));
             
             // If there's a file, delete it from Storage
-            if (storagePath) {
+            if (storagePath && storage) {
                 const fileRef = storageRef(storage, storagePath);
                 await deleteObject(fileRef);
             }
@@ -174,41 +164,29 @@ export default function WorkspacePage() {
     };
 
     const handleFinalizeBatch = async () => {
-        if (!workspace || sources?.length === 0 || !workspaceDocRef) return;
-        setIsSubmitting(true);
-
-        // This is where the call to the Genkit flow will happen.
-        // For now, we'll just update the states.
+        if (!workspace || sources?.length === 0 || !workspaceDocRef || !sources?.[0]?.batchId) return;
+        setIsProcessing(true);
+        toast({
+            title: "Processamento iniciado!",
+            description: "A IA está analisando seu conteúdo. Isso pode levar alguns minutos."
+        });
+        
         try {
-            const batch = writeBatch(firestore);
-            
-            // Update workspace state
-            batch.update(workspaceDocRef, { 
-                ingestionState: IngestionState.PROCESSING,
-                lastProcessedAt: serverTimestamp()
-             });
-
-            // Update status of all sources in the batch
-            sources?.forEach(source => {
-                const sourceRef = doc(firestore, `workspaces/${workspaceId}/sources`, source.id);
-                batch.update(sourceRef, { processingStatus: ProcessingStatus.PROCESSING });
-            });
-            
-            await batch.commit();
-            
+            await processContentBatch(workspaceId, sources[0].batchId);
             toast({
-                title: "Processamento iniciado!",
-                description: "A IA está analisando seu conteúdo. Você será notificado quando terminar."
+                title: "Rascunho gerado com sucesso!",
+                description: "Seu conteúdo foi processado e um novo rascunho está pronto para revisão."
             });
         } catch (error) {
-             console.error(error);
-             toast({ variant: 'destructive', title: 'Erro ao iniciar processamento.' });
+             console.error("Erro ao processar o lote:", error);
+             toast({ variant: 'destructive', title: 'Erro ao processar conteúdo.', description: (error as Error).message });
         } finally {
-            setIsSubmitting(false);
+            setIsProcessing(false);
         }
     }
     
     const isLoading = isWorkspaceLoading || isSourcesLoading;
+    const isActionDisabled = isSubmitting || isProcessing;
 
     if (isLoading) {
         return (
@@ -259,10 +237,10 @@ export default function WorkspacePage() {
                         className="min-h-[150px] text-base"
                         value={rawText}
                         onChange={(e) => setRawText(e.target.value)}
-                        disabled={isSubmitting}
+                        disabled={isActionDisabled}
                     />
                     <div className="flex items-center gap-4">
-                         <Button onClick={handleAddText} disabled={isSubmitting || !rawText.trim()}>
+                         <Button onClick={handleAddText} disabled={isActionDisabled || !rawText.trim()}>
                             {isSubmitting ? <Loader2 className="mr-2 animate-spin" /> : <FileText className="mr-2" />}
                             Adicionar texto
                          </Button>
@@ -275,10 +253,10 @@ export default function WorkspacePage() {
                         </div>
 
                          <Button variant="outline" asChild>
-                            <label htmlFor="file-upload" className="cursor-pointer">
+                            <label htmlFor="file-upload" className={`cursor-pointer ${isActionDisabled ? 'pointer-events-none opacity-50' : ''}`}>
                                 <Upload className="mr-2 h-4 w-4" />
                                 Fazer upload de arquivo
-                                <input id="file-upload" type="file" className="sr-only" onChange={handleFileChange} disabled={isSubmitting} />
+                                <input id="file-upload" type="file" className="sr-only" onChange={handleFileChange} disabled={isActionDisabled} />
                             </label>
                         </Button>
                     </div>
@@ -315,9 +293,9 @@ export default function WorkspacePage() {
                         </CardDescription>
                     </CardHeader>
                     <CardFooter>
-                         <Button size="lg" onClick={handleFinalizeBatch} disabled={isSubmitting}>
-                            {isSubmitting ? <Loader2 className="mr-2 animate-spin" /> : <Sparkles className="mr-2" />}
-                            Finalizar e gerar rascunho
+                         <Button size="lg" onClick={handleFinalizeBatch} disabled={isActionDisabled}>
+                            {isProcessing ? <Loader2 className="mr-2 animate-spin" /> : <Sparkles className="mr-2" />}
+                            {isProcessing ? 'Processando...' : 'Finalizar e gerar rascunho'}
                         </Button>
                     </CardFooter>
                 </Card>

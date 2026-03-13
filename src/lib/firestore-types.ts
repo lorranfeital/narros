@@ -35,7 +35,7 @@ export enum ProcessingStatus {
 export enum InsightType {
   GAP = 'gap',
   RISK = 'risk',
-  OPPORTUNITY = 'opportunity',
+  OPPORTUNITY = 'oportunidade',
 }
 
 export enum SyncProposalType {
@@ -101,13 +101,16 @@ export interface Source {
   notes?: string;
 }
 
+export interface KnowledgeItem {
+    titulo: string;
+    descricao: string;
+    sourceRefs?: string[];
+}
+
 export interface KnowledgeCategory {
     categoria: string;
     icone: string;
-    itens: Array<{
-        titulo: string;
-        descricao: string;
-    }>;
+    itens: KnowledgeItem[];
 }
 
 export interface DraftKnowledge {
@@ -150,7 +153,6 @@ export interface Playbook {
 export interface TrainingModule {
   id: string;
   workspaceId: string;
-  publishedVersion: boolean;
   modulo: number;
   titulo: string;
   duracao: string;
