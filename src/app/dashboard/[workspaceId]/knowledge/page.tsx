@@ -15,6 +15,7 @@ import { PublishedKnowledge, Playbook, TrainingModule, Insight, Version, Workspa
 import { BookOpen, Lightbulb, Milestone, Palette, Type, Globe } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import Image from 'next/image';
+import { cn } from '@/lib/utils';
 
 
 function BrandKitDisplay({ workspace, brandKit, isLoading }: { workspace: Workspace | null, brandKit: BrandKit | null, isLoading: boolean }) {
@@ -34,14 +35,15 @@ function BrandKitDisplay({ workspace, brandKit, isLoading }: { workspace: Worksp
         )
     }
 
-    const allLogos = [
-        ...(workspace?.logoUrl ? [{ name: 'Logo Principal', url: workspace.logoUrl }] : []),
-        ...(brandKit?.logos || [])
+    const logos = [
+        ...(workspace?.logoUrl ? [{ name: 'Ícone', url: workspace.logoUrl, darkBg: false }] : []),
+        ...(brandKit?.logoPrincipalUrl ? [{ name: 'Logo Principal', url: brandKit.logoPrincipalUrl, darkBg: false }] : []),
+        ...(brandKit?.logoNegativoUrl ? [{ name: 'Logo Negativo', url: brandKit.logoNegativoUrl, darkBg: true }] : [])
     ];
     
-    const hasBrandKitContent = (brandKit?.colorPalette && brandKit.colorPalette.length > 0) || (brandKit?.typography && brandKit.typography.length > 0) || (brandKit?.toneOfVoice && brandKit.toneOfVoice.length > 0);
+    const hasBrandKitContent = logos.length > 0 || (brandKit?.colorPalette && brandKit.colorPalette.length > 0) || (brandKit?.typography && brandKit.typography.length > 0) || (brandKit?.toneOfVoice && brandKit.toneOfVoice.length > 0);
 
-    if (!hasBrandKitContent && allLogos.length === 0) {
+    if (!hasBrandKitContent && !isLoading) {
         return (
             <Alert>
                 <Palette className="h-4 w-4" />
@@ -61,12 +63,12 @@ function BrandKitDisplay({ workspace, brandKit, isLoading }: { workspace: Worksp
                 <CardDescription>A identidade visual e verbal da sua marca, extraída pela IA.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-8">
-                 {allLogos.length > 0 && (
+                 {logos.length > 0 && (
                      <div>
                         <h3 className="text-lg font-semibold flex items-center gap-2 mb-4"><Globe className="h-5 w-5" /> Logos e Variações</h3>
                          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            {allLogos.map((logo) => (
-                                <div key={logo.name} className="flex flex-col items-center justify-center gap-2 rounded-lg border p-4 bg-muted/30">
+                            {logos.map((logo) => (
+                                <div key={logo.name} className={cn("flex flex-col items-center justify-center gap-2 rounded-lg border p-4", logo.darkBg ? 'bg-foreground' : 'bg-muted/30')}>
                                      <div className="relative w-24 h-24">
                                         <Image
                                             src={logo.url}
@@ -75,7 +77,7 @@ function BrandKitDisplay({ workspace, brandKit, isLoading }: { workspace: Worksp
                                             className="object-contain"
                                         />
                                     </div>
-                                    <p className="font-medium text-sm text-center mt-2">{logo.name}</p>
+                                    <p className={cn("font-medium text-sm text-center mt-2", logo.darkBg ? 'text-background' : '')}>{logo.name}</p>
                                 </div>
                             ))}
                         </div>

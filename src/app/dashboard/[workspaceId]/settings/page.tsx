@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useUser, useFirestore, useMemoFirebase, useStorage } from '@/firebase';
 import { useDoc } from '@/firebase/firestore/use-doc';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, setDoc } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -22,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Label } from '@/components/ui/label';
+import { BrandKit } from '@/lib/firestore-types';
 
 const profileFormSchema = z.object({
   name: z.string().min(2, { message: 'O nome deve ter pelo menos 2 caracteres.' }),
@@ -70,6 +72,10 @@ export default function SettingsPage() {
 
   const [logoFile, setLogoFile] = React.useState<File | null>(null);
   const [isUploading, setIsUploading] = React.useState(false);
+  const [logoPrincipalFile, setLogoPrincipalFile] = React.useState<File | null>(null);
+  const [isUploadingPrincipal, setIsUploadingPrincipal] = React.useState(false);
+  const [logoNegativoFile, setLogoNegativoFile] = React.useState<File | null>(null);
+  const [isUploadingNegativo, setIsUploadingNegativo] = React.useState(false);
 
   // User Profile Form
   const userDocRef = useMemoFirebase(() => {
@@ -119,6 +125,11 @@ export default function SettingsPage() {
   }, [firestore, workspaceId]);
   const { data: currentWorkspace, isLoading: isWorkspacesLoading } = useDoc<any>(workspaceDocRef);
 
+  const brandKitDocRef = useMemoFirebase(() => {
+    if (!firestore || !workspaceId) return null;
+    return doc(firestore, `workspaces/${workspaceId}/brand_kit`, 'live');
+  }, [firestore, workspaceId]);
+  const { data: currentBrandKit } = useDoc<BrandKit>(brandKitDocRef);
 
   const workspaceForm = useForm<WorkspaceFormValues>({
     resolver: zodResolver(workspaceFormSchema),
@@ -172,8 +183,8 @@ export default function SettingsPage() {
       await updateDoc(workspaceDocRef, { logoUrl: downloadURL });
 
       toast({
-        title: 'Logo atualizado!',
-        description: 'O novo logo do seu workspace foi salvo com sucesso.',
+        title: 'Ícone atualizado!',
+        description: 'O novo ícone do seu workspace foi salvo com sucesso.',
       });
       setLogoFile(null);
     } catch (error) {
@@ -181,10 +192,54 @@ export default function SettingsPage() {
       toast({
         variant: 'destructive',
         title: 'Uh oh! Algo deu errado.',
-        description: 'Não foi possível enviar o logo. Verifique as permissões de armazenamento (CORS).',
+        description: 'Não foi possível enviar o ícone. Verifique as permissões de armazenamento (CORS).',
       });
     } finally {
       setIsUploading(false);
+    }
+  }
+
+  async function handleLogoPrincipalUpload() {
+    if (!logoPrincipalFile || !storage || !user || !brandKitDocRef) return;
+
+    setIsUploadingPrincipal(true);
+    const logoStoragePath = `workspaces/${workspaceId}/brandkit/logo-principal.png`;
+    const logoStorageReference = storageRef(storage, logoStoragePath);
+
+    try {
+      await uploadBytes(logoStorageReference, logoPrincipalFile);
+      const downloadURL = await getDownloadURL(logoStorageReference);
+      await setDoc(brandKitDocRef, { logoPrincipalUrl: downloadURL }, { merge: true });
+
+      toast({ title: 'Logo principal atualizado!' });
+      setLogoPrincipalFile(null);
+    } catch (error) {
+      console.error('Error uploading principal logo:', error);
+      toast({ variant: 'destructive', title: 'Erro ao enviar logo principal.' });
+    } finally {
+      setIsUploadingPrincipal(false);
+    }
+  }
+
+  async function handleLogoNegativoUpload() {
+    if (!logoNegativoFile || !storage || !user || !brandKitDocRef) return;
+
+    setIsUploadingNegativo(true);
+    const logoStoragePath = `workspaces/${workspaceId}/brandkit/logo-negativo.png`;
+    const logoStorageReference = storageRef(storage, logoStoragePath);
+
+    try {
+      await uploadBytes(logoStorageReference, logoNegativoFile);
+      const downloadURL = await getDownloadURL(logoStorageReference);
+      await setDoc(brandKitDocRef, { logoNegativoUrl: downloadURL }, { merge: true });
+
+      toast({ title: 'Logo negativo atualizado!' });
+      setLogoNegativoFile(null);
+    } catch (error) {
+      console.error('Error uploading negative logo:', error);
+      toast({ variant: 'destructive', title: 'Erro ao enviar logo negativo.' });
+    } finally {
+      setIsUploadingNegativo(false);
     }
   }
 
@@ -341,21 +396,61 @@ export default function SettingsPage() {
                 </Form>
                 <Separator className="my-8" />
                 <div className="space-y-4">
-                    <h3 className="font-medium leading-none tracking-tight">Logo do Workspace</h3>
+                    <h3 className="font-medium leading-none tracking-tight">Ícone do Workspace (Favicon)</h3>
                     <div className="flex items-start gap-6 pt-2">
                         <Avatar className="h-16 w-16">
                             <AvatarImage src={currentWorkspace?.logoUrl} />
                             <AvatarFallback>{currentWorkspace?.name?.charAt(0) ?? 'W'}</AvatarFallback>
                         </Avatar>
                         <div className="grid flex-1 gap-2">
-                            <Label htmlFor="logo-upload">Arquivo do logo</Label>
-                            <Input id="logo-upload" type="file" accept="image/png, image/jpeg, image/gif" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} />
-                            <p className="text-sm text-muted-foreground">Selecione uma imagem para ser o logo do seu workspace.</p>
+                            <Label htmlFor="logo-upload">Arquivo do ícone</Label>
+                            <Input id="logo-upload" type="file" accept="image/png, image/jpeg, image/gif, image/svg+xml" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} />
+                            <p className="text-sm text-muted-foreground">Preferencialmente um arquivo quadrado (ex: .ico, .svg, ou .png 1:1).</p>
                         </div>
                     </div>
                      {logoFile && (
                         <Button onClick={handleLogoUpload} disabled={isUploading} className="mt-2">
-                            {isUploading ? 'Enviando...' : 'Salvar logo'}
+                            {isUploading ? 'Enviando...' : 'Salvar ícone'}
+                        </Button>
+                    )}
+                </div>
+                <Separator className="my-8" />
+                 <div className="space-y-4">
+                    <h3 className="font-medium leading-none tracking-tight">Logo Principal</h3>
+                    <div className="flex items-start gap-6 pt-2">
+                        <Avatar className="h-16 w-32 rounded-sm bg-muted/50 p-1">
+                            <AvatarImage src={currentBrandKit?.logoPrincipalUrl} className="object-contain" />
+                            <AvatarFallback>Logo</AvatarFallback>
+                        </Avatar>
+                        <div className="grid flex-1 gap-2">
+                            <Label htmlFor="logo-principal-upload">Arquivo do logo</Label>
+                            <Input id="logo-principal-upload" type="file" accept="image/png, image/jpeg, image/svg+xml" onChange={(e) => setLogoPrincipalFile(e.target.files?.[0] || null)} />
+                            <p className="text-sm text-muted-foreground">Versão primária/colorida do logo (ex: horizontal).</p>
+                        </div>
+                    </div>
+                     {logoPrincipalFile && (
+                        <Button onClick={handleLogoPrincipalUpload} disabled={isUploadingPrincipal} className="mt-2">
+                            {isUploadingPrincipal ? 'Enviando...' : 'Salvar logo principal'}
+                        </Button>
+                    )}
+                </div>
+                <Separator className="my-8" />
+                 <div className="space-y-4">
+                    <h3 className="font-medium leading-none tracking-tight">Logo Negativo</h3>
+                    <div className="flex items-start gap-6 pt-2">
+                        <Avatar className="h-16 w-32 rounded-sm bg-foreground p-1">
+                            <AvatarImage src={currentBrandKit?.logoNegativoUrl} className="object-contain" />
+                            <AvatarFallback className="bg-transparent text-background">Logo</AvatarFallback>
+                        </Avatar>
+                        <div className="grid flex-1 gap-2">
+                            <Label htmlFor="logo-negativo-upload">Arquivo do logo</Label>
+                            <Input id="logo-negativo-upload" type="file" accept="image/png, image/svg+xml" onChange={(e) => setLogoNegativoFile(e.target.files?.[0] || null)} />
+                            <p className="text-sm text-muted-foreground">Versão branca/negativa do logo para fundos escuros.</p>
+                        </div>
+                    </div>
+                     {logoNegativoFile && (
+                        <Button onClick={handleLogoNegativoUpload} disabled={isUploadingNegativo} className="mt-2">
+                            {isUploadingNegativo ? 'Enviando...' : 'Salvar logo negativo'}
                         </Button>
                     )}
                 </div>

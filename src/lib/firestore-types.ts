@@ -149,10 +149,11 @@ export interface Typography {
 export interface BrandKit {
   id: string;
   workspaceId: string;
+  logoPrincipalUrl?: string;
+  logoNegativoUrl?: string;
   colorPalette?: Color[];
   typography?: Typography[];
   toneOfVoice?: string[];
-  logos?: { name: string; url: string; }[];
   sourceRefs?: string[];
   publishedAt: Timestamp;
   version: number;

@@ -194,6 +194,8 @@
       "title": "Brand Kit",
       "type": "object",
       "properties": {
+        "logoPrincipalUrl": { "type": "string", "format": "uri", "description": "URL para o logo principal (versão horizontal/primária)." },
+        "logoNegativoUrl": { "type": "string", "format": "uri", "description": "URL para a versão negativa/branca do logo." },
         "colorPalette": {
           "type": "array",
           "items": {
