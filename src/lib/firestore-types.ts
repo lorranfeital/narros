@@ -1,3 +1,4 @@
+
 import { Timestamp } from 'firebase/firestore';
 
 // ---------
@@ -131,6 +132,29 @@ export interface PublishedKnowledge {
   publishedAt: Timestamp;
   version: number;
   publishedBy: string;
+}
+
+export interface Color {
+    name: string;
+    hex: string;
+}
+
+export interface Typography {
+    name: string;
+    family: string;
+    weight?: string;
+}
+
+export interface BrandKit {
+  id: string;
+  workspaceId: string;
+  colorPalette?: Color[];
+  typography?: Typography[];
+  toneOfVoice?: string[];
+  logos?: { name: string; url: string; }[];
+  sourceRefs?: string[];
+  publishedAt: Timestamp;
+  version: number;
 }
 
 export interface PlaybookStep {

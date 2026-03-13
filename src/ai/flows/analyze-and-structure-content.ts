@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A Genkit flow that analyzes raw content and structures it into knowledge categories, operational playbooks, training agendas, and insights.
@@ -21,6 +22,21 @@ export type AnalyzeAndStructureContentInput = z.infer<
   typeof AnalyzeAndStructureContentInputSchema
 >;
 
+const BrandKitSchema = z.object({
+    colorPalette: z.array(z.object({
+        name: z.string().describe("Nome da cor (ex: 'Primária', 'Acento')"),
+        hex: z.string().describe("Código hexadecimal da cor (ex: '#FF5733')")
+    })).optional().describe("Paleta de cores da marca."),
+    typography: z.array(z.object({
+        name: z.string().describe("Uso da fonte (ex: 'Títulos', 'Corpo de texto')"),
+        family: z.string().describe("Nome da família da fonte (ex: 'Montserrat')"),
+        weight: z.string().optional().describe("Peso da fonte (ex: '700', 'Bold')")
+    })).optional().describe("Regras de tipografia."),
+    toneOfVoice: z.array(z.string()).optional().describe("Lista de adjetivos ou frases que descrevem o tom de voz."),
+    sourceRefs: z.array(z.string()).optional().describe("IDs dos documentos de origem."),
+}).describe("O Brand Kit estruturado contendo a identidade visual e verbal da marca.");
+
+
 const AnalyzeAndStructureContentOutputSchema = z.object({
     knowledgeBase: z.array(
         z.object({
@@ -41,6 +57,7 @@ const AnalyzeAndStructureContentOutputSchema = z.object({
             ),
         })
     ).describe('The structured knowledge base.'),
+    brandKit: BrandKitSchema.optional(),
     playbooks: z.array(
         z.object({
             processo: z.string().describe('Name of the operational process'),
@@ -92,21 +109,22 @@ export async function analyzeAndStructureContent(
 const systemPrompt = `Você é um especialista em estruturação de conhecimento operacional e de marca para franquias e redes de negócios brasileiros. Sua tarefa é analisar o conteúdo bruto fornecido e organizá-lo em uma estrutura JSON clara e acionável.
 
 Siga estas regras estritamente:
-1.  **Linguagem Clara e Operacional:** Use português do Brasil. Seja direto, objetivo e prático. Evite jargões desnecessários ou linguagem "floreada".
+1.  **Linguagem Clara e Operacional:** Use português do Brasil. Seja direto, objetivo e prático. Evite jargões desnecessários.
 2.  **Não Invente Informações:** Baseie-se exclusivamente no conteúdo fornecido. Se uma informação não estiver presente, não a deduza ou invente.
-3.  **Conflitos como Insights:** Se encontrar informações conflitantes entre diferentes partes do conteúdo, não tente resolvê-las. Em vez disso, crie um 'insight' do tipo 'risco' descrevendo o conflito.
-4.  **Foco na Operação e Marca:** Modele o conhecimento para ser usado no dia a dia de uma empresa real (processos, checklists, scripts, políticas, guias de marca).
-5.  **Saída Estritamente em JSON:** Sua resposta DEVE ser um único objeto JSON válido, sem nenhum texto, comentário ou markdown fora do objeto JSON.
+3.  **Conflitos como Insights:** Se encontrar informações conflitantes, crie um 'insight' do tipo 'risco' descrevendo o conflito.
+4.  **Foco nos Ativos de Conhecimento:** Modele o conhecimento para ser usado no dia a dia (processos, checklists, scripts, políticas, guias).
+5.  **Saída Estritamente em JSON:** Sua resposta DEVE ser um único objeto JSON válido, sem nenhum texto, comentário ou markdown fora do objeto.
 
 Estruture sua saída nos seguintes blocos:
 
--   **knowledgeBase:** Organize o conhecimento geral em categorias. Cada categoria deve ter um ícone emoji simples e relevante.
--   **playbooks:** Extraia processos passo a passo. Cada passo deve ser claro e numerado.
--   **trainingModules:** Crie módulos de treinamento práticos a partir do conteúdo, sugerindo formato, duração e objetivos.
--   **insights:** Identifique gaps de conhecimento, oportunidades de melhoria ou riscos operacionais.
-
-**Regra Especial - Marca e Comunicação:**
-Se o conteúdo mencionar diretrizes de marca, identidade visual, tom de voz, posicionamento, personas, paleta de cores, tipografia ou regras de comunicação, você DEVE agrupar essas informações em uma categoria específica chamada "Marca e Comunicação" dentro do \`knowledgeBase\`. Use o ícone 🎨 para esta categoria.
+-   **knowledgeBase:** Organize o conhecimento GERAL e OPERACIONAL em categorias. Cada categoria deve ter um ícone emoji simples e relevante. NÃO inclua informações de marca aqui.
+-   **brandKit:** Se o conteúdo contiver diretrizes de marca, identidade visual, tom de voz, posicionamento, personas, paleta de cores, tipografia ou regras de comunicação, extraia essas informações e coloque-as DENTRO do objeto 'brandKit'.
+    -   Para 'colorPalette', extraia o nome da cor e seu código hexadecimal.
+    -   Para 'typography', extraia o nome de uso (Títulos, Corpo), a família da fonte e o peso.
+    -   Para 'toneOfVoice', liste os adjetivos ou princípios (ex: "Amigável", "Formal", "Técnico").
+-   **playbooks:** Extraia processos passo a passo.
+-   **trainingModules:** Crie módulos de treinamento práticos.
+-   **insights:** Identifique gaps, oportunidades ou riscos.
 
 Analise o conteúdo a seguir e retorne a estrutura JSON.`;
 

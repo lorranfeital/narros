@@ -189,6 +189,45 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["role", "content", "createdAt"]
+    },
+    "BrandKit": {
+      "title": "Brand Kit",
+      "type": "object",
+      "properties": {
+        "colorPalette": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "description": "Nome da cor (ex: 'Primária', 'Acento')" },
+              "hex": { "type": "string", "description": "Código hexadecimal da cor (ex: '#FF5733')" }
+            },
+            "required": ["name", "hex"]
+          }
+        },
+        "typography": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "description": "Uso da fonte (ex: 'Títulos', 'Corpo de texto')" },
+              "family": { "type": "string", "description": "Nome da família da fonte (ex: 'Montserrat')" },
+              "weight": { "type": "string", "description": "Peso da fonte (ex: '700', 'Bold')" }
+            },
+            "required": ["name", "family"]
+          }
+        },
+        "toneOfVoice": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Lista de adjetivos ou frases que descrevem o tom de voz"
+        },
+        "sourceRefs": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": []
     }
   },
   "auth": {
@@ -215,6 +254,10 @@
       {
         "path": "/workspaces/{workspaceId}/published_knowledge/{publishedId}",
         "definition": { "schema": { "$ref": "#/backend/entities/PublishedKnowledge" } }
+      },
+      {
+        "path": "/workspaces/{workspaceId}/brand_kit/{brandKitId}",
+        "definition": { "schema": { "$ref": "#/backend/entities/BrandKit" } }
       },
       {
         "path": "/workspaces/{workspaceId}/playbooks/{playbookId}",

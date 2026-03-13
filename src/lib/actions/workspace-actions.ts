@@ -30,6 +30,7 @@ import {
   SyncProposalType,
   SyncApprovalStatus,
   KnowledgeCategory,
+  BrandKit,
 } from '@/lib/firestore-types';
 import { getFirestore } from 'firebase/firestore';
 import { firebaseConfig } from '@/firebase/config';
@@ -106,6 +107,7 @@ export async function processContentBatch(
 ) {
   try {
     const db = getAdminFirestore();
+    const timestamp = serverTimestamp();
 
     // 1. Update workspace and sources status to 'PROCESSING'
     const workspaceRef = doc(db, 'workspaces', workspaceId);
@@ -156,12 +158,28 @@ export async function processContentBatch(
       rawContent: consolidatedContent,
     });
 
-    // 4. Check if workspace has published knowledge to decide flow
+    // 4. Start final batch write
+    const finalBatch = writeBatch(db);
+    const workspaceSnap = await getDoc(workspaceRef);
+    const currentVersion = workspaceSnap.data()?.version || 0;
+    const newVersion = currentVersion + 1;
+
+    // 5. Handle Brand Kit (always update/create)
+    if (aiResult.brandKit && Object.keys(aiResult.brandKit).length > 0) {
+      const brandKitRef = doc(db, `workspaces/${workspaceId}/brand_kit`, 'live');
+      finalBatch.set(brandKitRef, {
+        ...aiResult.brandKit,
+        sourceRefs: sourceIds,
+        publishedAt: timestamp,
+        version: newVersion,
+        workspaceId: workspaceId,
+      }, { merge: true });
+    }
+
+    // 6. Check if workspace has published knowledge to decide flow
     const publishedKnowledgeRef = doc(db, `workspaces/${workspaceId}/published_knowledge`, workspaceId);
     const publishedKnowledgeSnap = await getDoc(publishedKnowledgeRef);
-    const finalBatch = writeBatch(db);
-    const timestamp = serverTimestamp();
-
+    
     if (!publishedKnowledgeSnap.exists()) {
       // --- INITIAL DRAFT FLOW ---
       const draftKnowledgeRef = doc(collection(db, `workspaces/${workspaceId}/draft_knowledge`));

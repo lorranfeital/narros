@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
@@ -10,9 +11,90 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { PublishedKnowledge, Playbook, TrainingModule, Insight, Version, Workspace } from '@/lib/firestore-types';
-import { BookOpen, Lightbulb, Milestone } from 'lucide-react';
+import { PublishedKnowledge, Playbook, TrainingModule, Insight, Version, Workspace, BrandKit, Color, Typography as TypographyType } from '@/lib/firestore-types';
+import { BookOpen, Lightbulb, Milestone, Palette, Type } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+
+function BrandKitDisplay({ brandKit, isLoading }: { brandKit: BrandKit | null, isLoading: boolean }) {
+    if (isLoading) {
+        return (
+            <Card>
+                <CardHeader>
+                    <Skeleton className="h-6 w-1/4" />
+                    <Skeleton className="h-4 w-2/5" />
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-24 w-full" />
+                </CardContent>
+            </Card>
+        )
+    }
+
+    if (!brandKit) {
+        return (
+            <Alert>
+                <Palette className="h-4 w-4" />
+                <AlertTitle>Nenhum Brand Kit encontrado</AlertTitle>
+                <AlertDescription>
+                    Nenhuma informação de marca, identidade visual ou comunicação foi encontrada. Adicione documentos sobre sua marca para gerar o Brand Kit.
+                </AlertDescription>
+            </Alert>
+        )
+    }
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Brand Kit</CardTitle>
+                <CardDescription>A identidade visual e verbal da sua marca, extraída pela IA.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-8">
+                {brandKit.colorPalette && brandKit.colorPalette.length > 0 && (
+                    <div>
+                        <h3 className="text-lg font-semibold flex items-center gap-2 mb-4"><Palette className="h-5 w-5" /> Paleta de Cores</h3>
+                        <div className="flex flex-wrap gap-4">
+                            {brandKit.colorPalette.map((color: Color) => (
+                                <div key={color.hex} className="flex flex-col items-center gap-2">
+                                    <div className="w-20 h-20 rounded-lg shadow-inner border" style={{ backgroundColor: color.hex }} />
+                                    <div className="text-center">
+                                        <p className="font-medium text-sm">{color.name}</p>
+                                        <p className="text-xs text-muted-foreground uppercase font-mono">{color.hex}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+                 {brandKit.typography && brandKit.typography.length > 0 && (
+                    <div>
+                        <h3 className="text-lg font-semibold flex items-center gap-2 mb-4"><Type className="h-5 w-5" /> Tipografia</h3>
+                        <div className="space-y-4">
+                            {brandKit.typography.map((typo: TypographyType) => (
+                                <div key={typo.family} className="p-4 rounded-lg bg-muted/50">
+                                    <p className="text-sm text-muted-foreground">{typo.name}</p>
+                                    <p style={{ fontFamily: typo.family, fontWeight: typo.weight }} className="text-3xl truncate">Aa Bb Cc Dd Ee</p>
+                                    <p className="text-sm font-mono mt-2">{typo.family}{typo.weight ? `, ${typo.weight}` : ''}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+                 {brandKit.toneOfVoice && brandKit.toneOfVoice.length > 0 && (
+                    <div>
+                        <h3 className="text-lg font-semibold flex items-center gap-2 mb-4"><Lightbulb className="h-5 w-5" /> Tom de Voz</h3>
+                        <div className="flex flex-wrap gap-2">
+                            {brandKit.toneOfVoice.map((tone: string) => (
+                                <Badge key={tone} variant="secondary" className="text-base py-1 px-3">{tone}</Badge>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
 
 // Main component
 export default function KnowledgePage() {
@@ -25,12 +107,18 @@ export default function KnowledgePage() {
     const { data: workspace, isLoading: isWorkspaceLoading } = useDoc<Workspace>(workspaceDocRef);
 
     // Fetch the single LIVE published knowledge document.
-    // The doc ID is the same as the workspace ID.
     const publishedKnowledgeDocRef = useMemoFirebase(() => {
         if (!firestore || !workspaceId) return null;
         return doc(firestore, `workspaces/${workspaceId}/published_knowledge`, workspaceId);
     }, [firestore, workspaceId]);
     const { data: publishedKnowledge, isLoading: isKnowledgeLoading } = useDoc<PublishedKnowledge>(publishedKnowledgeDocRef);
+
+    // Fetch the single LIVE brand kit document
+    const brandKitDocRef = useMemoFirebase(() => {
+        if (!firestore || !workspaceId) return null;
+        return doc(firestore, `workspaces/${workspaceId}/brand_kit`, 'live');
+    }, [firestore, workspaceId]);
+    const { data: brandKit, isLoading: isBrandKitLoading } = useDoc<BrandKit>(brandKitDocRef);
 
     // Fetch published playbooks
     const playbooksQuery = useMemoFirebase(() => {
@@ -61,7 +149,7 @@ export default function KnowledgePage() {
     const { data: versions, isLoading: isVersionsLoading } = useCollection<Version>(versionsQuery);
 
 
-    const isLoading = isWorkspaceLoading || isKnowledgeLoading || isPlaybooksLoading || isTrainingLoading || isInsightsLoading || isVersionsLoading;
+    const isLoading = isWorkspaceLoading || isKnowledgeLoading || isPlaybooksLoading || isTrainingLoading || isInsightsLoading || isVersionsLoading || isBrandKitLoading;
 
     if (isLoading) {
         return (
@@ -79,7 +167,7 @@ export default function KnowledgePage() {
         );
     }
     
-    if (!publishedKnowledge && !isLoading) {
+    if (!publishedKnowledge && !brandKit && !isLoading) {
          return (
             <div className="p-12">
                 <Alert variant="default" className="bg-secondary">
@@ -115,8 +203,9 @@ export default function KnowledgePage() {
             </div>
 
             <Tabs defaultValue="knowledge" className="w-full">
-                <TabsList className="grid w-full grid-cols-4">
+                <TabsList className="grid w-full grid-cols-5">
                     <TabsTrigger value="knowledge">Base de Conhecimento</TabsTrigger>
+                    <TabsTrigger value="brandkit">Brand Kit</TabsTrigger>
                     <TabsTrigger value="playbooks">Playbooks</TabsTrigger>
                     <TabsTrigger value="training">Treinamentos</TabsTrigger>
                     <TabsTrigger value="insights">Insights</TabsTrigger>
@@ -149,8 +238,13 @@ export default function KnowledgePage() {
                                     </AccordionItem>
                                 ))}
                             </Accordion>
+                             {!publishedKnowledge?.categories && <p className="text-muted-foreground">Nenhum conhecimento operacional publicado.</p>}
                         </CardContent>
                     </Card>
+                </TabsContent>
+                
+                <TabsContent value="brandkit" className="mt-6">
+                   <BrandKitDisplay brandKit={brandKit} isLoading={isBrandKitLoading} />
                 </TabsContent>
 
                 <TabsContent value="playbooks" className="mt-6">
