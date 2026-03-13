@@ -13,10 +13,11 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuGroup } from "@/components/ui/dropdown-menu";
 import { useAuth, useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from "@/firebase";
 import { signOut } from "firebase/auth";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { collection, doc, query, where } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import React from "react";
 
 const mainNavItems = [
     { icon: Search, label: "Buscar", href: "#" },
@@ -29,6 +30,8 @@ export function Sidebar({ className }: { className?: string }) {
   const router = useRouter();
   const { user } = useUser();
   const firestore = useFirestore();
+  const params = useParams();
+  const workspaceId = params.workspaceId as string;
 
   const handleLogout = () => {
     signOut(auth).then(() => {
@@ -48,7 +51,14 @@ export function Sidebar({ className }: { className?: string }) {
   }, [user, firestore]);
   const { data: workspaces, isLoading: isWorkspacesLoading } = useCollection<any>(workspacesQuery);
 
-  const currentWorkspace = workspaces && workspaces.length > 0 ? workspaces[0] : null;
+  const currentWorkspace = React.useMemo(() => {
+    if (!workspaces || workspaces.length === 0) return null;
+    // Prefer workspace from URL, fallback to first in the list
+    if (workspaceId) {
+      return workspaces.find(ws => ws.id === workspaceId) || workspaces[0];
+    }
+    return workspaces[0];
+  }, [workspaces, workspaceId]);
 
   const getPlanName = (plan: string | undefined) => {
     if (!plan) return '';
@@ -95,21 +105,23 @@ export function Sidebar({ className }: { className?: string }) {
                             </DropdownMenuItem>
                         )}
                         {workspaces?.map((ws) => (
-                            <DropdownMenuItem key={ws.id}>
-                                <div className="flex items-center gap-2">
-                                    <Avatar className="h-6 w-6">
-                                        <AvatarImage src={ws.logoUrl} />
-                                        <AvatarFallback>{ws.name?.charAt(0)}</AvatarFallback>
-                                    </Avatar>
-                                    <div className="flex flex-col">
-                                        <span className="text-sm font-medium">{ws.name}</span>
-                                        {isProfileLoading ? (
-                                            <Skeleton className="h-3 w-16 mt-1" />
-                                        ) : (
-                                            <span className="text-xs text-muted-foreground">{getPlanName(userProfile?.plan)}</span>
-                                        )}
+                            <DropdownMenuItem key={ws.id} asChild>
+                                <Link href={`/dashboard/${ws.id}`}>
+                                    <div className="flex items-center gap-2 w-full">
+                                        <Avatar className="h-6 w-6">
+                                            <AvatarImage src={ws.logoUrl} />
+                                            <AvatarFallback>{ws.name?.charAt(0)}</AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-medium">{ws.name}</span>
+                                            {isProfileLoading ? (
+                                                <Skeleton className="h-3 w-16 mt-1" />
+                                            ) : (
+                                                <span className="text-xs text-muted-foreground">{getPlanName(userProfile?.plan)}</span>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
+                                </Link>
                             </DropdownMenuItem>
                         ))}
                          {!isWorkspacesLoading && (!workspaces || workspaces.length === 0) && (
