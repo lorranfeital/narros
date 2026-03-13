@@ -16,7 +16,7 @@ const ChatMessageSchema = z.object({
 });
 
 const ChatWithKnowledgeAssistantInputSchema = z.object({
-  query: z.string().describe('The user\u0027s natural language question.'),
+  query: z.string().describe('The user\'s natural language question.'),
   knowledgeBase: z.array(z.any()).describe('The structured knowledge base as an array of JSON objects.'),
   chatHistory: z.array(ChatMessageSchema).describe('An array of previous messages in the chat.'),
   workspaceName: z.string().describe('The name of the workspace.'),
@@ -24,7 +24,7 @@ const ChatWithKnowledgeAssistantInputSchema = z.object({
 export type ChatWithKnowledgeAssistantInput = z.infer<typeof ChatWithKnowledgeAssistantInputSchema>;
 
 const ChatWithKnowledgeAssistantOutputSchema = z.object({
-  response: z.string().describe('The AI assistant\u0027s answer based on the knowledge base.'),
+  response: z.string().describe('The AI assistant\'s answer based on the knowledge base.'),
 });
 export type ChatWithKnowledgeAssistantOutput = z.infer<typeof ChatWithKnowledgeAssistantOutputSchema>;
 
