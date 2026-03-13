@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Upload, FileText, Trash2, Loader2, Sparkles, AlertTriangle, ArrowRight, GitPullRequest, Clock, Database, ListChecks } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import React, { useState } from 'react';
-import { IngestionState, ProcessingStatus, Source, Workspace, SourceType, WorkspaceStatus } from '@/lib/firestore-types';
+import { IngestionState, ProcessingStatus, Source, Workspace, SourceType, WorkspaceStatus, SyncProposal, SyncApprovalStatus } from '@/lib/firestore-types';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -102,6 +102,14 @@ export default function WorkspacePage() {
         );
     }, [firestore, workspaceId]);
     const { data: sources, isLoading: isSourcesLoading } = useCollection<Source>(sourcesQuery);
+
+    // Real-time query for pending sync proposals to get an accurate count
+    const pendingSyncQuery = useMemoFirebase(() => {
+        if (!firestore || !workspaceId || workspace?.status !== WorkspaceStatus.SYNC_PENDING) return null;
+        return query(collection(firestore, `workspaces/${workspaceId}/sync_proposals`), where('approvalStatus', '==', SyncApprovalStatus.PENDING));
+    }, [firestore, workspaceId, workspace?.status]);
+    const { data: pendingProposals, isLoading: isPendingSyncLoading } = useCollection<SyncProposal>(pendingSyncQuery);
+    const pendingSyncCount = pendingProposals?.length ?? 0;
 
     const handleAddText = async () => {
         if (!rawText.trim() || !user || !workspaceId || !firestore) return;
@@ -232,7 +240,7 @@ export default function WorkspacePage() {
         }
     }
     
-    const isLoading = isWorkspaceLoading || isSourcesLoading;
+    const isLoading = isWorkspaceLoading || isSourcesLoading || isPendingSyncLoading;
     const isActionDisabled = isSubmitting || isProcessing;
     
     if (isLoading) {
@@ -296,20 +304,20 @@ export default function WorkspacePage() {
                         <span>Publicado: <span className="font-semibold text-foreground">{formatDistanceToNow(workspace.lastPublishedAt.toDate(), { locale: ptBR, addSuffix: true })}</span></span>
                     </div>
                 )}
-                 {workspace.status === 'sync_pending' && workspace.pendingSyncCount && workspace.pendingSyncCount > 0 &&(
+                 {workspace.status === 'sync_pending' && pendingSyncCount > 0 && (
                     <div className="flex items-center gap-2">
                         <GitPullRequest className="h-4 w-4" />
-                        <span>Pendentes: <span className="font-semibold text-foreground">{workspace.pendingSyncCount}</span></span>
+                        <span>Pendentes: <span className="font-semibold text-foreground">{pendingSyncCount}</span></span>
                     </div>
                 )}
             </div>
 
-            {workspace.status === WorkspaceStatus.SYNC_PENDING && (
+            {workspace.status === WorkspaceStatus.SYNC_PENDING && pendingSyncCount > 0 && (
                  <Alert className="border-blue-500/50 text-blue-600 dark:text-blue-400 [&>svg]:text-blue-500">
                     <GitPullRequest className="h-4 w-4" />
                     <AlertTitle className="font-bold text-blue-700 dark:text-blue-300">Sincronização pendente</AlertTitle>
                     <AlertDescription>
-                        Um novo lote de conteúdo foi processado e há {workspace.pendingSyncCount || 0} alterações propostas.
+                        Um novo lote de conteúdo foi processado e há {pendingSyncCount} alterações propostas.
                         <Button variant="link" asChild className="p-0 pl-2 h-auto text-blue-600 dark:text-blue-400">
                             <Link href={`/dashboard/${workspaceId}/sync`}>
                                 Revisar alterações <ArrowRight className="ml-2 h-4 w-4" />
@@ -424,3 +432,5 @@ export default function WorkspacePage() {
         </div>
     );
 }
+
+    

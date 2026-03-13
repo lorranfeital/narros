@@ -1,3 +1,4 @@
+
 'use client';
 
 import { cn } from "@/lib/utils";
@@ -23,7 +24,7 @@ import { collection, doc, query, where } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import React, { useState, useEffect } from "react";
-import { Workspace, WorkspaceStatus } from "@/lib/firestore-types";
+import { Workspace, WorkspaceStatus, SyncProposal, SyncApprovalStatus } from "@/lib/firestore-types";
 
 export function Sidebar({ className }: { className?: string }) {
   const auth = useAuth();
@@ -66,6 +67,14 @@ export function Sidebar({ className }: { className?: string }) {
     if (!workspaces || !activeWorkspaceId) return null;
     return workspaces.find(ws => ws.id === activeWorkspaceId) || workspaces[0] || null;
   }, [workspaces, activeWorkspaceId]);
+
+  // Real-time query for pending sync proposals count for the active workspace
+  const pendingSyncQuery = useMemoFirebase(() => {
+      if (!firestore || !activeWorkspaceId || currentWorkspace?.status !== WorkspaceStatus.SYNC_PENDING) return null;
+      return query(collection(firestore, `workspaces/${activeWorkspaceId}/sync_proposals`), where('approvalStatus', '==', SyncApprovalStatus.PENDING));
+  }, [firestore, activeWorkspaceId, currentWorkspace?.status]);
+  const { data: pendingProposals } = useCollection<SyncProposal>(pendingSyncQuery);
+  const pendingSyncCount = pendingProposals?.length ?? 0;
 
   const subPath = React.useMemo(() => {
     const currentPath = pathname || '';
@@ -212,7 +221,7 @@ export function Sidebar({ className }: { className?: string }) {
                 >
                     <GitPullRequest className="h-4 w-4" />
                     <span>Sincronização</span>
-                     {isSyncPending && currentWorkspace.pendingSyncCount && <span className="ml-auto text-xs font-normal text-blue-600 bg-blue-500/20 rounded-full px-2">{currentWorkspace.pendingSyncCount}</span>}
+                     {isSyncPending && pendingSyncCount > 0 && <span className="ml-auto text-xs font-normal text-blue-600 bg-blue-500/20 rounded-full px-2">{pendingSyncCount}</span>}
                 </Link>
 
 
@@ -288,3 +297,5 @@ export function Sidebar({ className }: { className?: string }) {
     </aside>
   );
 }
+
+    
