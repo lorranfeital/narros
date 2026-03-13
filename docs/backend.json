@@ -39,6 +39,374 @@
         "plan",
         "createdAt"
       ]
+    },
+    "Workspace": {
+      "title": "Workspace",
+      "description": "Defines a workspace with its name, type, sector, owner, and explicit member list.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the workspace."
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "franquia",
+            "escritório",
+            "rede",
+            "outro"
+          ],
+          "description": "The type of the workspace."
+        },
+        "sector": {
+          "type": "string",
+          "description": "The business sector of the workspace."
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "The UID of the user who owns the workspace."
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "A list of UIDs of users who are members of the workspace."
+        },
+        "knowledgeStatus": {
+          "type": "string",
+          "enum": [
+            "never_published",
+            "draft",
+            "published",
+            "sync_pending"
+          ],
+          "description": "The current status of the workspace's knowledge base."
+        },
+        "publishedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of when the knowledge base was first published."
+        },
+        "lastSyncAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of the last knowledge base synchronization."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp indicating when the workspace was created."
+        }
+      },
+      "required": [
+        "name",
+        "type",
+        "sector",
+        "ownerId",
+        "knowledgeStatus",
+        "createdAt"
+      ]
+    },
+    "Analysis": {
+      "title": "Analysis",
+      "description": "Stores details of content analyses performed.",
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string"
+        },
+        "rawContentUrl": {
+          "type": "string"
+        },
+        "rawTextPreview": {
+          "type": "string"
+        },
+        "wordCount": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "processing",
+            "draft",
+            "sync_pending",
+            "published",
+            "error"
+          ]
+        },
+        "errorMessage": {
+          "type": "string"
+        },
+        "empresa": {
+          "type": "object",
+          "properties": {
+            "nome": {
+              "type": "string"
+            },
+            "tipo": {
+              "type": "string"
+            },
+            "setor": {
+              "type": "string"
+            }
+          }
+        },
+        "publishedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "workspaceId",
+        "rawContentUrl",
+        "status",
+        "createdAt"
+      ]
+    },
+    "Knowledge": {
+      "title": "Knowledge",
+      "description": "Represents a structured knowledge category and its items.",
+      "type": "object",
+      "properties": {
+        "analysisId": {
+          "type": "string"
+        },
+        "workspaceId": {
+          "type": "string"
+        },
+        "publishedVersion": {
+          "type": "boolean"
+        },
+        "categoria": {
+          "type": "string"
+        },
+        "icone": {
+          "type": "string"
+        },
+        "itens": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "titulo": {
+                "type": "string"
+              },
+              "descricao": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "titulo",
+              "descricao"
+            ]
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "analysisId",
+        "workspaceId",
+        "publishedVersion",
+        "categoria",
+        "itens",
+        "createdAt"
+      ]
+    },
+    "Training": {
+      "title": "Training",
+      "description": "Stores individual training modules generated from an analysis.",
+      "type": "object",
+      "properties": {
+        "analysisId": {
+          "type": "string"
+        },
+        "workspaceId": {
+          "type": "string"
+        },
+        "publishedVersion": {
+          "type": "boolean"
+        },
+        "modulo": {
+          "type": "number"
+        },
+        "titulo": {
+          "type": "string"
+        },
+        "duracao": {
+          "type": "string"
+        },
+        "objetivo": {
+          "type": "string"
+        },
+        "topicos": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "formato": {
+          "type": "string",
+          "enum": [
+            "presencial",
+            "vídeo",
+            "slides",
+            "prático"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "analysisId",
+        "workspaceId",
+        "publishedVersion",
+        "modulo",
+        "titulo",
+        "objetivo",
+        "formato",
+        "createdAt"
+      ]
+    },
+    "Playbook": {
+      "title": "Playbook",
+      "description": "Stores operational playbooks generated from an analysis.",
+      "type": "object",
+      "properties": {
+        "analysisId": {
+          "type": "string"
+        },
+        "workspaceId": {
+          "type": "string"
+        },
+        "publishedVersion": {
+          "type": "boolean"
+        },
+        "processo": {
+          "type": "string"
+        },
+        "passos": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "numero": {
+                "type": "number"
+              },
+              "titulo": {
+                "type": "string"
+              },
+              "descricao": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "numero",
+              "titulo",
+              "descricao"
+            ]
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "analysisId",
+        "workspaceId",
+        "publishedVersion",
+        "processo",
+        "passos",
+        "createdAt"
+      ]
+    },
+    "Insight": {
+      "title": "Insight",
+      "description": "Stores identified gaps, opportunities, or risks from an analysis.",
+      "type": "object",
+      "properties": {
+        "analysisId": {
+          "type": "string"
+        },
+        "workspaceId": {
+          "type": "string"
+        },
+        "texto": {
+          "type": "string"
+        },
+        "tipo": {
+          "type": "string",
+          "enum": [
+            "gap",
+            "oportunidade",
+            "risco"
+          ]
+        },
+        "resolved": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "analysisId",
+        "workspaceId",
+        "texto",
+        "tipo",
+        "resolved",
+        "createdAt"
+      ]
+    },
+    "ChatMessage": {
+      "title": "Chat Message",
+      "description": "Stores individual chat messages for the AI assistant.",
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string"
+        },
+        "userId": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "user",
+            "assistant"
+          ]
+        },
+        "content": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "workspaceId",
+        "userId",
+        "role",
+        "content",
+        "createdAt"
+      ]
     }
   },
   "auth": {
