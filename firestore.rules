@@ -47,8 +47,9 @@ service cloud.firestore {
       allow create: if isOwner(request.resource.data.ownerId);
       // Allow read for workspace members.
       allow get: if isWorkspaceMember(workspaceId);
-      // Allow update and delete only for the workspace owner.
-      allow update, delete: if isWorkspaceOwner(workspaceId);
+      // Allow update for members, but delete only for the owner.
+      allow update: if isWorkspaceMember(workspaceId);
+      allow delete: if isWorkspaceOwner(workspaceId);
       // Allow list for any signed-in user, client must filter.
       allow list: if isSignedIn();
 
@@ -58,8 +59,9 @@ service cloud.firestore {
         allow create: if isWorkspaceMember(workspaceId);
         // Any workspace member can read sources.
         allow read, list: if isWorkspaceMember(workspaceId);
-        // Only owner can update/delete sources.
-        allow update, delete: if isWorkspaceOwner(workspaceId);
+        // Allow members to update status, but only owner to delete.
+        allow update: if isWorkspaceMember(workspaceId);
+        allow delete: if isWorkspaceOwner(workspaceId);
       }
 
       // --- Draft & Published Knowledge Subcollections ---
@@ -92,8 +94,8 @@ service cloud.firestore {
       match /sync_proposals/{proposalId} {
         // Members can read proposals to review them.
         allow read, list: if isWorkspaceMember(workspaceId);
-        // Only owners can act on (create/update/delete) proposals.
-        allow create, update, delete: if isWorkspaceOwner(workspaceId);
+        // Members can act on (create/update/delete) proposals.
+        allow create, update, delete: if isWorkspaceMember(workspaceId);
       }
 
       // --- Versions Subcollection ---
