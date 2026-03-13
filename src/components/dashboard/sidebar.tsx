@@ -26,7 +26,9 @@ export function Sidebar({ className }: { className?: string }) {
   const firestore = useFirestore();
   const params = useParams();
   const pathname = usePathname();
-  const workspaceId = params.workspaceId as string;
+  
+  const urlWorkspaceId = params.workspaceId as string;
+  const [activeWorkspaceId, setActiveWorkspaceId] = React.useState<string | null>(null);
 
   const handleLogout = () => {
     signOut(auth).then(() => {
@@ -46,22 +48,29 @@ export function Sidebar({ className }: { className?: string }) {
   }, [user, firestore]);
   const { data: workspaces, isLoading: isWorkspacesLoading } = useCollection<any>(workspacesQuery);
 
-  const currentWorkspace = React.useMemo(() => {
-    if (!workspaces || workspaces.length === 0) return null;
-    // Prefer workspace from URL, fallback to first in the list
-    if (workspaceId) {
-      return workspaces.find(ws => ws.id === workspaceId) || workspaces[0];
+  React.useEffect(() => {
+    // If the URL has a workspace ID, it's the source of truth.
+    if (urlWorkspaceId && urlWorkspaceId !== activeWorkspaceId) {
+      setActiveWorkspaceId(urlWorkspaceId);
     }
-    return workspaces[0];
-  }, [workspaces, workspaceId]);
+    // On first load or if no workspace is active, set one.
+    else if (!activeWorkspaceId && !isWorkspacesLoading && workspaces && workspaces.length > 0) {
+      setActiveWorkspaceId(workspaces[0].id);
+    }
+  }, [urlWorkspaceId, workspaces, isWorkspacesLoading, activeWorkspaceId]);
+
+  const currentWorkspace = React.useMemo(() => {
+    if (!workspaces || !activeWorkspaceId) return null;
+    return workspaces.find(ws => ws.id === activeWorkspaceId) || workspaces[0] || null;
+  }, [workspaces, activeWorkspaceId]);
 
   // This calculates the current page relative to the workspace root
   // e.g. /dashboard/ws1/settings -> /settings
   // e.g. /dashboard/ws1 -> ""
   const subPath = React.useMemo(() => {
-    if (!workspaceId || !pathname.startsWith(`/dashboard/${workspaceId}`)) return '';
-    return pathname.substring(`/dashboard/${workspaceId}`.length);
-  }, [pathname, workspaceId]);
+    if (!urlWorkspaceId || !pathname.startsWith(`/dashboard/${urlWorkspaceId}`)) return '';
+    return pathname.substring(`/dashboard/${urlWorkspaceId}`.length);
+  }, [pathname, urlWorkspaceId]);
 
   const getPlanName = (plan: string | undefined) => {
     if (!plan) return '';
@@ -85,7 +94,7 @@ export function Sidebar({ className }: { className?: string }) {
                             <AvatarImage src={currentWorkspace?.logoUrl} />
                             <AvatarFallback>{currentWorkspace?.name?.charAt(0) ?? 'N'}</AvatarFallback>
                         </Avatar>
-                        {isWorkspacesLoading ? (
+                        {isWorkspacesLoading || !currentWorkspace ? (
                             <Skeleton className="h-4 w-32" />
                         ) : (
                             <span className="font-semibold text-sm truncate">{currentWorkspace?.name || 'Sem workspace'}</span>
