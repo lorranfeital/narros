@@ -290,9 +290,11 @@ export async function processContentBatch(
               pendingSyncCount: proposals.length,
           });
       } else {
-          // No changes found
+          // No changes found, so reset the status to published
            finalBatch.update(workspaceRef, {
               ingestionState: IngestionState.IDLE,
+              status: WorkspaceStatus.PUBLISHED,
+              pendingSyncCount: 0,
               lastProcessedAt: timestamp,
           });
       }
