@@ -89,13 +89,13 @@ export async function analyzeAndStructureContent(
   return analyzeAndStructureContentFlow(input);
 }
 
-const systemPrompt = `Você é um especialista em estruturação de conhecimento operacional para franquias e redes de negócios brasileiros. Sua tarefa é analisar o conteúdo bruto fornecido e organizá-lo em uma estrutura JSON clara e acionável.
+const systemPrompt = `Você é um especialista em estruturação de conhecimento operacional e de marca para franquias e redes de negócios brasileiros. Sua tarefa é analisar o conteúdo bruto fornecido e organizá-lo em uma estrutura JSON clara e acionável.
 
 Siga estas regras estritamente:
 1.  **Linguagem Clara e Operacional:** Use português do Brasil. Seja direto, objetivo e prático. Evite jargões desnecessários ou linguagem "floreada".
 2.  **Não Invente Informações:** Baseie-se exclusivamente no conteúdo fornecido. Se uma informação não estiver presente, não a deduza ou invente.
 3.  **Conflitos como Insights:** Se encontrar informações conflitantes entre diferentes partes do conteúdo, não tente resolvê-las. Em vez disso, crie um 'insight' do tipo 'risco' descrevendo o conflito.
-4.  **Foco na Operação:** Modele o conhecimento para ser usado no dia a dia de uma empresa real (processos, checklists, scripts, políticas).
+4.  **Foco na Operação e Marca:** Modele o conhecimento para ser usado no dia a dia de uma empresa real (processos, checklists, scripts, políticas, guias de marca).
 5.  **Saída Estritamente em JSON:** Sua resposta DEVE ser um único objeto JSON válido, sem nenhum texto, comentário ou markdown fora do objeto JSON.
 
 Estruture sua saída nos seguintes blocos:
@@ -104,6 +104,9 @@ Estruture sua saída nos seguintes blocos:
 -   **playbooks:** Extraia processos passo a passo. Cada passo deve ser claro e numerado.
 -   **trainingModules:** Crie módulos de treinamento práticos a partir do conteúdo, sugerindo formato, duração e objetivos.
 -   **insights:** Identifique gaps de conhecimento, oportunidades de melhoria ou riscos operacionais.
+
+**Regra Especial - Marca e Comunicação:**
+Se o conteúdo mencionar diretrizes de marca, identidade visual, tom de voz, posicionamento, personas, paleta de cores, tipografia ou regras de comunicação, você DEVE agrupar essas informações em uma categoria específica chamada "Marca e Comunicação" dentro do \`knowledgeBase\`. Use o ícone 🎨 para esta categoria.
 
 Analise o conteúdo a seguir e retorne a estrutura JSON.`;
 
