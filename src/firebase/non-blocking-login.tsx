@@ -5,7 +5,8 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInWithPopup,
-  GoogleAuthProvider
+  GoogleAuthProvider,
+  OAuthProvider
   // Assume getAuth and app are initialized elsewhere
 } from 'firebase/auth';
 
@@ -33,6 +34,14 @@ export function initiateEmailSignIn(authInstance: Auth, email: string, password:
 /** Initiate Google sign-in (non-blocking). */
 export function initiateGoogleSignIn(authInstance: Auth): void {
   const provider = new GoogleAuthProvider();
+  // CRITICAL: Call signInWithPopup directly. Do NOT use 'await signInWithPopup(...)'.
+  signInWithPopup(authInstance, provider);
+  // Code continues immediately. Auth state change is handled by onAuthStateChanged listener.
+}
+
+/** Initiate Microsoft sign-in (non-blocking). */
+export function initiateMicrosoftSignIn(authInstance: Auth): void {
+  const provider = new OAuthProvider('microsoft.com');
   // CRITICAL: Call signInWithPopup directly. Do NOT use 'await signInWithPopup(...)'.
   signInWithPopup(authInstance, provider);
   // Code continues immediately. Auth state change is handled by onAuthStateChanged listener.

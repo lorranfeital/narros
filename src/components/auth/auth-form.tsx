@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth, useUser } from "@/firebase";
-import { initiateEmailSignIn, initiateEmailSignUp, initiateGoogleSignIn } from "@/firebase/non-blocking-login";
+import { initiateEmailSignIn, initiateEmailSignUp, initiateGoogleSignIn, initiateMicrosoftSignIn } from "@/firebase/non-blocking-login";
 import { useRouter } from "next/navigation";
 
 
@@ -24,6 +24,15 @@ const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
             <path d="M23.714 37.867a13.85 13.85 0 0 1-13.182-9.51l-7.909 6.038a23.43 23.43 0 0 0 21.09 13.072c5.732 0 11.205-2.036 15.312-5.849l-7.507-5.804c-2.118 1.335-4.786 2.053-7.804 2.053" fill="#34a853"/>
             <path d="M46.145 24c0-1.387-.213-2.88-.534-4.267H23.714V28.8h12.604c-.63 3.091-2.346 5.468-4.8 7.014l7.507 5.804c4.314-4.004 7.12-9.969 7.12-17.618" fill="#4285f4"/>
         </g>
+    </svg>
+);
+
+const MicrosoftIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg" {...props}>
+        <path d="M1 1h9v9H1z" fill="#f25022"/>
+        <path d="M11 1h9v9h-9z" fill="#7fba00"/>
+        <path d="M1 11h9v9H1z" fill="#00a4ef"/>
+        <path d="M11 11h9v9h-9z" fill="#ffb900"/>
     </svg>
 );
 
@@ -58,6 +67,11 @@ export function AuthForm() {
     initiateGoogleSignIn(auth);
   };
 
+  const handleMicrosoftSignIn = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    initiateMicrosoftSignIn(auth);
+  };
+
   return (
     <Tabs defaultValue="login" className="w-full">
       <TabsList className="grid w-full grid-cols-2">
@@ -72,10 +86,16 @@ export function AuthForm() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 p-0">
-            <Button variant="outline" className="w-full" onClick={handleGoogleSignIn}>
-              <GoogleIcon className="mr-2 h-4 w-4" />
-              Continuar com Google
-            </Button>
+            <div className="space-y-2">
+              <Button variant="outline" className="w-full" onClick={handleGoogleSignIn}>
+                <GoogleIcon className="mr-2 h-4 w-4" />
+                Continuar com Google
+              </Button>
+              <Button variant="outline" className="w-full" onClick={handleMicrosoftSignIn}>
+                <MicrosoftIcon className="mr-2 h-4 w-4" />
+                Continuar com Microsoft
+              </Button>
+            </div>
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t" />
@@ -108,10 +128,16 @@ export function AuthForm() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 p-0">
-          <Button variant="outline" className="w-full" onClick={handleGoogleSignIn}>
-              <GoogleIcon className="mr-2 h-4 w-4" />
-              Continuar com Google
-            </Button>
+            <div className="space-y-2">
+              <Button variant="outline" className="w-full" onClick={handleGoogleSignIn}>
+                <GoogleIcon className="mr-2 h-4 w-4" />
+                Continuar com Google
+              </Button>
+              <Button variant="outline" className="w-full" onClick={handleMicrosoftSignIn}>
+                <MicrosoftIcon className="mr-2 h-4 w-4" />
+                Continuar com Microsoft
+              </Button>
+            </div>
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t" />
