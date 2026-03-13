@@ -15,6 +15,22 @@ service firebase.storage {
                     request.resource.metadata.ownerId == request.auth.uid;
     }
 
+    // --- Rule for Source Files ---
+    match /workspaces/{workspaceId}/sources/{sourceId}/{allPaths=**} {
+        // Allow write if the user is authenticated, the uploaderId metadata
+        // matches their UID, and the file is under 10MB.
+        // This rule is intentionally broad on content type for flexibility.
+        // Security is primarily enforced by Firestore rules on the 'Source'
+        // document creation.
+        allow write: if request.auth != null &&
+                      request.auth.uid == request.resource.metadata.uploaderId &&
+                      request.resource.size < 10 * 1024 * 1024;
+                      
+        // For now, deny direct client-side reads to enforce that file access
+        // is mediated by the application logic if needed.
+        allow read: if false;
+    }
+
     // Deny all other access to the bucket by default.
     match /{allPaths=**} {
       allow read, write: if false;

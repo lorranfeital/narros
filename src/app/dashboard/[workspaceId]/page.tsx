@@ -137,7 +137,12 @@ export default function WorkspacePage() {
         const fileStorageRef = storageRef(storage, filePath);
 
         try {
-            await uploadBytes(fileStorageRef, file);
+            const metadata = {
+                customMetadata: {
+                    'uploaderId': user.uid
+                }
+            };
+            await uploadBytes(fileStorageRef, file, metadata);
 
             const batchId = sources?.[0]?.batchId || newSourceDocRef.id;
 
