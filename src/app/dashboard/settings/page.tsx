@@ -344,7 +344,7 @@ export default function SettingsPage() {
                         <div className="grid flex-1 gap-2">
                             <Label htmlFor="logo-upload">Arquivo do logo</Label>
                             <Input id="logo-upload" type="file" accept="image/png, image/jpeg, image/gif" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} />
-                            <FormDescription>Selecione uma imagem para ser o logo do seu workspace.</FormDescription>
+                            <p className="text-sm text-muted-foreground">Selecione uma imagem para ser o logo do seu workspace.</p>
                         </div>
                     </div>
                      {logoFile && (
