@@ -28,7 +28,7 @@ export function Sidebar({ className }: { className?: string }) {
   const pathname = usePathname();
   
   const urlWorkspaceId = params.workspaceId as string;
-  const [activeWorkspaceId, setActiveWorkspaceId] = React.useState<string | null>(null);
+  const [activeWorkspaceId, setActiveWorkspaceId] = React.useState<string | null>(urlWorkspaceId);
 
   const handleLogout = () => {
     signOut(auth).then(() => {
@@ -49,18 +49,18 @@ export function Sidebar({ className }: { className?: string }) {
   const { data: workspaces, isLoading: isWorkspacesLoading } = useCollection<any>(workspacesQuery);
 
   React.useEffect(() => {
-    // If the URL has a workspace ID, it's the source of truth.
     if (urlWorkspaceId && urlWorkspaceId !== activeWorkspaceId) {
-      setActiveWorkspaceId(urlWorkspaceId);
+        setActiveWorkspaceId(urlWorkspaceId);
     }
-    // On first load or if no workspace is active, set one.
-    else if (!activeWorkspaceId && !isWorkspacesLoading && workspaces && workspaces.length > 0) {
-      setActiveWorkspaceId(workspaces[0].id);
-    }
-  }, [urlWorkspaceId, workspaces, isWorkspacesLoading, activeWorkspaceId]);
+  }, [urlWorkspaceId, activeWorkspaceId]);
 
   const currentWorkspace = React.useMemo(() => {
-    if (!workspaces || !activeWorkspaceId) return null;
+    if (!workspaces || !activeWorkspaceId) {
+      if (workspaces && workspaces.length > 0) {
+        return workspaces[0];
+      }
+      return null;
+    }
     return workspaces.find(ws => ws.id === activeWorkspaceId) || workspaces[0] || null;
   }, [workspaces, activeWorkspaceId]);
 
@@ -68,9 +68,10 @@ export function Sidebar({ className }: { className?: string }) {
   // e.g. /dashboard/ws1/settings -> /settings
   // e.g. /dashboard/ws1 -> ""
   const subPath = React.useMemo(() => {
-    if (!urlWorkspaceId || !pathname.startsWith(`/dashboard/${urlWorkspaceId}`)) return '';
-    return pathname.substring(`/dashboard/${urlWorkspaceId}`.length);
-  }, [pathname, urlWorkspaceId]);
+    const currentPath = pathname || '';
+    if (!activeWorkspaceId || !currentPath.startsWith(`/dashboard/${activeWorkspaceId}`)) return '';
+    return currentPath.substring(`/dashboard/${activeWorkspaceId}`.length);
+  }, [pathname, activeWorkspaceId]);
 
   const getPlanName = (plan: string | undefined) => {
     if (!plan) return '';
@@ -78,6 +79,16 @@ export function Sidebar({ className }: { className?: string }) {
     if (plan === 'pro') return 'Plano Pro';
     return plan;
   }
+
+  const handleWorkspaceChange = (newWorkspaceId: string) => {
+    setActiveWorkspaceId(newWorkspaceId);
+    // If on a workspace-specific page, navigate to the same page for the new workspace
+    if (urlWorkspaceId && subPath) {
+      router.push(`/dashboard/${newWorkspaceId}${subPath}`);
+    } else {
+      router.push(`/dashboard/${newWorkspaceId}`);
+    }
+  };
 
   return (
     <aside
@@ -117,8 +128,7 @@ export function Sidebar({ className }: { className?: string }) {
                             </DropdownMenuItem>
                         )}
                         {workspaces?.map((ws) => (
-                            <DropdownMenuItem key={ws.id} asChild>
-                                <Link href={`/dashboard/${ws.id}${subPath}`}>
+                            <DropdownMenuItem key={ws.id} onSelect={() => handleWorkspaceChange(ws.id)}>
                                     <div className="flex items-center gap-2 w-full">
                                         <Avatar className="h-6 w-6">
                                             <AvatarImage src={ws.logoUrl} />
@@ -133,7 +143,6 @@ export function Sidebar({ className }: { className?: string }) {
                                             )}
                                         </div>
                                     </div>
-                                </Link>
                             </DropdownMenuItem>
                         ))}
                          {!isWorkspacesLoading && (!workspaces || workspaces.length === 0) && (
@@ -147,7 +156,7 @@ export function Sidebar({ className }: { className?: string }) {
                     <DropdownMenuItem asChild>
                         <Link href="/dashboard/new-workspace">
                             <Plus className="mr-2 h-4 w-4" />
-                            <span>Criar ou entrar em workspace</span>
+                            <span>Criar novo workspace</span>
                         </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
