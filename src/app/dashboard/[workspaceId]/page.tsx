@@ -248,7 +248,7 @@ export default function WorkspacePage() {
             
             <Card>
                 <CardHeader>
-                    <CardTitle>Adicionar conteúdo</CardTitle>
+                    <CardTitle className="font-headline">Adicionar conteúdo</CardTitle>
                     <CardDescription>
                         Cole textos ou faça upload de arquivos. Eles entrarão na fila de processamento.
                     </CardDescription>
@@ -309,7 +309,7 @@ export default function WorkspacePage() {
             {!isQueueEmpty && (
                 <Card className="bg-secondary">
                     <CardHeader>
-                        <CardTitle>Pronto para começar?</CardTitle>
+                        <CardTitle className="font-headline">Pronto para começar?</CardTitle>
                         <CardDescription>
                            {sources.length} {sources.length === 1 ? 'item está' : 'itens estão'} na fila. Ao clicar abaixo, a IA começará a analisar todo o lote.
                         </CardDescription>
