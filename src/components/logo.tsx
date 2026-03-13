@@ -27,7 +27,7 @@ export function Logo({
       {showText && (
         <span
           className={cn(
-            "font-headline text-xl font-medium text-foreground",
+            "font-body text-xl font-bold text-foreground",
             textClassName
           )}
         >

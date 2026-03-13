@@ -33,8 +33,7 @@ export function Sidebar({ className }: { className?: string }) {
     >
       <div className="p-4">
         <div className="flex items-center gap-2 p-2">
-            <Logo showText={false} />
-            <span className="font-bold">Narros</span>
+            <Logo />
         </div>
 
         <nav className="mt-4 flex flex-col gap-1">
