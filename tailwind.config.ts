@@ -92,9 +92,6 @@ export default {
         '.clip-primary': {
           'clip-path': 'polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px))',
         },
-        '.clip-logo': {
-          'clip-path': 'polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px))',
-        },
       })
     })
   ],

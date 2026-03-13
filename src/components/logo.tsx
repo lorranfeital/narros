@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import Image from "next/image";
 
 type LogoProps = {
   className?: string;
@@ -16,7 +17,13 @@ export function Logo({
 }: LogoProps) {
   return (
     <Link href="/" className={cn("flex items-center gap-2.5", className)}>
-      <div className={cn("bg-primary h-7 w-7 clip-logo", iconClassName)} />
+      <Image
+        src="/narros-favicon.svg"
+        alt="Narros logo"
+        width={28}
+        height={28}
+        className={cn(iconClassName)}
+      />
       {showText && (
         <span
           className={cn(
