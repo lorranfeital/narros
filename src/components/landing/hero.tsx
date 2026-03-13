@@ -19,14 +19,14 @@ export function Hero() {
       <div className="container text-center">
         <div className="mx-auto max-w-3xl">
           <h1 className="font-headline text-4xl font-medium tracking-tight text-foreground sm:text-5xl md:text-6xl">
-            Seu conhecimento virou áudio de WhatsApp.
+            Toda empresa tem uma história operacional.
             <br />
             <span className="font-headline italic text-primary">
-              A gente transforma em treinamento.
+              A Narros organiza ela.
             </span>
           </h1>
           <p className="mt-6 text-lg text-muted-foreground">
-            Cole qualquer conteúdo bruto. A IA organiza, estrutura e gera a pauta de treinamento pronta para sua rede. Grátis para começar, sem cartão de crédito.
+            Áudios de WhatsApp, reuniões gravadas, PDFs esquecidos, anotações de bastidor. A Narros lê tudo isso e devolve uma narrativa que sua equipe consegue aprender, replicar e evoluir.
           </p>
         </div>
         <div className="mt-10 flex justify-center gap-4">
