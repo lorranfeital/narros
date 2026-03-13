@@ -120,7 +120,7 @@ service cloud.firestore {
           // All members of the workspace can read all messages in all threads.
           allow read, list: if isWorkspaceMember(workspaceId);
           // Users can only update/delete their own messages.
-          allow update, delete: if isWorkspaceMember(workspaceId) && isOwner(resource.data.userId);
+          allow update, delete: if false;
         }
       }
     }

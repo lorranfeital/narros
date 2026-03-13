@@ -216,5 +216,3 @@ export interface AssistantMessage {
   citations?: any[];
   createdAt: Timestamp;
 }
-
-    
