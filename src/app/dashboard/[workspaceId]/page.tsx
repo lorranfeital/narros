@@ -20,6 +20,8 @@ import { processContentBatch } from '@/lib/actions/workspace-actions';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 // Component to render a single source item
 function SourceItem({ source, onDelete }: { source: Source & {id: string}, onDelete: (sourceId: string, storagePath?: string) => void }) {
@@ -40,7 +42,7 @@ function SourceItem({ source, onDelete }: { source: Source & {id: string}, onDel
                 {getIcon()}
             </div>
             <div className="flex-grow overflow-hidden">
-                <p className="truncate font-medium">{source.type === SourceType.TEXT ? 'Texto colado' : source.sourceName}</p>
+                <p className="truncate font-medium">{source.sourceName || (source.type === SourceType.TEXT ? 'Texto colado' : 'Fonte desconhecida')}</p>
                 <p className="text-sm text-muted-foreground">
                     {source.type === SourceType.TEXT ? `${source.rawText?.substring(0, 50)}...` : `Tipo: ${source.mimeType}`}
                 </p>
@@ -77,6 +79,7 @@ export default function WorkspacePage() {
     const workspaceId = params.workspaceId as string;
 
     const [rawText, setRawText] = useState('');
+    const [textSourceName, setTextSourceName] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     
     // Workspace data
@@ -108,17 +111,24 @@ export default function WorkspacePage() {
             const newDoc = doc(sourcesColRef); // Generate ID client-side
             const batchId = sources?.[0]?.batchId || newDoc.id; // Use existing batch or create new one
             
-            await setDocumentNonBlocking(newDoc, {
+            const data: any = {
                 type: SourceType.TEXT,
                 rawText: rawText.trim(),
                 processingStatus: ProcessingStatus.PENDING,
                 batchId: batchId,
                 createdAt: new Date(),
                 createdBy: user.uid,
-            }, {});
+            };
+
+            if (textSourceName.trim()) {
+                data.sourceName = textSourceName.trim();
+            }
+    
+            await setDocumentNonBlocking(newDoc, data, {});
 
             toast({ title: 'Texto adicionado à fila.' });
             setRawText('');
+            setTextSourceName('');
         } catch (error) {
             console.error(error);
             toast({ variant: 'destructive', title: 'Erro ao adicionar texto.' });
@@ -330,6 +340,16 @@ export default function WorkspacePage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                         <Label htmlFor="text-source-name">Nome da Fonte (opcional)</Label>
+                         <Input
+                            id="text-source-name"
+                            placeholder="Ex: Transcrição da reunião de alinhamento"
+                            value={textSourceName}
+                            onChange={(e) => setTextSourceName(e.target.value)}
+                            disabled={isActionDisabled}
+                        />
+                    </div>
                     <Textarea
                         placeholder="Cole seu conteúdo aqui..."
                         className="min-h-[150px] text-base"
@@ -402,5 +422,3 @@ export default function WorkspacePage() {
         </div>
     );
 }
-
-    
