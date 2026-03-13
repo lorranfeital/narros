@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useFirestore, useDoc, useMemoFirebase, useCollection, useStorage, useUser } from '@/firebase';
@@ -14,7 +15,7 @@ import { IngestionState, ProcessingStatus, Source, Workspace, SourceType, Worksp
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { processContentBatch } from '@/lib/actions/workspace-actions';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
@@ -107,14 +108,14 @@ export default function WorkspacePage() {
             const newDoc = doc(sourcesColRef); // Generate ID client-side
             const batchId = sources?.[0]?.batchId || newDoc.id; // Use existing batch or create new one
             
-            await addDocumentNonBlocking(newDoc, {
+            await setDocumentNonBlocking(newDoc, {
                 type: SourceType.TEXT,
                 rawText: rawText.trim(),
                 processingStatus: ProcessingStatus.PENDING,
                 batchId: batchId,
                 createdAt: new Date(),
                 createdBy: user.uid,
-            });
+            }, {});
 
             toast({ title: 'Texto adicionado à fila.' });
             setRawText('');
@@ -146,7 +147,7 @@ export default function WorkspacePage() {
 
             const batchId = sources?.[0]?.batchId || newSourceDocRef.id;
 
-            await addDocumentNonBlocking(newSourceDocRef, {
+            await setDocumentNonBlocking(newSourceDocRef, {
                 type: SourceType.FILE,
                 sourceName: file.name,
                 mimeType: file.type,
@@ -155,7 +156,7 @@ export default function WorkspacePage() {
                 batchId: batchId,
                 createdAt: new Date(),
                 createdBy: user.uid,
-            });
+            }, {});
             
             toast({ title: 'Arquivo adicionado à fila.' });
         } catch (error) {
@@ -401,3 +402,5 @@ export default function WorkspacePage() {
         </div>
     );
 }
+
+    
