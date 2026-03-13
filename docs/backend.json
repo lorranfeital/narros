@@ -61,7 +61,16 @@
         },
         "sector": {
           "type": "string",
-          "description": "The business sector of the workspace."
+          "description": "The business sector of the workspace.",
+          "enum": [
+            "Alimentação",
+            "Varejo",
+            "Serviços",
+            "Saúde",
+            "Educação",
+            "Imobiliário",
+            "Outro"
+          ]
         },
         "ownerId": {
           "type": "string",

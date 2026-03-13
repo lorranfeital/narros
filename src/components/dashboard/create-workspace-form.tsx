@@ -28,7 +28,9 @@ import { useRouter } from 'next/navigation';
 const formSchema = z.object({
   name: z.string().min(2, 'O nome deve ter pelo menos 2 caracteres.'),
   type: z.enum(['franquia', 'escritório', 'rede', 'outro']),
-  sector: z.string().min(2, 'O setor deve ter pelo menos 2 caracteres.'),
+  sector: z.enum(['Alimentação', 'Varejo', 'Serviços', 'Saúde', 'Educação', 'Imobiliário', 'Outro'], {
+    required_error: 'Selecione um setor.'
+  }),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -44,7 +46,6 @@ export function CreateWorkspaceForm() {
     defaultValues: {
       name: '',
       type: 'franquia',
-      sector: '',
     },
   });
 
@@ -120,9 +121,22 @@ export function CreateWorkspaceForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Setor</FormLabel>
-              <FormControl>
-                <Input placeholder="Ex: Alimentação" {...field} />
-              </FormControl>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o setor de atuação" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="Alimentação">Alimentação</SelectItem>
+                  <SelectItem value="Varejo">Varejo</SelectItem>
+                  <SelectItem value="Serviços">Serviços</SelectItem>
+                  <SelectItem value="Saúde">Saúde</SelectItem>
+                  <SelectItem value="Educação">Educação</SelectItem>
+                  <SelectItem value="Imobiliário">Imobiliário</SelectItem>
+                  <SelectItem value="Outro">Outro</SelectItem>
+                </SelectContent>
+              </Select>
               <FormMessage />
             </FormItem>
           )}

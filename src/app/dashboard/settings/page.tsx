@@ -28,7 +28,7 @@ type ProfileFormValues = z.infer<typeof profileFormSchema>;
 const workspaceFormSchema = z.object({
   name: z.string().min(2, { message: 'O nome do workspace deve ter pelo menos 2 caracteres.' }),
   type: z.enum(['franquia', 'escritório', 'rede', 'outro']),
-  sector: z.string().min(2, { message: 'O setor deve ter pelo menos 2 caracteres.' }),
+  sector: z.enum(['Alimentação', 'Varejo', 'Serviços', 'Saúde', 'Educação', 'Imobiliário', 'Outro']),
 });
 
 type WorkspaceFormValues = z.infer<typeof workspaceFormSchema>;
@@ -89,7 +89,7 @@ export default function SettingsPage() {
 
   const workspaceForm = useForm<WorkspaceFormValues>({
     resolver: zodResolver(workspaceFormSchema),
-    defaultValues: { name: '', type: 'franquia', sector: '' },
+    defaultValues: { name: '', type: 'franquia', sector: 'Alimentação' },
   });
 
   React.useEffect(() => {
@@ -97,7 +97,7 @@ export default function SettingsPage() {
       workspaceForm.reset({
         name: currentWorkspace.name || '',
         type: currentWorkspace.type || 'franquia',
-        sector: currentWorkspace.sector || '',
+        sector: currentWorkspace.sector || 'Alimentação',
       });
     }
   }, [currentWorkspace, workspaceForm]);
@@ -239,9 +239,22 @@ export default function SettingsPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Setor</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Setor de atuação" {...field} />
-                        </FormControl>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                           <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione o setor de atuação" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Alimentação">Alimentação</SelectItem>
+                            <SelectItem value="Varejo">Varejo</SelectItem>
+                            <SelectItem value="Serviços">Serviços</SelectItem>
+                            <SelectItem value="Saúde">Saúde</SelectItem>
+                            <SelectItem value="Educação">Educação</SelectItem>
+                            <SelectItem value="Imobiliário">Imobiliário</SelectItem>
+                            <SelectItem value="Outro">Outro</SelectItem>
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}
