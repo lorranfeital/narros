@@ -1,42 +1,105 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { History } from "lucide-react";
+'use client';
 
-const recentItems = [
-    { title: "Criar post 'Antes de automatizar ...'", date: "Dez 4, 2025" },
-    { title: "Manifesto Beacon", date: "Dez 9, 2025" },
-    { title: "Ajustar formulário do ...", date: "Dez 3, 2025" },
-    { title: "Criar post manifesto fixo ...", date: "Nov 19, 2025" },
-    { title: "Publicar 1ª edição da newsletter ...", date: "Dez 19, 2025" },
-    { title: "Novo item", date: "Nov 11, 2025" },
-]
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
+import { collection, query, where } from "firebase/firestore";
+import Link from "next/link";
+import { Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { VariantProps } from "class-variance-authority";
+import { badgeVariants } from "@/components/ui/badge";
+
+type BadgeVariant = VariantProps<typeof badgeVariants>["variant"];
+
+function getStatusBadgeVariant(status: string): BadgeVariant {
+  switch (status) {
+    case 'published':
+      return 'success';
+    case 'sync_pending':
+      return 'processing';
+    case 'draft':
+      return 'default';
+    case 'never_published':
+    default:
+      return 'secondary';
+  }
+}
+
+function getStatusText(status: string) {
+    switch (status) {
+        case 'published':
+            return 'Publicado';
+        case 'draft':
+            return 'Rascunho pronto';
+        case 'sync_pending':
+            return 'Atualização pendente';
+        case 'never_published':
+        default:
+            return 'Nunca publicado';
+    }
+}
+
 
 export default function DashboardPage() {
+    const { user } = useUser();
+    const firestore = useFirestore();
+
+    const workspacesQuery = useMemoFirebase(() => {
+        if (!user || !firestore) return null;
+        return query(collection(firestore, 'workspaces'), where('members', 'array-contains', user.uid));
+    }, [user, firestore]);
+
+    const { data: workspaces, isLoading } = useCollection<any>(workspacesQuery);
+
     return (
         <div className="p-12">
-            <h1 className="text-4xl font-bold tracking-tight">Bom dia</h1>
-            <div className="mt-10">
-                <h2 className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                    <History className="h-4 w-4" />
-                    <span>Visitados recentemente</span>
-                </h2>
-                <div className="mt-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                    {recentItems.map((item) => (
-                        <Card key={item.title}>
-                            <CardContent className="p-4 space-y-3">
-                                <div className="h-16 w-full rounded bg-muted/50"></div>
-                                <h3 className="font-semibold text-sm truncate">{item.title}</h3>
-                                <div className="flex items-center gap-2">
-                                    <Avatar className="h-5 w-5">
-                                        <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" />
-                                        <AvatarFallback>CN</AvatarFallback>
-                                    </Avatar>
-                                    <p className="text-xs text-muted-foreground">{item.date}</p>
-                                </div>
+            <h1 className="text-4xl font-headline font-bold tracking-tight">Bom dia, {user?.displayName?.split(' ')[0]}</h1>
+            <p className="text-muted-foreground mt-2">Gerencie seus workspaces ou crie um novo para começar.</p>
+            
+            <div className="mt-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {isLoading && Array.from({ length: 3 }).map((_, i) => (
+                    <Card key={i} className="h-[180px]">
+                        <CardHeader>
+                            <Skeleton className="h-6 w-3/4" />
+                            <Skeleton className="h-4 w-1/2 mt-2" />
+                        </CardHeader>
+                        <CardContent>
+                             <Skeleton className="h-6 w-1/3" />
+                        </CardContent>
+                    </Card>
+                ))}
+
+                {!isLoading && workspaces?.map((ws) => (
+                    <Link href={'/dashboard'} key={ws.id}>
+                        <Card className="h-full min-h-[180px] hover:border-primary/50 transition-colors flex flex-col">
+                            <CardHeader className="flex-grow">
+                                <CardTitle className="text-xl">{ws.name}</CardTitle>
+                                <CardDescription className="flex items-center gap-2 pt-1">
+                                    <span>{ws.type}</span>
+                                    <span>&middot;</span>
+                                    <span>{ws.sector}</span>
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <Badge variant={getStatusBadgeVariant(ws.knowledgeStatus)}>
+                                    {getStatusText(ws.knowledgeStatus)}
+                                </Badge>
                             </CardContent>
                         </Card>
-                    ))}
-                </div>
+                    </Link>
+                ))}
+                
+                {!isLoading && (
+                    <Link href="/dashboard/new-workspace">
+                        <Card className="flex h-full min-h-[180px] items-center justify-center border-dashed hover:border-primary/80 transition-colors">
+                            <div className="text-center text-muted-foreground">
+                                <Plus className="mx-auto h-8 w-8" />
+                                <p className="mt-2 font-medium">Novo workspace</p>
+                            </div>
+                        </Card>
+                    </Link>
+                )}
             </div>
         </div>
     )
