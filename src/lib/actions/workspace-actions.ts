@@ -126,7 +126,14 @@ export async function processContentBatch(
       processingStatus: ProcessingStatus.PROCESSING,
     });
   });
-  await initialBatch.commit();
+
+  try {
+      await initialBatch.commit();
+  } catch (e: any) {
+      console.error("Error committing initial batch:", e);
+      throw new Error(`Falha na permissão do Firestore ao iniciar o processamento. A regra de segurança pode estar bloqueando a atualização do status do workspace ou das fontes. Detalhe: ${e.message}`);
+  }
+
 
   // 2. Consolidate content from all sources in the batch
   let consolidatedContent = '';
@@ -229,7 +236,12 @@ export async function processContentBatch(
   });
 
   // Commit all changes
-  await finalBatch.commit();
+  try {
+    await finalBatch.commit();
+  } catch (e: any) {
+      console.error("Error committing final batch:", e);
+      throw new Error(`Falha na permissão do Firestore ao salvar o resultado da IA. A regra de segurança pode estar bloqueando a criação de 'draft_knowledge', 'sync_proposals', 'insights' ou a atualização do status 'sources'. Detalhe: ${e.message}`);
+  }
 }
 
 
@@ -298,7 +310,12 @@ export async function publishDraft(
   batch.delete(draftRef);
 
   // 6. Commit the transaction
-  await batch.commit();
+  try {
+    await batch.commit();
+  } catch (e: any) {
+    console.error("Error committing publish batch:", e);
+    throw new Error(`Falha na permissão do Firestore ao publicar o rascunho. Verifique as regras para 'published_knowledge', 'versions' e 'workspaces'. Detalhe: ${e.message}`);
+  }
 }
 
 
@@ -400,7 +417,10 @@ export async function publishSync(workspaceId: string, userId: string) {
     });
     
     // 9. Commit
-    await batch.commit();
+    try {
+        await batch.commit();
+    } catch (e: any) {
+        console.error("Error committing sync batch:", e);
+        throw new Error(`Falha na permissão do Firestore ao publicar a sincronização. Verifique as regras para 'published_knowledge', 'sync_proposals', 'versions' e 'workspaces'. Detalhe: ${e.message}`);
+    }
 }
-
-    

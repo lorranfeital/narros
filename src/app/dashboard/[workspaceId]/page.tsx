@@ -2,7 +2,7 @@
 'use client';
 
 import { useFirestore, useDoc, useMemoFirebase, useCollection, useStorage, useUser } from '@/firebase';
-import { doc, collection, query, where, deleteDoc, getDoc } from 'firebase/firestore';
+import { doc, collection, query, where, getDoc } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, deleteObject } from 'firebase/storage';
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -15,7 +15,7 @@ import { IngestionState, ProcessingStatus, Source, Workspace, SourceType, Worksp
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { processContentBatch } from '@/lib/actions/workspace-actions';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
@@ -180,18 +180,20 @@ export default function WorkspacePage() {
 
     const handleDeleteSource = async (sourceId: string, storagePath?: string) => {
         if (!workspaceId || !firestore) return;
+        
+        // Use non-blocking delete for Firestore, which will handle permission errors globally
+        deleteDocumentNonBlocking(doc(firestore, `workspaces/${workspaceId}/sources`, sourceId));
+
         try {
-            await deleteDoc(doc(firestore, `workspaces/${workspaceId}/sources`, sourceId));
-            
             if (storagePath && storage) {
                 const fileRef = storageRef(storage, storagePath);
                 await deleteObject(fileRef);
             }
-
             toast({ title: 'Fonte removida da fila.' });
         } catch (error) {
-            console.error(error);
-            toast({ variant: 'destructive', title: 'Erro ao remover fonte.' });
+             // This catch is now primarily for storage errors
+            console.error("Error deleting source file from storage:", error);
+            toast({ variant: 'destructive', title: 'Erro ao remover arquivo do armazenamento.' });
         }
     };
 

@@ -2,7 +2,7 @@
 'use client';
 
 import { useFirestore, useMemoFirebase, useCollection, useUser } from '@/firebase';
-import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { doc, collection, query, orderBy, serverTimestamp } from 'firebase/firestore';
 import { useParams } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
@@ -19,6 +19,7 @@ import { ptBR } from 'date-fns/locale';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 
 function ThreadList({
@@ -173,7 +174,7 @@ export default function AssistantPage() {
         if (activeThread && activeThread.title === 'Nova Conversa') {
             const threadRef = doc(firestore, `workspaces/${workspaceId}/assistant_threads`, activeThreadId);
             // This is a non-blocking update
-            updateDoc(threadRef, { title: userMessage.substring(0, 40) });
+            updateDocumentNonBlocking(threadRef, { title: userMessage.substring(0, 40) });
         }
         
         // Assemble chat history
