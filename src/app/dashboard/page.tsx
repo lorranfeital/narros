@@ -40,6 +40,11 @@ function getStatusText(status: string) {
     }
 }
 
+function capitalize(str: string) {
+    if (!str) return str;
+    return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
 
 export default function DashboardPage() {
     const { user } = useUser();
@@ -76,7 +81,7 @@ export default function DashboardPage() {
                             <CardHeader className="flex-grow">
                                 <CardTitle className="text-xl font-body font-semibold">{ws.name}</CardTitle>
                                 <CardDescription className="flex items-center gap-2 pt-1">
-                                    <span>{ws.type}</span>
+                                    <span>{capitalize(ws.type)}</span>
                                     <span>&middot;</span>
                                     <span>{ws.sector}</span>
                                 </CardDescription>
