@@ -7,7 +7,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Upload, FileText, Trash2, Loader2, Sparkles, AlertTriangle, ArrowRight, GitPullRequest } from 'lucide-react';
+import { Upload, FileText, Trash2, Loader2, Sparkles, AlertTriangle, ArrowRight, GitPullRequest, Clock, Database, ListChecks } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import React, { useState } from 'react';
 import { IngestionState, ProcessingStatus, Source, Workspace, SourceType, WorkspaceStatus } from '@/lib/firestore-types';
@@ -17,6 +17,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { processContentBatch } from '@/lib/actions/workspace-actions';
 import Link from 'next/link';
+import { formatDistanceToNow } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 // Component to render a single source item
 function SourceItem({ source, onDelete }: { source: Source & {id: string}, onDelete: (sourceId: string, storagePath?: string) => void }) {
@@ -50,6 +52,19 @@ function SourceItem({ source, onDelete }: { source: Source & {id: string}, onDel
     );
 }
 
+function getStatusText(status: WorkspaceStatus) {
+    switch (status) {
+        case WorkspaceStatus.PUBLISHED:
+            return 'Publicado';
+        case WorkspaceStatus.DRAFT_READY:
+            return 'Rascunho pronto';
+        case WorkspaceStatus.SYNC_PENDING:
+            return 'Sincronização pendente';
+        case WorkspaceStatus.NEVER_PUBLISHED:
+        default:
+            return 'Nunca publicado';
+    }
+}
 
 export default function WorkspacePage() {
     const firestore = useFirestore();
@@ -238,6 +253,39 @@ export default function WorkspacePage() {
                 </p>
             </div>
             
+            <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2" title={`Status: ${getStatusText(workspace.status)}`}>
+                    <Badge variant={
+                        workspace.status === 'published' ? 'success' : 
+                        workspace.status === 'sync_pending' ? 'processing' :
+                        workspace.status === 'draft_ready' ? 'default' :
+                        'secondary'
+                    }>{getStatusText(workspace.status)}</Badge>
+                </div>
+                <div className="flex items-center gap-2">
+                    <ListChecks className="h-4 w-4" />
+                    <span>Fila: <span className="font-semibold text-foreground">{sources?.length || 0} itens</span></span>
+                </div>
+                {workspace.lastProcessedAt && (
+                    <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        <span>Processado: <span className="font-semibold text-foreground">{formatDistanceToNow(workspace.lastProcessedAt.toDate(), { locale: ptBR, addSuffix: true })}</span></span>
+                    </div>
+                )}
+                {workspace.lastPublishedAt && (
+                    <div className="flex items-center gap-2">
+                        <Database className="h-4 w-4" />
+                        <span>Publicado: <span className="font-semibold text-foreground">{formatDistanceToNow(workspace.lastPublishedAt.toDate(), { locale: ptBR, addSuffix: true })}</span></span>
+                    </div>
+                )}
+                 {workspace.status === 'sync_pending' && workspace.pendingSyncCount && workspace.pendingSyncCount > 0 &&(
+                    <div className="flex items-center gap-2">
+                        <GitPullRequest className="h-4 w-4" />
+                        <span>Pendentes: <span className="font-semibold text-foreground">{workspace.pendingSyncCount}</span></span>
+                    </div>
+                )}
+            </div>
+
             {workspace.status === WorkspaceStatus.SYNC_PENDING && (
                  <Alert className="border-blue-500/50 text-blue-600 dark:text-blue-400 [&>svg]:text-blue-500">
                     <GitPullRequest className="h-4 w-4" />

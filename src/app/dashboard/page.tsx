@@ -11,6 +11,7 @@ import type { VariantProps } from "class-variance-authority";
 import { badgeVariants } from "@/components/ui/badge";
 import { Workspace, WorkspaceStatus } from "@/lib/firestore-types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { format } from 'date-fns';
 
 type BadgeVariant = VariantProps<typeof badgeVariants>["variant"];
 
@@ -102,9 +103,19 @@ export default function DashboardPage() {
                                </div>
                             </CardHeader>
                             <CardContent>
-                                <Badge variant={getStatusBadgeVariant(ws.status)}>
-                                    {getStatusText(ws.status)}
-                                </Badge>
+                                <div className="flex justify-between items-center">
+                                    <Badge variant={getStatusBadgeVariant(ws.status)}>
+                                        <span>{getStatusText(ws.status)}</span>
+                                         {ws.status === WorkspaceStatus.SYNC_PENDING && ws.pendingSyncCount && ws.pendingSyncCount > 0 && (
+                                            <span className="ml-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white">{ws.pendingSyncCount}</span>
+                                        )}
+                                    </Badge>
+                                    {ws.lastPublishedAt && (
+                                        <p className="text-xs text-muted-foreground">
+                                            Pub: {format(ws.lastPublishedAt.toDate(), "dd/MM/yy")}
+                                        </p>
+                                    )}
+                                </div>
                             </CardContent>
                         </Card>
                     </Link>
@@ -124,5 +135,3 @@ export default function DashboardPage() {
         </div>
     )
 }
-
-    
