@@ -95,7 +95,7 @@ export interface Source {
   extractedText?: string;
   transcript?: string;
   processingStatus: ProcessingStatus;
-  batchId?: string;
+  batchId: string;
   createdAt: Timestamp;
   createdBy: string;
   notes?: string;
