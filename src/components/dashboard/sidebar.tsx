@@ -11,6 +11,7 @@ import {
   BookOpen,
   GitPullRequest,
   Bot,
+  LogOut,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -157,16 +158,6 @@ export function Sidebar({ className }: { className?: string }) {
                             <span>Criar novo workspace</span>
                         </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                         <Link href={currentWorkspace?.id ? `/dashboard/${currentWorkspace.id}/settings` : '#'}>
-                            <Settings className="mr-2 h-4 w-4" />
-                            <span>Configurações</span>
-                        </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout}>
-                        <span>Sair</span>
-                    </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
 
@@ -252,26 +243,48 @@ export function Sidebar({ className }: { className?: string }) {
                     <Bot className="h-4 w-4" />
                     <span>Assistente</span>
                 </Link>
-
-                <Link
-                    href={currentWorkspace ? `/dashboard/${currentWorkspace.id}/settings` : '#'}
-                    className={cn(
-                        "flex items-center gap-3 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground",
-                        pathname?.includes('/settings') && "bg-muted/50 text-foreground",
-                        !currentWorkspace && "pointer-events-none opacity-50"
-                    )}
-                    aria-disabled={!currentWorkspace}
-                    tabIndex={!currentWorkspace ? -1 : undefined}
-                >
-                    <Settings className="h-4 w-4" />
-                    <span>Configurações</span>
-                </Link>
             </nav>
         </div>
 
-      <div className="mt-auto border-t p-2">
-        {/* Placeholder for future items like invites */}
-      </div>
+        <div className="mt-auto border-t p-2">
+            {isProfileLoading ? (
+                <div className="flex items-center gap-2 p-2">
+                    <Skeleton className="h-8 w-8 rounded-full" />
+                    <div className="flex-1 space-y-1">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-3 w-32" />
+                    </div>
+                </div>
+            ) : (
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="w-full justify-start gap-2 px-2 h-auto py-2">
+                            <Avatar className="h-8 w-8">
+                                <AvatarImage src={user?.photoURL ?? undefined} />
+                                <AvatarFallback>{userProfile?.name?.charAt(0) ?? user?.email?.charAt(0) ?? 'U'}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex flex-col items-start truncate">
+                                <span className="text-sm font-semibold">{userProfile?.name ?? user?.displayName ?? 'Usuário'}</span>
+                                <span className="text-xs text-muted-foreground truncate">{user?.email}</span>
+                            </div>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-[270px] mb-2" side="top" align="start">
+                        <DropdownMenuItem asChild>
+                            <Link href={currentWorkspace?.id ? `/dashboard/${currentWorkspace.id}/settings` : '/dashboard'}>
+                                <Settings className="mr-2 h-4 w-4" />
+                                <span>Configurações</span>
+                            </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                            <LogOut className="mr-2 h-4 w-4" />
+                            <span>Sair</span>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            )}
+        </div>
     </aside>
   );
 }
