@@ -21,7 +21,7 @@ import { useRouter } from "next/navigation";
 const mainNavItems = [
     { icon: Search, label: "Buscar", href: "#" },
     { icon: Home, label: "Início", href: "/dashboard" },
-    { icon: Settings, label: "Configurações", href: "#" },
+    { icon: Settings, label: "Configurações", href: "/dashboard/settings" },
 ]
 
 const docItems = [
@@ -76,9 +76,11 @@ export function Sidebar({ className }: { className?: string }) {
                         <Plus className="mr-2 h-4 w-4" />
                         <span>Criar ou entrar em workspace</span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
-                        <Settings className="mr-2 h-4 w-4" />
-                        <span>Configurações</span>
+                    <DropdownMenuItem asChild>
+                        <Link href="/dashboard/settings">
+                            <Settings className="mr-2 h-4 w-4" />
+                            <span>Configurações</span>
+                        </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleLogout}>
