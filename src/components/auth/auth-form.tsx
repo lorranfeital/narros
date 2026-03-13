@@ -1,17 +1,20 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import Link from "next/link";
+import { useAuth, useUser } from "@/firebase";
+import { initiateEmailSignIn, initiateEmailSignUp, initiateGoogleSignIn } from "@/firebase/non-blocking-login";
+import { useRouter } from "next/navigation";
+
 
 const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg viewBox="-0.5 0 48 48" xmlns="http://www.w3.org/2000/svg" {...props}>
@@ -25,6 +28,36 @@ const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
 );
 
 export function AuthForm() {
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [registerEmail, setRegisterEmail] = useState('');
+  const [registerPassword, setRegisterPassword] = useState('');
+  
+  const auth = useAuth();
+  const router = useRouter();
+  const { user, isUserLoading } = useUser();
+
+  useEffect(() => {
+    if (!isUserLoading && user) {
+      router.push('/dashboard');
+    }
+  }, [user, isUserLoading, router]);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    initiateEmailSignIn(auth, loginEmail, loginPassword);
+  };
+
+  const handleRegister = (e: React.FormEvent) => {
+    e.preventDefault();
+    initiateEmailSignUp(auth, registerEmail, registerPassword);
+  };
+  
+  const handleGoogleSignIn = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    initiateGoogleSignIn(auth);
+  };
+
   return (
     <Tabs defaultValue="login" className="w-full">
       <TabsList className="grid w-full grid-cols-2">
@@ -39,11 +72,9 @@ export function AuthForm() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 p-0">
-          <Button variant="outline" className="w-full" asChild>
-            <Link href="/dashboard">
+            <Button variant="outline" className="w-full" onClick={handleGoogleSignIn}>
               <GoogleIcon className="mr-2 h-4 w-4" />
               Continuar com Google
-            </Link>
             </Button>
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -55,17 +86,17 @@ export function AuthForm() {
                 </span>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="email-login">Email</Label>
-              <Input id="email-login" type="email" placeholder="m@example.com" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password-login">Senha</Label>
-              <Input id="password-login" type="password" />
-            </div>
-            <Button className="w-full" asChild>
-              <Link href="/dashboard">Entrar</Link>
-            </Button>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email-login">Email</Label>
+                <Input id="email-login" type="email" placeholder="m@example.com" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password-login">Senha</Label>
+                <Input id="password-login" type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required />
+              </div>
+              <Button type="submit" className="w-full">Entrar</Button>
+            </form>
           </CardContent>
         </Card>
       </TabsContent>
@@ -77,11 +108,9 @@ export function AuthForm() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 p-0">
-          <Button variant="outline" className="w-full" asChild>
-            <Link href="/dashboard">
+          <Button variant="outline" className="w-full" onClick={handleGoogleSignIn}>
               <GoogleIcon className="mr-2 h-4 w-4" />
               Continuar com Google
-            </Link>
             </Button>
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -93,17 +122,17 @@ export function AuthForm() {
                 </span>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="email-register">Email</Label>
-              <Input id="email-register" type="email" placeholder="m@example.com" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password-register">Senha</Label>
-              <Input id="password-register" type="password" />
-            </div>
-            <Button className="w-full" asChild>
-              <Link href="/dashboard">Criar conta</Link>
-            </Button>
+            <form onSubmit={handleRegister} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email-register">Email</Label>
+                <Input id="email-register" type="email" placeholder="m@example.com" value={registerEmail} onChange={e => setRegisterEmail(e.target.value)} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password-register">Senha</Label>
+                <Input id="password-register" type="password" value={registerPassword} onChange={e => setRegisterPassword(e.target.value)} required />
+              </div>
+              <Button type="submit" className="w-full">Criar conta</Button>
+              </form>
           </CardContent>
         </Card>
       </TabsContent>

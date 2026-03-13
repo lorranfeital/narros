@@ -1,3 +1,5 @@
+'use client';
+
 import { Logo } from "@/components/logo";
 import { cn } from "@/lib/utils";
 import {
@@ -12,6 +14,9 @@ import {
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuGroup } from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/firebase";
+import { signOut } from "firebase/auth";
+import { useRouter } from "next/navigation";
 
 const mainNavItems = [
     { icon: Search, label: "Buscar", href: "#" },
@@ -28,6 +33,15 @@ const docItems = [
 ]
 
 export function Sidebar({ className }: { className?: string }) {
+  const auth = useAuth();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    signOut(auth).then(() => {
+      router.push('/login');
+    });
+  };
+
   return (
     <aside
       className={cn(
@@ -67,7 +81,7 @@ export function Sidebar({ className }: { className?: string }) {
                         <span>Configurações</span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleLogout}>
                         <span>Sair</span>
                     </DropdownMenuItem>
                 </DropdownMenuContent>
