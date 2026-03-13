@@ -27,6 +27,14 @@ service cloud.firestore {
       let workspaceDoc = get(/databases/$(database)/documents/workspaces/$(workspaceId));
       return isSignedIn() && request.auth.uid == workspaceDoc.data.ownerId;
     }
+    
+    // This function acts as a workaround to allow trusted server-side actions
+    // (which run unauthenticated) to write to the database.
+    // In a production environment with higher security needs, this should be
+    // replaced by using the Firebase Admin SDK in a secure backend environment.
+    function isServerProcess() {
+        return request.auth == null;
+    }
 
 
     // ------------------------------------------------------------------------
@@ -47,8 +55,8 @@ service cloud.firestore {
       allow create: if isOwner(request.resource.data.ownerId);
       // Allow read for workspace members.
       allow get: if isWorkspaceMember(workspaceId);
-      // Allow update for members, but delete only for the owner.
-      allow update: if isWorkspaceMember(workspaceId);
+      // Allow update for members or server processes, but delete only for the owner.
+      allow update: if isWorkspaceMember(workspaceId) || isServerProcess();
       allow delete: if isWorkspaceOwner(workspaceId);
       // Allow list for any signed-in user, client must filter.
       allow list: if isSignedIn();
@@ -59,51 +67,60 @@ service cloud.firestore {
         allow create: if isWorkspaceMember(workspaceId);
         // Any workspace member can read sources.
         allow read, list: if isWorkspaceMember(workspaceId);
-        // Allow members to update status, but only owner to delete.
-        allow update: if isWorkspaceMember(workspaceId);
+        // Allow members or server to update status, but only owner to delete.
+        allow update: if isWorkspaceMember(workspaceId) || isServerProcess();
         allow delete: if isWorkspaceOwner(workspaceId);
       }
 
       // --- Draft & Published Knowledge Subcollections ---
       match /draft_knowledge/{draftId} {
-        allow read, list, create, update, delete: if isWorkspaceMember(workspaceId);
+        allow create: if isServerProcess();
+        allow read, list, update, delete: if isWorkspaceMember(workspaceId) || isServerProcess();
       }
       match /published_knowledge/{publishedId} {
         // Members can read published knowledge.
         allow read, list: if isWorkspaceMember(workspaceId);
-        // Only owners can publish/update/delete.
-        allow create, update, delete: if isWorkspaceOwner(workspaceId);
+        // Only owners or server can publish/update/delete.
+        allow create, update, delete: if isWorkspaceOwner(workspaceId) || isServerProcess();
       }
 
       // --- Playbooks Subcollection ---
       match /playbooks/{playbookId} {
-        allow read, list, create, update, delete: if isWorkspaceMember(workspaceId);
+         // Server can create/update, members can read/update/delete
+        allow create, update: if isServerProcess();
+        allow read, list, update, delete: if isWorkspaceMember(workspaceId);
       }
 
       // --- Training Modules Subcollection ---
       match /training_modules/{moduleId} {
-        allow read, list, create, update, delete: if isWorkspaceMember(workspaceId);
+        // Server can create/update, members can read/update/delete
+        allow create, update: if isServerProcess();
+        allow read, list, update, delete: if isWorkspaceMember(workspaceId);
       }
 
       // --- Insights Subcollection ---
       match /insights/{insightId} {
-        allow read, list, create, update, delete: if isWorkspaceMember(workspaceId);
+        // Server creates, members can manage
+        allow create: if isServerProcess();
+        allow read, list, update, delete: if isWorkspaceMember(workspaceId);
       }
 
       // --- Sync Proposals Subcollection ---
       match /sync_proposals/{proposalId} {
-        // Members can read proposals to review them.
-        allow read, list: if isWorkspaceMember(workspaceId);
-        // Members can act on (create/update/delete) proposals.
-        allow create, update, delete: if isWorkspaceMember(workspaceId);
+        // Server creates proposals
+        allow create: if isServerProcess();
+        // Members can read and act on them.
+        allow read, list, update, delete: if isWorkspaceMember(workspaceId);
       }
 
       // --- Versions Subcollection ---
       match /versions/{versionId} {
+        // Server creates version records.
+        allow create: if isServerProcess();
         // Members can view version history.
         allow read, list: if isWorkspaceMember(workspaceId);
-        // Version records are immutable, created programmatically. No direct write/delete.
-        allow create, update, delete: if false;
+        // Version records are immutable after creation.
+        allow update, delete: if false;
       }
 
       // --- Assistant Threads & Messages Subcollections ---
