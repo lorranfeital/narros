@@ -17,6 +17,7 @@ const AnalyzeAndStructureContentInputSchema = z.object({
     .describe(
       'The raw content to be analyzed, which can be a transcription, PDF text, meeting notes, etc.'
     ),
+  existingKnowledge: z.string().optional().describe('A JSON string representing the current published knowledge base. If provided, the AI should update this knowledge base rather than creating a new one.'),
 });
 export type AnalyzeAndStructureContentInput = z.infer<
   typeof AnalyzeAndStructureContentInputSchema
@@ -108,31 +109,35 @@ export async function analyzeAndStructureContent(
 
 const systemPrompt = `Você é um especialista em estruturação de conhecimento operacional e de marca para franquias e redes de negócios brasileiros. Sua tarefa é analisar o conteúdo bruto fornecido e organizá-lo em uma estrutura JSON clara e acionável.
 
+**Sua principal função é ATUALIZAR uma base de conhecimento existente com base em novo conteúdo.**
+
 Siga estas regras estritamente:
-1.  **Linguagem Clara e Operacional:** Use português do Brasil. Seja direto, objetivo e prático. Evite jargões desnecessários.
-2.  **Não Invente Informações:** Baseie-se exclusivamente no conteúdo fornecido. Se uma informação não estiver presente, não a deduza ou invente.
-3.  **Conflitos como Insights:** Se encontrar informações conflitantes, crie um 'insight' do tipo 'risco' descrevendo o conflito.
-4.  **Foco nos Ativos de Conhecimento:** Modele o conhecimento para ser usado no dia a dia (processos, checklists, scripts, políticas, guias).
-5.  **Saída Estritamente em JSON:** Sua resposta DEVE ser um único objeto JSON válido, sem nenhum texto, comentário ou markdown fora do objeto.
+1.  **Analisar e Integrar:** Analise o "Conteúdo Bruto" e integre-o à "Base de Conhecimento Existente", se fornecida.
+2.  **Manter Itens Intactos:** Se um item da base de conhecimento existente não for mencionado ou afetado pelo novo conteúdo, você **DEVE** mantê-lo exatamente como está em sua resposta. A ausência de menção **NÃO** significa que a informação é obsoleta.
+3.  **Adicionar e Modificar:** Adicione novos itens (knowledgeBase, brandKit, playbooks, etc.) se o conteúdo os introduzir. Modifique itens existentes se o novo conteúdo os atualizar explicitamente.
+4.  **Linguagem Clara e Operacional:** Use português do Brasil. Seja direto, objetivo e prático.
+5.  **Base Exclusiva no Conteúdo:** Baseie-se exclusivamente no conteúdo fornecido para fazer alterações. Não invente informações.
+6.  **Conflitos como Insights:** Se encontrar informações conflitantes entre o novo conteúdo e o existente, crie um 'insight' do tipo 'risco' descrevendo o conflito.
+7.  **Saída Estritamente em JSON:** Sua resposta DEVE ser um único objeto JSON válido, representando a base de conhecimento **COMPLETA E ATUALIZADA**, sem nenhum texto, comentário ou markdown fora do objeto.
 
 Estruture sua saída nos seguintes blocos:
 
--   **knowledgeBase:** Organize o conhecimento GERAL e OPERACIONAL em categorias. Cada categoria deve ter um ícone emoji simples e relevante. NÃO inclua informações de marca aqui.
--   **brandKit:** Se o conteúdo contiver diretrizes de marca, identidade visual, tom de voz, posicionamento, personas, paleta de cores, tipografia ou regras de comunicação, extraia essas informações e coloque-as DENTRO do objeto 'brandKit'.
-    -   Para 'colorPalette', extraia o nome da cor e seu código hexadecimal.
-    -   Para 'typography', extraia o nome de uso (Títulos, Corpo), a família da fonte e o peso.
-    -   Para 'toneOfVoice', liste os adjetivos ou princípios (ex: "Amigável", "Formal", "Técnico").
--   **playbooks:** Extraia processos passo a passo.
--   **trainingModules:** Crie módulos de treinamento práticos.
--   **insights:** Identifique gaps, oportunidades ou riscos.
+-   **knowledgeBase:** Organize o conhecimento GERAL e OPERACIONAL em categorias. Cada categoria deve ter um ícone emoji simples e relevante.
+-   **brandKit:** Extraia ou atualize as diretrizes de marca (cores, tipografia, tom de voz).
+-   **playbooks:** Extraia ou atualize processos passo a passo.
+-   **trainingModules:** Crie ou atualize módulos de treinamento práticos.
+-   **insights:** Identifique gaps, oportunidades ou riscos com base na análise.
 
-Analise o conteúdo a seguir e retorne a estrutura JSON.`;
+Analise os dados a seguir e retorne a estrutura JSON completa e atualizada.`;
 
 const analyzeAndStructureContentPrompt = ai.definePrompt({
   name: 'analyzeAndStructureContentPrompt',
   input: { schema: AnalyzeAndStructureContentInputSchema },
   output: { schema: AnalyzeAndStructureContentOutputSchema, format: 'json' },
-  prompt: systemPrompt + '\n\nConteúdo bruto a ser analisado:\n{{{rawContent}}}',
+  prompt: 
+    systemPrompt + 
+    '{{#if existingKnowledge}}\n\nBase de Conhecimento Existente para Atualizar:\n{{{existingKnowledge}}}{{/if}}' +
+    '\n\nConteúdo bruto a ser analisado:\n{{{rawContent}}}',
 });
 
 const analyzeAndStructureContentFlow = ai.defineFlow(

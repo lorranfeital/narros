@@ -186,11 +186,43 @@ export async function processContentBatch(
         'Nenhum conteúdo textual encontrado nas fontes para processar.'
       );
     }
+    
+    // Fetch all existing published knowledge to pass to the AI for context
+    const publishedKnowledgeRef = doc(db, `workspaces/${workspaceId}/published_knowledge`, workspaceId);
+    const brandKitRef = doc(db, `workspaces/${workspaceId}/brand_kit`, 'live');
+    const playbooksQuery = query(collection(db, `workspaces/${workspaceId}/playbooks`), where('status', '==', 'published'));
+    const trainingQuery = query(collection(db, `workspaces/${workspaceId}/training_modules`), where('status', '==', 'published'));
+    
+    const [
+        publishedKnowledgeSnap,
+        brandKitSnap,
+        playbooksSnap,
+        trainingSnap
+    ] = await Promise.all([
+        getDoc(publishedKnowledgeRef),
+        getDoc(brandKitRef),
+        getDocs(playbooksQuery),
+        getDocs(trainingQuery)
+    ]);
+
+    let existingKnowledgeForAI: object | null = null;
+    const hasExistingKnowledge = publishedKnowledgeSnap.exists() || brandKitSnap.exists() || !playbooksSnap.empty || !trainingSnap.empty;
+
+    if (hasExistingKnowledge) {
+        existingKnowledgeForAI = {
+            knowledgeBase: publishedKnowledgeSnap.data()?.categories || [],
+            brandKit: brandKitSnap.data() || {},
+            playbooks: playbooksSnap.docs.map(d => d.data()) || [],
+            trainingModules: trainingSnap.docs.map(d => d.data()) || [],
+        }
+    }
+
 
     // 3. Call the Genkit flow to analyze content
     let aiResult: AnalyzeAndStructureContentOutput;
     aiResult = await analyzeAndStructureContent({
       rawContent: consolidatedContent,
+      existingKnowledge: existingKnowledgeForAI ? JSON.stringify(existingKnowledgeForAI, null, 2) : undefined,
     });
 
     // 4. Start final batch write
@@ -201,8 +233,8 @@ export async function processContentBatch(
 
     // 5. Handle Brand Kit (always update/create)
     if (aiResult.brandKit && Object.keys(aiResult.brandKit).length > 0) {
-      const brandKitRef = doc(db, `workspaces/${workspaceId}/brand_kit`, 'live');
-      finalBatch.set(brandKitRef, {
+      const brandKitDocRef = doc(db, `workspaces/${workspaceId}/brand_kit`, 'live');
+      finalBatch.set(brandKitDocRef, {
         ...aiResult.brandKit,
         sourceRefs: sourceIds,
         publishedAt: timestamp,
@@ -210,10 +242,6 @@ export async function processContentBatch(
         workspaceId: workspaceId,
       }, { merge: true });
     }
-
-    // 6. Check if workspace has published knowledge to decide flow
-    const publishedKnowledgeRef = doc(db, `workspaces/${workspaceId}/published_knowledge`, workspaceId);
-    const publishedKnowledgeSnap = await getDoc(publishedKnowledgeRef);
     
     if (!publishedKnowledgeSnap.exists()) {
       // --- INITIAL DRAFT FLOW ---
