@@ -52,11 +52,13 @@
         "type": {
           "type": "string",
           "enum": [
+            "empresa",
+            "grupo",
             "franquia",
             "rede",
-            "escritório",
-            "clínica",
             "loja",
+            "clínica",
+            "escritório",
             "outro"
           ],
           "description": "The type of the workspace."
@@ -574,3 +576,5 @@
     "reasoning": "The recommended Firestore structure prioritizes Authorization Independence and Query-Agnostic Permissions (QAPs) by refactoring subcollections into top-level collections and denormalizing authorization context into every document. This approach directly addresses the critical need to avoid hierarchical authorization dependencies and complex `get()` calls in Firestore Security Rules.\n\nSpecifically, each document within the `analyses`, `knowledge`, `training`, `playbooks`, `insights`, and `chatHistory` collections will now explicitly contain the `workspaceId` it belongs to, its `ownerId`, and a `members` map (`{[uid: string]: \"role\"}`).\n\n**Authorization Independence (CRITICAL):** By denormalizing the `ownerId` and `members` map into every document, security rules can directly evaluate access permissions based on the `resource.data` of the document being accessed. For example, a rule for `/analyses/{analysisId}` would check `request.auth.uid == resource.data.ownerId || request.auth.uid in resource.data.members`. This completely eliminates the need for `get(/workspaces/$(workspaceId))` calls, which are non-atomic, expensive, and difficult to debug. This also enables atomic creation/update of documents without needing to read parent permissions first, fulfilling Mandate A.\n\n**QAPs (Query-Agnostic Permissions):** Moving these collections to the top level (e.g., `/analyses` instead of `/workspaces/{workspaceId}/analyses`) and including the `workspaceId` as a field, allows for powerful and secure `list` queries. Clients can now query `/analyses` with `where('workspaceId', '==', someWorkspaceId).where('members.' + request.auth.uid, 'exists', true)`. The rules can then directly validate `resource.data.members[request.auth.uid] == 'owner' || resource.data.members[request.auth.uid] == 'member'`, ensuring that the client only receives documents it is authorized to access. This approach adheres to Mandate B (Structural Segregation) by ensuring that all documents within a given collection share the same authorization fields and, therefore, a consistent security posture, simplifying rule logic and improving query efficiency."
   }
 }
+
+    

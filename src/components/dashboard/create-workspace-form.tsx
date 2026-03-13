@@ -49,7 +49,7 @@ const sectorEnum = z.enum([
 
 const formSchema = z.object({
   name: z.string().min(2, 'O nome deve ter pelo menos 2 caracteres.'),
-  type: z.enum(['franquia', 'rede', 'escritório', 'clínica', 'loja', 'outro']),
+  type: z.enum(['empresa', 'grupo', 'franquia', 'rede', 'loja', 'clínica', 'escritório', 'outro']),
   sector: sectorEnum,
 });
 
@@ -65,7 +65,7 @@ export function CreateWorkspaceForm() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: '',
-      type: 'franquia',
+      type: 'empresa',
     },
   });
 
@@ -125,11 +125,13 @@ export function CreateWorkspaceForm() {
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
+                  <SelectItem value="empresa">Empresa</SelectItem>
+                  <SelectItem value="grupo">Grupo</SelectItem>
                   <SelectItem value="franquia">Franquia</SelectItem>
                   <SelectItem value="rede">Rede</SelectItem>
-                  <SelectItem value="escritório">Escritório</SelectItem>
-                  <SelectItem value="clínica">Clínica</SelectItem>
                   <SelectItem value="loja">Loja</SelectItem>
+                  <SelectItem value="clínica">Clínica</SelectItem>
+                  <SelectItem value="escritório">Escritório</SelectItem>
                   <SelectItem value="outro">Outro</SelectItem>
                 </SelectContent>
               </Select>
@@ -166,3 +168,5 @@ export function CreateWorkspaceForm() {
     </Form>
   );
 }
+
+    

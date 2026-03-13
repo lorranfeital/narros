@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { updateProfile } from 'firebase/auth';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const profileFormSchema = z.object({
   name: z.string().min(2, { message: 'O nome deve ter pelo menos 2 caracteres.' }),
@@ -49,7 +50,7 @@ const sectorEnum = z.enum([
 
 const workspaceFormSchema = z.object({
   name: z.string().min(2, { message: 'O nome do workspace deve ter pelo menos 2 caracteres.' }),
-  type: z.enum(['franquia', 'rede', 'escritório', 'clínica', 'loja', 'outro']),
+  type: z.enum(['empresa', 'grupo', 'franquia', 'rede', 'loja', 'clínica', 'escritório', 'outro']),
   sector: sectorEnum,
 });
 
@@ -111,14 +112,14 @@ export default function SettingsPage() {
 
   const workspaceForm = useForm<WorkspaceFormValues>({
     resolver: zodResolver(workspaceFormSchema),
-    defaultValues: { name: '', type: 'franquia', sector: 'Alimentação' },
+    defaultValues: { name: '', type: 'empresa', sector: 'Alimentação' },
   });
 
   React.useEffect(() => {
     if (currentWorkspace) {
       workspaceForm.reset({
         name: currentWorkspace.name || '',
-        type: currentWorkspace.type || 'franquia',
+        type: currentWorkspace.type || 'empresa',
         sector: currentWorkspace.sector || 'Alimentação',
       });
     }
@@ -148,150 +149,161 @@ export default function SettingsPage() {
       <h1 className="text-4xl font-bold tracking-tight">Configurações</h1>
       <p className="text-muted-foreground mt-2">Gerencie as configurações da sua conta e de seus workspaces.</p>
 
-      <div className="mt-10 grid gap-8 max-w-2xl">
-        <Card>
-          <CardHeader>
-            <CardTitle>Perfil</CardTitle>
-            <CardDescription>
-              Estas são suas informações. O e-mail não pode ser alterado.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isProfileLoading ? (
-              <div className="space-y-4">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-32" />
-              </div>
-            ) : (
-              <Form {...profileForm}>
-                <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-8">
-                  <FormField
-                    control={profileForm.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nome</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Seu nome" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={profileForm.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Seu e-mail" {...field} disabled />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button type="submit" disabled={profileForm.formState.isSubmitting}>
-                    {profileForm.formState.isSubmitting ? 'Salvando...' : 'Salvar alterações'}
-                  </Button>
-                </form>
-              </Form>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Workspace</CardTitle>
-            <CardDescription>
-              Gerencie as informações do seu workspace principal.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isWorkspacesLoading ? (
-               <div className="space-y-4">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-32" />
-              </div>
-            ) : currentWorkspace ? (
-              <Form {...workspaceForm}>
-                <form onSubmit={workspaceForm.handleSubmit(onWorkspaceSubmit)} className="space-y-8">
-                  <FormField
-                    control={workspaceForm.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nome do Workspace</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Nome do seu workspace" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                   <FormField
-                    control={workspaceForm.control}
-                    name="type"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Tipo</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+      <Tabs defaultValue="profile" className="mt-10 max-w-2xl">
+        <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="profile">Perfil</TabsTrigger>
+            <TabsTrigger value="workspace">Workspace</TabsTrigger>
+        </TabsList>
+        <TabsContent value="profile">
+          <Card>
+            <CardHeader>
+              <CardTitle>Perfil</CardTitle>
+              <CardDescription>
+                Estas são suas informações. O e-mail não pode ser alterado.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isProfileLoading ? (
+                <div className="space-y-4">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-32" />
+                </div>
+              ) : (
+                <Form {...profileForm}>
+                  <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-8">
+                    <FormField
+                      control={profileForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nome</FormLabel>
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione o tipo de negócio" />
-                            </SelectTrigger>
+                            <Input placeholder="Seu nome" {...field} />
                           </FormControl>
-                          <SelectContent>
-                            <SelectItem value="franquia">Franquia</SelectItem>
-                            <SelectItem value="rede">Rede</SelectItem>
-                            <SelectItem value="escritório">Escritório</SelectItem>
-                            <SelectItem value="clínica">Clínica</SelectItem>
-                            <SelectItem value="loja">Loja</SelectItem>
-                            <SelectItem value="outro">Outro</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={workspaceForm.control}
-                    name="sector"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Setor</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione o setor de atuação" />
-                            </SelectTrigger>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={profileForm.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Seu e-mail" {...field} disabled />
                           </FormControl>
-                          <SelectContent>
-                             {sectorEnum.options.map((sector) => (
-                                <SelectItem key={sector} value={sector}>{sector}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button type="submit" disabled={workspaceForm.formState.isSubmitting}>
-                    {workspaceForm.formState.isSubmitting ? 'Salvando...' : 'Salvar alterações'}
-                  </Button>
-                </form>
-              </Form>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Você ainda não possui um workspace. Crie um no seu dashboard para poder gerenciá-lo aqui.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button type="submit" disabled={profileForm.formState.isSubmitting}>
+                      {profileForm.formState.isSubmitting ? 'Salvando...' : 'Salvar alterações'}
+                    </Button>
+                  </form>
+                </Form>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="workspace">
+          <Card>
+            <CardHeader>
+              <CardTitle>Workspace</CardTitle>
+              <CardDescription>
+                Gerencie as informações do seu workspace principal.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isWorkspacesLoading ? (
+                <div className="space-y-4">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-32" />
+                </div>
+              ) : currentWorkspace ? (
+                <Form {...workspaceForm}>
+                  <form onSubmit={workspaceForm.handleSubmit(onWorkspaceSubmit)} className="space-y-8">
+                    <FormField
+                      control={workspaceForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nome do Workspace</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Nome do seu workspace" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={workspaceForm.control}
+                      name="type"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tipo</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione o tipo de negócio" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                                <SelectItem value="empresa">Empresa</SelectItem>
+                                <SelectItem value="grupo">Grupo</SelectItem>
+                                <SelectItem value="franquia">Franquia</SelectItem>
+                                <SelectItem value="rede">Rede</SelectItem>
+                                <SelectItem value="loja">Loja</SelectItem>
+                                <SelectItem value="clínica">Clínica</SelectItem>
+                                <SelectItem value="escritório">Escritório</SelectItem>
+                                <SelectItem value="outro">Outro</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={workspaceForm.control}
+                      name="sector"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Setor</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione o setor de atuação" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {sectorEnum.options.map((sector) => (
+                                  <SelectItem key={sector} value={sector}>{sector}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button type="submit" disabled={workspaceForm.formState.isSubmitting}>
+                      {workspaceForm.formState.isSubmitting ? 'Salvando...' : 'Salvar alterações'}
+                    </Button>
+                  </form>
+                </Form>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Você ainda não possui um workspace. Crie um no seu dashboard para poder gerenciá-lo aqui.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
+
+    
