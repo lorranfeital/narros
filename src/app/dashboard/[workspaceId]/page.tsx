@@ -218,7 +218,7 @@ export default function WorkspacePage() {
     return (
         <div className="p-12 space-y-10">
              <div>
-                <h1 className="text-4xl font-headline font-bold tracking-tight">{workspace.name}</h1>
+                <h1 className="text-4xl font-bold tracking-tight">{workspace.name}</h1>
                 <p className="text-muted-foreground mt-2">
                     Adicione conteúdo bruto à fila para que a IA possa organizá-lo.
                 </p>

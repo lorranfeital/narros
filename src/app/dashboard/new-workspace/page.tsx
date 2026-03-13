@@ -7,7 +7,7 @@ export default function NewWorkspacePage() {
       <div className="mx-auto flex w-full max-w-md flex-col justify-center space-y-6">
         <div className="flex flex-col space-y-2 text-center">
           <Logo className="mx-auto" />
-          <h1 className="text-2xl font-headline font-semibold tracking-tight">
+          <h1 className="text-2xl font-semibold tracking-tight">
             Crie seu primeiro workspace
           </h1>
           <p className="text-sm text-muted-foreground">

@@ -61,7 +61,7 @@ export default function DashboardPage() {
 
     return (
         <div className="p-12">
-            <h1 className="text-4xl font-headline font-bold tracking-tight">Bom dia, {user?.displayName?.split(' ')[0]}</h1>
+            <h1 className="text-4xl font-bold tracking-tight">Bom dia, {user?.displayName?.split(' ')[0]}</h1>
             <p className="text-muted-foreground mt-2">Gerencie seus workspaces ou crie um novo para começar.</p>
             
             <div className="mt-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
