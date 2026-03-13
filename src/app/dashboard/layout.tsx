@@ -31,8 +31,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     }
 
     // Logic to handle redirects based on workspace existence
-    if (!isUserLoading && user && !isWorkspacesLoading) {
-      const hasWorkspaces = workspaces && workspaces.length > 0;
+    // We wait until the workspaces query has explicitly returned (workspaces !== null) to avoid race conditions
+    if (!isUserLoading && user && !isWorkspacesLoading && workspaces !== null) {
+      const hasWorkspaces = workspaces.length > 0;
       const isOnNewWorkspacePage = pathname === '/dashboard/new-workspace';
 
       // If user has no workspaces and is not on the creation page, redirect them.
