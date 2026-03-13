@@ -9,13 +9,14 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { getFirestore } from 'firebase-admin/firestore';
+// Corrected: Using client SDK on the server, removing 'firebase-admin'
+import { getFirestore, collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import {
   PublishedKnowledge,
   Playbook,
   TrainingModule,
 } from '@/lib/firestore-types';
-import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
+import { getApps } from 'firebase/app';
 
 const ChatMessageSchema = z.object({
   role: z.enum(['user', 'assistant']),
@@ -49,6 +50,17 @@ const prompt = ai.definePrompt({
   prompt: `Você é o assistente de conhecimento da empresa {{{workspaceName}}}. Responda com base exclusivamente nas informações da base de conhecimento abaixo. Seja direto, prático e objetivo. Se não souber, diga que a informação não está na base.\n\nBase de Conhecimento:\n{{{json knowledgeBase}}}\n\nHistórico do Chat:\n{{#each chatHistory}}\n  {{this.role}}: {{this.content}}\n{{/each}}\n\nPergunta do usuário: {{{query}}}`,
 });
 
+
+// Helper to ensure Firebase is ready on the server
+function getFlowFirestore() {
+  if (getApps().length === 0) {
+    // This flow runs on the server and assumes Firebase has been initialized.
+    // The project setup should handle this. If not, it's a fatal error.
+    throw new Error('Firebase has not been initialized on the server for this Genkit flow.');
+  }
+  return getFirestore();
+}
+
 const chatWithKnowledgeAssistantFlow = ai.defineFlow(
   {
     name: 'chatWithKnowledgeAssistantFlow',
@@ -57,9 +69,7 @@ const chatWithKnowledgeAssistantFlow = ai.defineFlow(
   },
   async (input) => {
     // This is where we assemble the knowledge base on the server before calling the prompt.
-    // NOTE: This uses the regular client SDK, assuming it's run in an environment
-    // where it's already initialized. For server-side actions, you might use the Admin SDK.
-    const db = getFirestore();
+    const db = getFlowFirestore();
 
     const workspaceRef = doc(db, 'workspaces', input.workspaceId);
     const publishedKnowledgeRef = doc(db, `workspaces/${input.workspaceId}/published_knowledge`, input.workspaceId);
