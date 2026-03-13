@@ -31,9 +31,12 @@ import {
   SyncApprovalStatus,
   KnowledgeCategory,
   BrandKit,
+  SourceType,
 } from '@/lib/firestore-types';
 import { getFirestore } from 'firebase/firestore';
+import { getStorage, ref, getBytes } from 'firebase/storage';
 import { firebaseConfig } from '@/firebase/config';
+import pdf from 'pdf-parse';
 
 // Helper to get a server-side Firestore instance
 function getAdminFirestore() {
@@ -42,6 +45,15 @@ function getAdminFirestore() {
   }
   return getFirestore(getApp());
 }
+
+// Helper to get a server-side Storage instance
+function getAdminStorage() {
+    if (getApps().length === 0) {
+        initializeApp(firebaseConfig);
+    }
+    return getStorage(getApp());
+}
+
 
 /**
  * Diffs two knowledge bases and creates proposals.
@@ -107,6 +119,7 @@ export async function processContentBatch(
 ) {
   try {
     const db = getAdminFirestore();
+    const storage = getAdminStorage();
     const timestamp = serverTimestamp();
 
     // 1. Update workspace and sources status to 'PROCESSING'
@@ -137,14 +150,36 @@ export async function processContentBatch(
     await initialBatch.commit();
 
     // 2. Consolidate content from all sources in the batch
-    let consolidatedContent = '';
-    sourcesSnapshot.forEach((doc) => {
-      const data = doc.data() as Source;
-      consolidatedContent += data.rawText || '';
-      consolidatedContent += data.extractedText || '';
-      consolidatedContent += data.transcript || '';
-      consolidatedContent += '\n\n---\n\n';
+    const contentPromises = sourcesSnapshot.docs.map(async (docSnap): Promise<string> => {
+        const data = docSnap.data() as Source;
+        
+        switch (data.type) {
+            case SourceType.TEXT:
+                return data.rawText || '';
+            case SourceType.FILE:
+                if (data.mimeType === 'application/pdf' && data.storagePath) {
+                    try {
+                        const fileRef = ref(storage, data.storagePath);
+                        const fileBuffer = await getBytes(fileRef);
+                        const parsedPdf = await pdf(fileBuffer);
+                        return parsedPdf.text;
+                    } catch (error) {
+                        console.error(`Error processing PDF ${data.sourceName}:`, error);
+                        return ''; // Don't fail the whole batch, just skip this file.
+                    }
+                }
+                // Placeholder for other file types like .docx, .txt etc.
+                return '';
+            case SourceType.AUDIO:
+                return data.transcript || '';
+            default:
+                return '';
+        }
     });
+
+    const allContents = await Promise.all(contentPromises);
+    const consolidatedContent = allContents.filter(content => content && content.trim() !== '').join('\n\n---\n\n');
+
 
     if (!consolidatedContent.trim()) {
       throw new Error(
