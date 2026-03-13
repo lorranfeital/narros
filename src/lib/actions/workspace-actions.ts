@@ -104,143 +104,142 @@ export async function processContentBatch(
   workspaceId: string,
   batchId: string
 ) {
-  const db = getAdminFirestore();
-
-  // 1. Update workspace and sources status to 'PROCESSING'
-  const workspaceRef = doc(db, 'workspaces', workspaceId);
-  const sourcesQuery = query(
-    collection(db, `workspaces/${workspaceId}/sources`),
-    where('batchId', '==', batchId),
-    where('processingStatus', '==', ProcessingStatus.PENDING)
-  );
-
-  const initialBatch = writeBatch(db);
-  initialBatch.update(workspaceRef, {
-    ingestionState: IngestionState.PROCESSING,
-  });
-  const sourcesSnapshot = await getDocs(sourcesQuery);
-  const sourceIds: string[] = [];
-  sourcesSnapshot.forEach((doc) => {
-    sourceIds.push(doc.id);
-    initialBatch.update(doc.ref, {
-      processingStatus: ProcessingStatus.PROCESSING,
-    });
-  });
-
   try {
-      await initialBatch.commit();
-  } catch (e: any) {
-      console.error("Error committing initial batch:", e);
-      throw new Error(`Falha na permissão do Firestore ao iniciar o processamento. A regra de segurança pode estar bloqueando a atualização do status do workspace ou das fontes. Detalhe: ${e.message}`);
-  }
+    const db = getAdminFirestore();
 
-
-  // 2. Consolidate content from all sources in the batch
-  let consolidatedContent = '';
-  sourcesSnapshot.forEach((doc) => {
-    const data = doc.data() as Source;
-    consolidatedContent += data.rawText || '';
-    consolidatedContent += data.extractedText || '';
-    consolidatedContent += data.transcript || '';
-    consolidatedContent += '\n\n---\n\n';
-  });
-
-  if (!consolidatedContent.trim()) {
-    throw new Error(
-      'Nenhum conteúdo textual encontrado nas fontes para processar.'
+    // 1. Update workspace and sources status to 'PROCESSING'
+    const workspaceRef = doc(db, 'workspaces', workspaceId);
+    const sourcesQuery = query(
+      collection(db, `workspaces/${workspaceId}/sources`),
+      where('batchId', '==', batchId),
+      where('processingStatus', '==', ProcessingStatus.PENDING)
     );
-  }
+    
+    const sourcesSnapshot = await getDocs(sourcesQuery);
+    if (sourcesSnapshot.empty) {
+        throw new Error("Nenhum item pendente encontrado na fila para o lote especificado.");
+    }
 
-  // 3. Call the Genkit flow to analyze content
-  let aiResult: AnalyzeAndStructureContentOutput;
-  try {
+    const initialBatch = writeBatch(db);
+    initialBatch.update(workspaceRef, {
+      ingestionState: IngestionState.PROCESSING,
+    });
+    const sourceIds: string[] = [];
+    sourcesSnapshot.forEach((doc) => {
+      sourceIds.push(doc.id);
+      initialBatch.update(doc.ref, {
+        processingStatus: ProcessingStatus.PROCESSING,
+      });
+    });
+
+    await initialBatch.commit();
+
+    // 2. Consolidate content from all sources in the batch
+    let consolidatedContent = '';
+    sourcesSnapshot.forEach((doc) => {
+      const data = doc.data() as Source;
+      consolidatedContent += data.rawText || '';
+      consolidatedContent += data.extractedText || '';
+      consolidatedContent += data.transcript || '';
+      consolidatedContent += '\n\n---\n\n';
+    });
+
+    if (!consolidatedContent.trim()) {
+      throw new Error(
+        'Nenhum conteúdo textual encontrado nas fontes para processar.'
+      );
+    }
+
+    // 3. Call the Genkit flow to analyze content
+    let aiResult: AnalyzeAndStructureContentOutput;
     aiResult = await analyzeAndStructureContent({
       rawContent: consolidatedContent,
     });
-  } catch (error) {
-    console.error('AI flow execution failed:', error);
-    // TODO: Revert status of sources to 'error'
-    throw new Error('A IA falhou ao processar o conteúdo.');
-  }
 
-  // 4. Check if workspace has published knowledge to decide flow
-  const publishedKnowledgeRef = doc(db, `workspaces/${workspaceId}/published_knowledge`, workspaceId);
-  const publishedKnowledgeSnap = await getDoc(publishedKnowledgeRef);
-  const finalBatch = writeBatch(db);
-  const timestamp = serverTimestamp();
+    // 4. Check if workspace has published knowledge to decide flow
+    const publishedKnowledgeRef = doc(db, `workspaces/${workspaceId}/published_knowledge`, workspaceId);
+    const publishedKnowledgeSnap = await getDoc(publishedKnowledgeRef);
+    const finalBatch = writeBatch(db);
+    const timestamp = serverTimestamp();
 
-  if (!publishedKnowledgeSnap.exists()) {
-    // --- INITIAL DRAFT FLOW ---
-    const draftKnowledgeRef = doc(collection(db, `workspaces/${workspaceId}/draft_knowledge`));
-    finalBatch.set(draftKnowledgeRef, {
-      categories: aiResult.knowledgeBase,
-      generatedAt: timestamp,
-      sourceBatchId: batchId,
-      version: 1,
-      status: 'draft',
-    });
-    // Drafts for other entities
-    aiResult.playbooks.forEach((playbook) => {
-        const playbookRef = doc(collection(db, `workspaces/${workspaceId}/playbooks`));
-        finalBatch.set(playbookRef, { ...playbook, sourceRefs: sourceIds, status: 'draft', createdAt: timestamp, updatedAt: timestamp });
-    });
-    aiResult.trainingModules.forEach((module) => {
-        const moduleRef = doc(collection(db, `workspaces/${workspaceId}/training_modules`));
-        finalBatch.set(moduleRef, { ...module, sourceRefs: sourceIds, status: 'draft', createdAt: timestamp });
-    });
-    finalBatch.update(workspaceRef, {
-        ingestionState: IngestionState.IDLE,
-        status: WorkspaceStatus.DRAFT_READY,
-        lastProcessedAt: timestamp,
-    });
-  } else {
-    // --- SYNC PROPOSAL FLOW ---
-    const publishedKnowledge = publishedKnowledgeSnap.data() as PublishedKnowledge;
-    const proposals = diffKnowledge(publishedKnowledge.categories, aiResult.knowledgeBase);
-    
-    if (proposals.length > 0) {
-        proposals.forEach(proposal => {
-            const proposalRef = doc(collection(db, `workspaces/${workspaceId}/sync_proposals`));
-            finalBatch.set(proposalRef, {
-                ...proposal,
-                workspaceId: workspaceId,
-                sourceBatchId: batchId,
-                approvalStatus: SyncApprovalStatus.PENDING,
-                createdAt: timestamp,
-            });
-        });
-        finalBatch.update(workspaceRef, {
-            ingestionState: IngestionState.IDLE,
-            status: WorkspaceStatus.SYNC_PENDING,
-            lastProcessedAt: timestamp,
-            pendingSyncCount: proposals.length,
-        });
+    if (!publishedKnowledgeSnap.exists()) {
+      // --- INITIAL DRAFT FLOW ---
+      const draftKnowledgeRef = doc(collection(db, `workspaces/${workspaceId}/draft_knowledge`));
+      finalBatch.set(draftKnowledgeRef, {
+        categories: aiResult.knowledgeBase,
+        generatedAt: timestamp,
+        sourceBatchId: batchId,
+        version: 1,
+        status: 'draft',
+      });
+      // Drafts for other entities
+      aiResult.playbooks.forEach((playbook) => {
+          const playbookRef = doc(collection(db, `workspaces/${workspaceId}/playbooks`));
+          finalBatch.set(playbookRef, { ...playbook, sourceRefs: sourceIds, status: 'draft', createdAt: timestamp, updatedAt: timestamp });
+      });
+      aiResult.trainingModules.forEach((module) => {
+          const moduleRef = doc(collection(db, `workspaces/${workspaceId}/training_modules`));
+          finalBatch.set(moduleRef, { ...module, sourceRefs: sourceIds, status: 'draft', createdAt: timestamp });
+      });
+      finalBatch.update(workspaceRef, {
+          ingestionState: IngestionState.IDLE,
+          status: WorkspaceStatus.DRAFT_READY,
+          lastProcessedAt: timestamp,
+      });
     } else {
-        // No changes found
-         finalBatch.update(workspaceRef, {
-            ingestionState: IngestionState.IDLE,
-            lastProcessedAt: timestamp,
-        });
+      // --- SYNC PROPOSAL FLOW ---
+      const publishedKnowledge = publishedKnowledgeSnap.data() as PublishedKnowledge;
+      const proposals = diffKnowledge(publishedKnowledge.categories, aiResult.knowledgeBase);
+      
+      if (proposals.length > 0) {
+          proposals.forEach(proposal => {
+              const proposalRef = doc(collection(db, `workspaces/${workspaceId}/sync_proposals`));
+              finalBatch.set(proposalRef, {
+                  ...proposal,
+                  workspaceId: workspaceId,
+                  sourceBatchId: batchId,
+                  approvalStatus: SyncApprovalStatus.PENDING,
+                  createdAt: timestamp,
+              });
+          });
+          finalBatch.update(workspaceRef, {
+              ingestionState: IngestionState.IDLE,
+              status: WorkspaceStatus.SYNC_PENDING,
+              lastProcessedAt: timestamp,
+              pendingSyncCount: proposals.length,
+          });
+      } else {
+          // No changes found
+           finalBatch.update(workspaceRef, {
+              ingestionState: IngestionState.IDLE,
+              lastProcessedAt: timestamp,
+          });
+      }
     }
-  }
 
-  // Insights are always created
-  aiResult.insights.forEach((insight) => {
-    const insightRef = doc(collection(db, `workspaces/${workspaceId}/insights`));
-    finalBatch.set(insightRef, { ...insight, sourceRefs: sourceIds, resolved: false, createdAt: timestamp });
-  });
+    // Insights are always created
+    aiResult.insights.forEach((insight) => {
+      const insightRef = doc(collection(db, `workspaces/${workspaceId}/insights`));
+      finalBatch.set(insightRef, { ...insight, sourceRefs: sourceIds, resolved: false, createdAt: timestamp });
+    });
 
-  // Update status of sources to 'COMPLETED'
-  sourcesSnapshot.forEach((doc) => {
-    finalBatch.update(doc.ref, { processingStatus: ProcessingStatus.COMPLETED });
-  });
+    // Update status of sources to 'COMPLETED'
+    sourcesSnapshot.forEach((doc) => {
+      finalBatch.update(doc.ref, { processingStatus: ProcessingStatus.COMPLETED });
+    });
 
-  // Commit all changes
-  try {
+    // Commit all changes
     await finalBatch.commit();
-  } catch (e: any) {
-      console.error("Error committing final batch:", e);
-      throw new Error(`Falha na permissão do Firestore ao salvar o resultado da IA. A regra de segurança pode estar bloqueando a criação de 'draft_knowledge', 'sync_proposals', 'insights' ou a atualização do status 'sources'. Detalhe: ${e.message}`);
+  } catch (error: any) {
+    console.error(`[SERVER ACTION ERROR] in processContentBatch for workspace ${workspaceId}:`, error);
+
+    if (error.code === 'permission-denied' || (error.message && error.message.toLowerCase().includes('permission'))) {
+        throw new Error(
+        `[Permissão Negada no Servidor] A operação falhou devido às regras de segurança do Firestore. A ação no servidor (processContentBatch) pode não estar autenticada ou não ter permissão para ler/escrever os dados necessários. Verifique os logs do servidor para detalhes e ajuste as 'firestore.rules'.`
+      );
+    }
+    
+    throw new Error(`[Erro no Servidor] ${error.message}`);
   }
 }
 
