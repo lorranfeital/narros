@@ -167,15 +167,22 @@ export function Sidebar({ className }: { className?: string }) {
                             <span>Criar novo workspace</span>
                         </Link>
                     </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                     <DropdownMenuItem asChild>
+                        <Link href="/dashboard">
+                            <Home className="mr-2 h-4 w-4" />
+                            <span>Ver todos os workspaces</span>
+                        </Link>
+                    </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
 
             <nav className="flex flex-col gap-0.5">
                 <Link
-                    href="/dashboard"
+                    href={currentWorkspace ? `/dashboard/${currentWorkspace.id}` : '/dashboard'}
                     className={cn(
                         "flex items-center gap-3 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground",
-                        (pathname === '/dashboard') && 'bg-muted/50 text-foreground'
+                        (pathname === `/dashboard/${currentWorkspace?.id}`) && 'bg-muted/50 text-foreground'
                     )}
                 >
                     <Home className="h-4 w-4" />
@@ -183,10 +190,10 @@ export function Sidebar({ className }: { className?: string }) {
                 </Link>
 
                  <Link
-                    href={currentWorkspace ? `/dashboard/${currentWorkspace.id}` : '#'}
+                    href={currentWorkspace ? `/dashboard/${currentWorkspace.id}/content` : '#'}
                     className={cn(
                         "flex items-center gap-3 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground",
-                        pathname === `/dashboard/${currentWorkspace?.id}` && 'bg-muted/50 text-foreground'
+                        pathname === `/dashboard/${currentWorkspace?.id}/content` && 'bg-muted/50 text-foreground'
                     )}
                 >
                     <Upload className="h-4 w-4" />

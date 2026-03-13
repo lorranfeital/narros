@@ -32,15 +32,20 @@ const ChatWithKnowledgeAssistantInputSchema = z.object({
 });
 export type ChatWithKnowledgeAssistantInput = z.infer<typeof ChatWithKnowledgeAssistantInputSchema>;
 
+const CitationSchema = z.object({
+    document: z.string().describe("The title of the source document or entity (e.g., 'Base de Conhecimento', 'Playbook de Vendas')."),
+});
+
 const ChatWithKnowledgeAssistantOutputSchema = z.object({
   response: z.string().describe("The AI assistant's answer based on the knowledge base."),
+  citations: z.array(CitationSchema).optional().describe("A list of documents used to generate the response."),
 });
 export type ChatWithKnowledgeAssistantOutput = z.infer<typeof ChatWithKnowledgeAssistantOutputSchema>;
 
 // This is a private schema, not exported, for the internal prompt
 const InternalPromptInputSchema = z.object({
     query: z.string(),
-    knowledgeBase: z.array(z.any()).describe('The structured knowledge base as an array of JSON objects.'),
+    knowledgeBase: z.any().describe('The structured knowledge base as a JSON object with keys like "baseDeConhecimento", "playbooks", "treinamentos".'),
     chatHistory: z.array(ChatMessageSchema),
     workspaceName: z.string(),
 })
@@ -49,7 +54,7 @@ const prompt = ai.definePrompt({
   name: 'chatWithKnowledgeAssistantPrompt',
   input: { schema: InternalPromptInputSchema },
   output: { schema: ChatWithKnowledgeAssistantOutputSchema },
-  prompt: `Você é o assistente de conhecimento da empresa {{{workspaceName}}}. Responda com base exclusivamente nas informações da base de conhecimento abaixo. Seja direto, prático e objetivo. Se não souber, diga que a informação não está na base.\n\nBase de Conhecimento:\n{{{json knowledgeBase}}}\n\nHistórico do Chat:\n{{#each chatHistory}}\n  {{this.role}}: {{this.content}}\n{{/each}}\n\nPergunta do usuário: {{{query}}}`,
+  prompt: `Você é o assistente de conhecimento da empresa {{{workspaceName}}}. Responda com base exclusivamente nas informações da base de conhecimento abaixo. Seja direto, prático e objetivo. Se não souber, diga que a informação não está na base. Após sua resposta, liste os documentos que você usou no campo 'citations', usando os títulos dos documentos encontrados na base de conhecimento (ex: o campo "processo" de um playbook).\n\nBase de Conhecimento:\n{{{json knowledgeBase}}}\n\nHistórico do Chat:\n{{#each chatHistory}}\n  {{this.role}}: {{this.content}}\n{{/each}}\n\nPergunta do usuário: {{{query}}}`,
 });
 
 
@@ -88,15 +93,15 @@ const chatWithKnowledgeAssistantFlow = ai.defineFlow(
         getDocs(trainingQuery)
     ]);
     
-    const knowledgeBase: any[] = [];
+    const knowledgeBase: any = {};
     if (publishedKnowledgeSnap.exists()) {
-        knowledgeBase.push(publishedKnowledgeSnap.data() as PublishedKnowledge);
+        knowledgeBase.baseDeConhecimento = { titulo: "Base de Conhecimento Principal", ...(publishedKnowledgeSnap.data() as PublishedKnowledge) };
     }
     if (!playbooksSnap.empty) {
-        knowledgeBase.push(...playbooksSnap.docs.map(d => d.data() as Playbook));
+        knowledgeBase.playbooks = playbooksSnap.docs.map(d => d.data() as Playbook);
     }
     if (!trainingSnap.empty) {
-        knowledgeBase.push(...trainingSnap.docs.map(d => d.data() as TrainingModule));
+        knowledgeBase.treinamentos = trainingSnap.docs.map(d => d.data() as TrainingModule);
     }
 
     const { output } = await prompt({
