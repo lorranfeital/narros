@@ -76,9 +76,9 @@ function BrandKitDisplay({ workspace, brandKit, isLoading }: { workspace: Worksp
         return (
             <Alert>
                 <Palette className="h-4 w-4" />
-                <AlertTitle>Nenhum Brand Kit encontrado</AlertTitle>
+                <AlertTitle>Nenhuma Marca encontrada</AlertTitle>
                 <AlertDescription>
-                    Nenhuma informação de marca, identidade visual ou comunicação foi encontrada. Adicione documentos sobre sua marca para gerar o Brand Kit.
+                    Nenhuma informação de marca, identidade visual ou comunicação foi encontrada. Adicione documentos sobre sua marca para gerar a seção de Marca.
                 </AlertDescription>
             </Alert>
         )
@@ -88,7 +88,7 @@ function BrandKitDisplay({ workspace, brandKit, isLoading }: { workspace: Worksp
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Brand Kit</CardTitle>
+                <CardTitle>Marca</CardTitle>
                 <CardDescription>A identidade visual e verbal da sua marca, extraída pela IA.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-8">
@@ -234,9 +234,9 @@ export default function KnowledgePage() {
             <div className="p-12">
                 <Alert variant="default" className="bg-secondary">
                     <BookOpen className="h-4 w-4" />
-                    <AlertTitle>Base de conhecimento não publicada</AlertTitle>
+                    <AlertTitle>Conhecimento não publicado</AlertTitle>
                     <AlertDescription>
-                        Este workspace ainda não possui uma base de conhecimento publicada. Adicione conteúdo e gere um rascunho para começar.
+                        Este workspace ainda não possui conhecimento publicado. Adicione conteúdo e gere um rascunho para começar.
                     </AlertDescription>
                 </Alert>
             </div>
@@ -249,7 +249,7 @@ export default function KnowledgePage() {
         <div className="p-12 space-y-10">
             <div>
                 <div className="flex justify-between items-center">
-                    <h1 className="text-4xl font-bold tracking-tight">Base de Conhecimento</h1>
+                    <h1 className="text-4xl font-bold tracking-tight">Conhecimento</h1>
                     {workspace?.version ? (
                         <div className="text-right">
                             <Badge variant="success">Versão {workspace.version}</Badge>
@@ -266,8 +266,8 @@ export default function KnowledgePage() {
 
             <Tabs defaultValue="knowledge" className="w-full">
                 <TabsList className="grid w-full grid-cols-5">
-                    <TabsTrigger value="knowledge">Base de Conhecimento</TabsTrigger>
-                    <TabsTrigger value="brandkit">Brand Kit</TabsTrigger>
+                    <TabsTrigger value="knowledge">Conhecimento</TabsTrigger>
+                    <TabsTrigger value="brandkit">Marca</TabsTrigger>
                     <TabsTrigger value="playbooks">Playbooks</TabsTrigger>
                     <TabsTrigger value="training">Treinamentos</TabsTrigger>
                     <TabsTrigger value="insights">Insights</TabsTrigger>
@@ -417,3 +417,5 @@ export default function KnowledgePage() {
         </div>
     );
 }
+
+    
