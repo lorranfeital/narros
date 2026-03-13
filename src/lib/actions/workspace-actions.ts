@@ -256,11 +256,11 @@ export async function processContentBatch(
       // Drafts for other entities
       aiResult.playbooks.forEach((playbook) => {
           const playbookRef = doc(collection(db, `workspaces/${workspaceId}/playbooks`));
-          finalBatch.set(playbookRef, { ...playbook, sourceRefs: sourceIds, status: 'draft', createdAt: timestamp, updatedAt: timestamp });
+          finalBatch.set(playbookRef, { ...playbook, sourceRefs: sourceIds, status: 'draft', createdAt: timestamp, updatedAt: timestamp, sourceBatchId: batchId });
       });
       aiResult.trainingModules.forEach((module) => {
           const moduleRef = doc(collection(db, `workspaces/${workspaceId}/training_modules`));
-          finalBatch.set(moduleRef, { ...module, sourceRefs: sourceIds, status: 'draft', createdAt: timestamp });
+          finalBatch.set(moduleRef, { ...module, sourceRefs: sourceIds, status: 'draft', createdAt: timestamp, sourceBatchId: batchId });
       });
       finalBatch.update(workspaceRef, {
           ingestionState: IngestionState.IDLE,
