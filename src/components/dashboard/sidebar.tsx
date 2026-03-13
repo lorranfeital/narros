@@ -101,7 +101,7 @@ export function Sidebar({ className }: { className?: string }) {
   return (
     <aside
       className={cn(
-        "hidden w-72 flex-col border-r bg-secondary md:flex",
+        "hidden w-64 flex-col border-r bg-secondary md:flex",
         className
       )}
     >
@@ -121,7 +121,7 @@ export function Sidebar({ className }: { className?: string }) {
                         <ChevronsUpDown className="ml-auto h-4 w-4 text-muted-foreground" />
                     </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-[270px]" align="start">
+                <DropdownMenuContent className="w-[240px]" align="start">
                     <DropdownMenuGroup>
                         <DropdownMenuLabel className="text-xs text-muted-foreground">Workspaces</DropdownMenuLabel>
                         {isWorkspacesLoading && (
@@ -278,7 +278,7 @@ export function Sidebar({ className }: { className?: string }) {
                             </div>
                         </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-[270px] mb-2" side="top" align="start">
+                    <DropdownMenuContent className="w-[240px] mb-2" side="top" align="start">
                         <DropdownMenuItem asChild>
                             <Link href={currentWorkspace?.id ? `/dashboard/${currentWorkspace.id}/settings` : '/dashboard'}>
                                 <Settings className="mr-2 h-4 w-4" />
@@ -297,5 +297,3 @@ export function Sidebar({ className }: { className?: string }) {
     </aside>
   );
 }
-
-    
