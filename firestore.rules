@@ -1,0 +1,180 @@
+/**
+ * Core Philosophy: This ruleset implements a highly secure and performant model based on
+ * "Authorization Independence". Access control decisions are made using data denormalized
+ * directly onto the documents being secured, eliminating the need for slow, costly, and
+ * complex cross-document `get()` calls in most rules.
+ *
+ * Data Structure: The data model features a primary `users` collection for profile data
+ * and several top-level collections (`workspaces`, `analyses`, `insights`, etc.).
+ * Instead of nesting data under workspaces, workspace-related entities are placed in
+ * their own collections and linked via a `workspaceId` field. This Query-Agnostic
+ * Permission (QAP) structure is critical for enabling secure and efficient list queries.
+ *
+ * Key Security Decisions:
+ * - Strict Ownership: A user can only ever access their own document in the `/users`
+ *   collection. Listing users is disabled to protect privacy.
+ * - Workspace Membership: Access to any document in workspace-related collections
+ *   (`analyses`, `playbooks`, etc.) is governed by an `ownerId` and a `members` map
+ *   denormalized directly onto that document. This ensures that authorization is
+ *   self-contained.
+ * - Secure Creation: To create a resource (e.g., an analysis), a user must be a verified
+ *   member of the parent workspace. This is the one case where a `get()` call is
+ *   required to securely validate membership against the canonical source of truth
+ *   (the `/workspaces/{workspaceId}` document).
+ * - Client-Side Query Enforcement: The rules for `list` operations permit signed-in
+ *   users to issue queries. Security is enforced by the client application, which MUST
+ *   include `where` clauses to filter documents based on the user's ID within the
+ *   denormalized `ownerId` or `members` map.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------------------
+    // Helper Functions
+    // ------------------------------------------------------------------------
+
+    /**
+     * Checks if the user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Validates if the requesting user's UID matches the provided userId.
+     * This is the foundation of the user-ownership model.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * Checks if a document currently exists. Essential for safe updates and deletes.
+     */
+    function isExistingDoc() {
+      return resource != null;
+    }
+
+    /**
+     * Checks if the requesting user is the owner of an existing document.
+     * Combines ownership, sign-in, and existence checks for destructive operations.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && isExistingDoc();
+    }
+
+    /**
+     * Checks if the user is either the owner or a member of a workspace,
+     * based on the authorization data provided in the document map.
+     */
+    function isWorkspaceMember(docData) {
+      return isSignedIn() && (request.auth.uid == docData.ownerId || request.auth.uid in docData.members);
+    }
+
+    /**
+     * Checks if the user is the owner of a workspace,
+     * based on the authorization data provided in the document map.
+     */
+    function isWorkspaceOwner(docData) {
+      return isSignedIn() && request.auth.uid == docData.ownerId;
+    }
+
+    /**
+     * Securely verifies if a user can create a resource within a workspace.
+     * Performs a required read on the workspace document to confirm membership.
+     */
+    function canCreateWorkspaceResource(workspaceId) {
+      let workspaceData = get(/databases/$(database)/documents/workspaces/$(workspaceId)).data;
+      return isWorkspaceMember(workspaceData);
+    }
+
+    /**
+     * Checks if the given collection is one of the workspace-content collections.
+     * This helper centralizes the list of collections that follow the generic workspace content rules.
+     */
+    function isAllowedCollection(collectionName) {
+      return collectionName in ['analyses', 'knowledge', 'training', 'playbooks', 'insights'];
+    }
+
+    // ------------------------------------------------------------------------
+    // User Profile Rules
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description Controls access to a user's own profile document.
+     * @path /users/{userId}
+     * @allow (create) An authenticated user creating their own user document for the first time.
+     * @deny (get) An authenticated user trying to read another user's profile.
+     * @principle Restricts access to a user's own data tree.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false; // Disallow listing/querying users for privacy.
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    // ------------------------------------------------------------------------
+    // Workspace Rules
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description Governs access to workspace documents, which are the source of truth for membership.
+     * @path /workspaces/{workspaceId}
+     * @allow (get) A user who is listed in the workspace's 'members' map reading the document.
+     * @deny (update) A member (not owner) trying to change the workspace name or add other members.
+     * @principle Enforces role-based access where only the owner has administrative rights.
+     */
+    match /workspaces/{workspaceId} {
+      allow get: if isWorkspaceMember(resource.data);
+      allow list: if isSignedIn(); // Relies on client-side queries to filter for user's workspaces.
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isWorkspaceOwner(resource.data) && isExistingDoc();
+      allow delete: if isWorkspaceOwner(resource.data) && isExistingDoc();
+    }
+
+    // ------------------------------------------------------------------------
+    // Workspace Content Rules (Generic Pattern)
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description Generic rule for top-level collections whose access is controlled by workspace membership.
+     * @path /analyses/{analysisId}, /knowledge/{knowledgeId}, etc.
+     * @allow (create) A verified workspace member creating a new analysis document for that workspace.
+     * @deny (create) A user trying to create an analysis for a workspace they are not a member of.
+     * @principle Enforces that all child resources inherit permissions from the parent workspace.
+     *
+     * FIX: The 'where' clause directly on a 'match' statement for dynamic collection names
+     * is not supported in Firestore Security Rules. The collection name check is moved
+     * into the 'if' condition of each allow rule, using a new helper function.
+     */
+    match /{collection}/{docId} {
+      allow get: if isAllowedCollection(collection) && isWorkspaceMember(resource.data);
+      allow list: if isAllowedCollection(collection) && isSignedIn(); // Relies on client-side queries to filter by workspaceId and membership.
+      allow create: if isAllowedCollection(collection) && canCreateWorkspaceResource(request.resource.data.workspaceId);
+      allow update: if isAllowedCollection(collection) && isWorkspaceOwner(resource.data) && isExistingDoc();
+      allow delete: if isAllowedCollection(collection) && isWorkspaceOwner(resource.data) && isExistingDoc();
+    }
+
+    // ------------------------------------------------------------------------
+    // Chat History Rules
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description Secures chat messages, allowing workspace members to read but only the author to edit/delete.
+     * @path /chatHistory/{messageId}
+     * @allow (delete) The original author of a message deleting their own message.
+     * @deny (delete) A workspace owner trying to delete a message written by another member.
+     * @principle Combines workspace membership for reads with strict document ownership for writes.
+     */
+    match /chatHistory/{messageId} {
+      allow get: if isWorkspaceMember(resource.data);
+      allow list: if isSignedIn(); // Relies on client-side queries to filter by workspaceId.
+      allow create: if canCreateWorkspaceResource(request.resource.data.workspaceId) && request.resource.data.userId == request.auth.uid;
+      allow update: if isOwner(resource.data.userId) && isExistingDoc();
+      allow delete: if isOwner(resource.data.userId) && isExistingDoc();
+    }
+  }
+}

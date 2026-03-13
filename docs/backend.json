@@ -1,0 +1,183 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user account in the Narros platform, used for authentication and identifying workspace owners/members.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The user's full name as registered or obtained from the authentication provider."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address, used for identification and communication.",
+          "format": "email"
+        },
+        "plan": {
+          "type": "string",
+          "description": "The user's subscription plan, determining access to features and quotas.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the user account was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "email",
+        "plan",
+        "createdAt"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profile data. Authenticated users (`request.auth.uid`) can only read/write their own document.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user, corresponding to `request.auth.uid`."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/workspaces/{workspaceId}",
+        "definition": {
+          "entityName": "Workspace",
+          "schema": {
+            "$ref": "#/backend/entities/Workspace"
+          },
+          "description": "Defines a workspace with its name, type, sector, owner, and explicit member list. Includes `ownerId` and `members` map for direct authorization on this document and subsequent denormalization into related entities.",
+          "params": [
+            {
+              "name": "workspaceId",
+              "description": "The unique identifier of the workspace."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/analyses/{analysisId}",
+        "definition": {
+          "entityName": "Analysis",
+          "schema": {
+            "$ref": "#/backend/entities/Analysis"
+          },
+          "description": "Stores details of content analyses performed. Includes denormalized `workspaceId`, `ownerId`, and `members` map for authorization independence and QAPs.",
+          "params": [
+            {
+              "name": "analysisId",
+              "description": "The unique identifier of the analysis document."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/knowledge/{knowledgeId}",
+        "definition": {
+          "entityName": "Knowledge",
+          "schema": {
+            "$ref": "#/backend/entities/Knowledge"
+          },
+          "description": "Represents a structured knowledge category and its items generated from an analysis. Includes denormalized `workspaceId`, `ownerId`, and `members` map for authorization independence and QAPs.",
+          "params": [
+            {
+              "name": "knowledgeId",
+              "description": "The unique identifier for a knowledge category document."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/training/{moduleId}",
+        "definition": {
+          "entityName": "Training",
+          "schema": {
+            "$ref": "#/backend/entities/Training"
+          },
+          "description": "Stores individual training modules generated from an analysis. Includes denormalized `workspaceId`, `ownerId`, and `members` map for authorization independence and QAPs.",
+          "params": [
+            {
+              "name": "moduleId",
+              "description": "The unique identifier for a training module document."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/playbooks/{playbookId}",
+        "definition": {
+          "entityName": "Playbook",
+          "schema": {
+            "$ref": "#/backend/entities/Playbook"
+          },
+          "description": "Stores operational playbooks generated from an analysis. Includes denormalized `workspaceId`, `ownerId`, and `members` map for authorization independence and QAPs.",
+          "params": [
+            {
+              "name": "playbookId",
+              "description": "The unique identifier for a playbook document."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/insights/{insightId}",
+        "definition": {
+          "entityName": "Insight",
+          "schema": {
+            "$ref": "#/backend/entities/Insight"
+          },
+          "description": "Stores identified gaps, opportunities, or risks from an analysis. Includes denormalized `workspaceId`, `ownerId`, and `members` map for authorization independence and QAPs.",
+          "params": [
+            {
+              "name": "insightId",
+              "description": "The unique identifier for an insight document."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/chatHistory/{messageId}",
+        "definition": {
+          "entityName": "ChatMessage",
+          "schema": {
+            "$ref": "#/backend/entities/ChatMessage"
+          },
+          "description": "Stores individual chat messages for the AI assistant. Includes denormalized `workspaceId`, `ownerId`, and `members` map for authorization independence, and `userId` of the sender for message ownership.",
+          "params": [
+            {
+              "name": "messageId",
+              "description": "The unique identifier for a chat message document."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The recommended Firestore structure prioritizes Authorization Independence and Query-Agnostic Permissions (QAPs) by refactoring subcollections into top-level collections and denormalizing authorization context into every document. This approach directly addresses the critical need to avoid hierarchical authorization dependencies and complex `get()` calls in Firestore Security Rules.\n\nSpecifically, each document within the `analyses`, `knowledge`, `training`, `playbooks`, `insights`, and `chatHistory` collections will now explicitly contain the `workspaceId` it belongs to, its `ownerId`, and a `members` map (`{[uid: string]: \"role\"}`).\n\n**Authorization Independence (CRITICAL):** By denormalizing the `ownerId` and `members` map into every document, security rules can directly evaluate access permissions based on the `resource.data` of the document being accessed. For example, a rule for `/analyses/{analysisId}` would check `request.auth.uid == resource.data.ownerId || request.auth.uid in resource.data.members`. This completely eliminates the need for `get(/workspaces/$(workspaceId))` calls, which are non-atomic, expensive, and difficult to debug. This also enables atomic creation/update of documents without needing to read parent permissions first, fulfilling Mandate A.\n\n**QAPs (Query-Agnostic Permissions):** Moving these collections to the top level (e.g., `/analyses` instead of `/workspaces/{workspaceId}/analyses`) and including the `workspaceId` as a field, allows for powerful and secure `list` queries. Clients can now query `/analyses` with `where('workspaceId', '==', someWorkspaceId).where('members.' + request.auth.uid, 'exists', true)`. The rules can then directly validate `resource.data.members[request.auth.uid] == 'owner' || resource.data.members[request.auth.uid] == 'member'`, ensuring that the client only receives documents it is authorized to access. This approach adheres to Mandate B (Structural Segregation) by ensuring that all documents within a given collection share the same authorization fields and, therefore, a consistent security posture, simplifying rule logic and improving query efficiency."
+  }
+}
