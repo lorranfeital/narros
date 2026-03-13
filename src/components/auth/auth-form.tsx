@@ -11,6 +11,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import Link from "next/link";
 
 const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg role="img" viewBox="0 0 24 24" {...props}>
@@ -36,9 +37,11 @@ export function AuthForm() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 p-0">
-          <Button variant="outline" className="w-full">
+          <Button variant="outline" className="w-full" asChild>
+            <Link href="/dashboard">
               <GoogleIcon className="mr-2 h-4 w-4" />
               Continuar com Google
+            </Link>
             </Button>
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -58,7 +61,9 @@ export function AuthForm() {
               <Label htmlFor="password-login">Senha</Label>
               <Input id="password-login" type="password" />
             </div>
-            <Button className="w-full">Entrar</Button>
+            <Button className="w-full" asChild>
+              <Link href="/dashboard">Entrar</Link>
+            </Button>
           </CardContent>
         </Card>
       </TabsContent>
@@ -70,9 +75,11 @@ export function AuthForm() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 p-0">
-          <Button variant="outline" className="w-full">
+          <Button variant="outline" className="w-full" asChild>
+            <Link href="/dashboard">
               <GoogleIcon className="mr-2 h-4 w-4" />
               Continuar com Google
+            </Link>
             </Button>
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -92,7 +99,9 @@ export function AuthForm() {
               <Label htmlFor="password-register">Senha</Label>
               <Input id="password-register" type="password" />
             </div>
-            <Button className="w-full">Criar conta</Button>
+            <Button className="w-full" asChild>
+              <Link href="/dashboard">Criar conta</Link>
+            </Button>
           </CardContent>
         </Card>
       </TabsContent>
