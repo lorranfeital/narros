@@ -7,7 +7,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Upload, FileText, Trash2, Loader2, Sparkles, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Upload, FileText, Trash2, Loader2, Sparkles, AlertTriangle, ArrowRight, GitPullRequest } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import React, { useState } from 'react';
 import { IngestionState, ProcessingStatus, Source, Workspace, SourceType, WorkspaceStatus } from '@/lib/firestore-types';
@@ -89,9 +89,10 @@ export default function WorkspacePage() {
         setIsSubmitting(true);
         try {
             const sourcesColRef = collection(firestore, `workspaces/${workspaceId}/sources`);
-            const batchId = sources?.[0]?.batchId || doc(collection(firestore, 'temp')).id;
+            const newDoc = doc(sourcesColRef); // Generate ID client-side
+            const batchId = sources?.[0]?.batchId || newDoc.id; // Use existing batch or create new one
             
-            await addDocumentNonBlocking(sourcesColRef, {
+            await addDocumentNonBlocking(newDoc, {
                 type: SourceType.TEXT,
                 rawText: rawText.trim(),
                 processingStatus: ProcessingStatus.PENDING,
@@ -116,16 +117,14 @@ export default function WorkspacePage() {
         setIsSubmitting(true);
         
         const sourcesColRef = collection(firestore, `workspaces/${workspaceId}/sources`);
-        const newSourceDocRef = doc(sourcesColRef); // Create a new doc ref to get the ID
+        const newSourceDocRef = doc(sourcesColRef);
         const filePath = `workspaces/${workspaceId}/sources/${newSourceDocRef.id}/${file.name}`;
         const fileStorageRef = storageRef(storage, filePath);
 
         try {
-            // 1. Upload file to Storage
             await uploadBytes(fileStorageRef, file);
 
-            // 2. Create source doc in Firestore
-            const batchId = sources?.[0]?.batchId || doc(collection(firestore, 'temp')).id;
+            const batchId = sources?.[0]?.batchId || newSourceDocRef.id;
 
             await addDocumentNonBlocking(newSourceDocRef, {
                 type: SourceType.FILE,
@@ -144,17 +143,15 @@ export default function WorkspacePage() {
             toast({ variant: 'destructive', title: 'Erro ao enviar arquivo.' });
         } finally {
             setIsSubmitting(false);
-            e.target.value = ''; // Reset file input
+            e.target.value = '';
         }
     }
 
     const handleDeleteSource = async (sourceId: string, storagePath?: string) => {
         if (!workspaceId || !firestore) return;
         try {
-            // Delete Firestore document
             await deleteDoc(doc(firestore, `workspaces/${workspaceId}/sources`, sourceId));
             
-            // If there's a file, delete it from Storage
             if (storagePath && storage) {
                 const fileRef = storageRef(storage, storagePath);
                 await deleteObject(fileRef);
@@ -177,12 +174,25 @@ export default function WorkspacePage() {
         
         try {
             await processContentBatch(workspaceId, sources[0].batchId);
-            toast({
-                title: "Rascunho gerado com sucesso!",
-                description: "Seu conteúdo foi processado e um novo rascunho está pronto para revisão."
-            });
-            // Redirect to review page after successful processing
-            router.push(`/dashboard/${workspaceId}/review`);
+            
+            // Refetch workspace data to get the new status
+            const updatedWorkspaceSnap = await getDoc(workspaceDocRef);
+            const newStatus = updatedWorkspaceSnap.data()?.status;
+
+            if (newStatus === WorkspaceStatus.DRAFT_READY) {
+                 toast({
+                    title: "Rascunho gerado com sucesso!",
+                    description: "Seu conteúdo foi processado e um novo rascunho está pronto para revisão."
+                });
+                router.push(`/dashboard/${workspaceId}/review`);
+            } else if (newStatus === WorkspaceStatus.SYNC_PENDING) {
+                 toast({
+                    title: "Sincronização pendente!",
+                    description: "A IA encontrou alterações e um novo sync está pronto para revisão."
+                });
+                router.push(`/dashboard/${workspaceId}/sync`);
+            }
+           
         } catch (error) {
              console.error("Erro ao processar o lote:", error);
              toast({ variant: 'destructive', title: 'Erro ao processar conteúdo.', description: (error as Error).message });
@@ -227,6 +237,21 @@ export default function WorkspacePage() {
                     Adicione conteúdo bruto à fila para que a IA possa organizá-lo.
                 </p>
             </div>
+            
+            {workspace.status === WorkspaceStatus.SYNC_PENDING && (
+                 <Alert className="border-blue-500/50 text-blue-600 dark:text-blue-400 [&>svg]:text-blue-500">
+                    <GitPullRequest className="h-4 w-4" />
+                    <AlertTitle className="font-bold text-blue-700 dark:text-blue-300">Sincronização pendente</AlertTitle>
+                    <AlertDescription>
+                        Um novo lote de conteúdo foi processado e há {workspace.pendingSyncCount || 0} alterações propostas.
+                        <Button variant="link" asChild className="p-0 pl-2 h-auto text-blue-600 dark:text-blue-400">
+                            <Link href={`/dashboard/${workspaceId}/sync`}>
+                                Revisar alterações <ArrowRight className="ml-2 h-4 w-4" />
+                            </Link>
+                        </Button>
+                    </AlertDescription>
+                </Alert>
+            )}
 
             {workspace.status === WorkspaceStatus.DRAFT_READY && (
                 <Alert className="border-amber-500/50 text-amber-600 dark:text-amber-400 [&>svg]:text-amber-500">
@@ -323,3 +348,5 @@ export default function WorkspacePage() {
         </div>
     );
 }
+
+    

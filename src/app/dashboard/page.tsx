@@ -35,7 +35,7 @@ function getStatusText(status: WorkspaceStatus) {
         case WorkspaceStatus.DRAFT_READY:
             return 'Rascunho pronto';
         case WorkspaceStatus.SYNC_PENDING:
-            return 'Atualização pendente';
+            return 'Sincronização pendente';
         case WorkspaceStatus.NEVER_PUBLISHED:
         default:
             return 'Nunca publicado';
@@ -124,3 +124,5 @@ export default function DashboardPage() {
         </div>
     )
 }
+
+    

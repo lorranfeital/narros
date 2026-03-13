@@ -9,6 +9,7 @@ import {
   Plus,
   FileCheck,
   BookOpen,
+  GitPullRequest,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -31,7 +32,6 @@ export function Sidebar({ className }: { className?: string }) {
   const pathname = usePathname();
   
   const urlWorkspaceId = params.workspaceId as string;
-  // Use a state that falls back to the URL, but doesn't get overwritten by a missing URL
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(urlWorkspaceId);
 
   const handleLogout = () => {
@@ -53,11 +53,9 @@ export function Sidebar({ className }: { className?: string }) {
   const { data: workspaces, isLoading: isWorkspacesLoading } = useCollection<Workspace>(workspacesQuery);
 
   useEffect(() => {
-    // If the URL has a workspace ID, it's the source of truth.
     if (urlWorkspaceId) {
         setActiveWorkspaceId(urlWorkspaceId);
     } else if (!activeWorkspaceId && workspaces && workspaces.length > 0) {
-        // If there's no active ID (e.g., on /dashboard) and we have workspaces, default to the first one.
         setActiveWorkspaceId(workspaces[0].id);
     }
   }, [urlWorkspaceId, workspaces, activeWorkspaceId]);
@@ -67,13 +65,10 @@ export function Sidebar({ className }: { className?: string }) {
     return workspaces.find(ws => ws.id === activeWorkspaceId) || workspaces[0] || null;
   }, [workspaces, activeWorkspaceId]);
 
-  // This calculates the current page relative to the workspace root
-  // e.g. /dashboard/ws1/settings -> /settings
-  // e.g. /dashboard/ws1 -> ""
   const subPath = React.useMemo(() => {
     const currentPath = pathname || '';
-    if (!activeWorkspaceId || !currentPath.startsWith(`/dashboard/${activeWorkspaceId}`)) return '';
-    return currentPath.substring(`/dashboard/${activeWorkspaceId}`.length) || '/'; // Default to root
+    if (!activeWorkspaceId || !currentPath.startsWith(`/dashboard/${activeWorkspaceId}`)) return '/';
+    return currentPath.substring(`/dashboard/${activeWorkspaceId}`.length) || '/';
   }, [pathname, activeWorkspaceId]);
 
   const getPlanName = (plan: string | undefined) => {
@@ -85,13 +80,12 @@ export function Sidebar({ className }: { className?: string }) {
 
   const handleWorkspaceChange = (newWorkspaceId: string) => {
     setActiveWorkspaceId(newWorkspaceId);
-    // Navigate to the same sub-path for the newly selected workspace
     const newPath = subPath === '/' ? '' : subPath;
     router.push(`/dashboard/${newWorkspaceId}${newPath}`);
   };
 
   const isReviewReady = currentWorkspace?.status === WorkspaceStatus.DRAFT_READY;
-  const isPublished = currentWorkspace?.status === WorkspaceStatus.PUBLISHED;
+  const isSyncPending = currentWorkspace?.status === WorkspaceStatus.SYNC_PENDING;
 
   return (
     <aside
@@ -210,8 +204,25 @@ export function Sidebar({ className }: { className?: string }) {
                     tabIndex={!isReviewReady ? -1 : undefined}
                 >
                     <FileCheck className="h-4 w-4" />
-                    <span>Revisão</span>
+                    <span>Revisão de Rascunho</span>
                 </Link>
+
+                 <Link
+                    href={currentWorkspace ? `/dashboard/${currentWorkspace.id}/sync` : '#'}
+                    className={cn(
+                        "flex items-center gap-3 rounded-md px-2 py-1.5 text-sm",
+                        !isSyncPending && "pointer-events-none text-muted-foreground/50",
+                         isSyncPending && "text-blue-600 dark:text-blue-400 font-medium animate-pulse",
+                         pathname?.includes('/sync') && "bg-blue-400/20"
+                    )}
+                    aria-disabled={!isSyncPending}
+                    tabIndex={!isSyncPending ? -1 : undefined}
+                >
+                    <GitPullRequest className="h-4 w-4" />
+                    <span>Sincronização</span>
+                     {isSyncPending && currentWorkspace.pendingSyncCount && <span className="ml-auto text-xs font-normal text-blue-600 bg-blue-500/20 rounded-full px-2">{currentWorkspace.pendingSyncCount}</span>}
+                </Link>
+
 
                 <Link
                     href={currentWorkspace ? `/dashboard/${currentWorkspace.id}/knowledge` : '#'}
@@ -249,3 +260,5 @@ export function Sidebar({ className }: { className?: string }) {
     </aside>
   );
 }
+
+    

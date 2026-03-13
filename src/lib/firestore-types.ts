@@ -34,7 +34,7 @@ export enum ProcessingStatus {
 
 export enum InsightType {
   GAP = 'gap',
-  RISK = 'risk',
+  RISK = 'risco',
   OPPORTUNITY = 'oportunidade',
 }
 
@@ -78,6 +78,7 @@ export interface Workspace {
   lastProcessedAt?: Timestamp;
   pendingSyncCount?: number;
   visibility?: 'public' | 'private';
+  version?: number;
 }
 
 // ---------
@@ -215,3 +216,5 @@ export interface AssistantMessage {
   citations?: any[];
   createdAt: Timestamp;
 }
+
+    
