@@ -31,8 +31,13 @@ const BrandKitSchema = z.object({
     typography: z.array(z.object({
         name: z.string().describe("Uso da fonte (ex: 'Títulos', 'Corpo de texto')"),
         family: z.string().describe("Nome da família da fonte (ex: 'Montserrat')"),
-        weight: z.string().optional().describe("Peso da fonte (ex: '700', 'Bold')")
+        weight: z.string().optional().describe("Peso da fonte (ex: '700', 'Bold')"),
+        example: z.string().optional().describe("Uma frase de exemplo curta (máx. 5 palavras) para demonstrar a fonte em uso.")
     })).optional().describe("Regras de tipografia."),
+    logos: z.array(z.object({
+        name: z.string().describe("Nome da variação do logo (ex: 'Principal', 'Versão Horizontal', 'Favicon')"),
+        url: z.string().url().describe("URL pública da imagem do logo.")
+    })).optional().describe("Variações do logo da marca. O logo principal do workspace é adicionado automaticamente. A IA deve extrair apenas variações adicionais mencionadas no conteúdo."),
     toneOfVoice: z.array(z.string()).optional().describe("Lista de adjetivos ou frases que descrevem o tom de voz."),
     sourceRefs: z.array(z.string()).optional().describe("IDs dos documentos de origem."),
 }).describe("O Brand Kit estruturado contendo a identidade visual e verbal da marca.");
@@ -119,11 +124,14 @@ Siga estas regras estritamente:
 5.  **Base Exclusiva no Conteúdo:** Baseie-se exclusivamente no conteúdo fornecido para fazer alterações. Não invente informações.
 6.  **Conflitos como Insights:** Se encontrar informações conflitantes entre o novo conteúdo e o existente, crie um 'insight' do tipo 'risco' descrevendo o conflito.
 7.  **Saída Estritamente em JSON:** Sua resposta DEVE ser um único objeto JSON válido, representando a base de conhecimento **COMPLETA E ATUALIZADA**, sem nenhum texto, comentário ou markdown fora do objeto.
+8.  **Brand Kit Específico:** Ao estruturar o 'brandKit':
+    *   Para a **tipografia**, crie uma frase de exemplo curta e relevante (máximo 5 palavras) que demonstre o uso da fonte no campo 'example'.
+    *   Para os **logos**, extraia apenas variações mencionadas no conteúdo (ex: "versão negativa", "monocromática", "favicon"). Não extraia o logo principal, pois ele já é conhecido pelo sistema.
 
 Estruture sua saída nos seguintes blocos:
 
 -   **knowledgeBase:** Organize o conhecimento GERAL e OPERACIONAL em categorias. Cada categoria deve ter um ícone emoji simples e relevante.
--   **brandKit:** Extraia ou atualize as diretrizes de marca (cores, tipografia, tom de voz).
+-   **brandKit:** Extraia ou atualize as diretrizes de marca (cores, tipografia, tom de voz, logos).
 -   **playbooks:** Extraia ou atualize processos passo a passo.
 -   **trainingModules:** Crie ou atualize módulos de treinamento práticos.
 -   **insights:** Identifique gaps, oportunidades ou riscos com base na análise.

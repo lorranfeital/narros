@@ -12,10 +12,12 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PublishedKnowledge, Playbook, TrainingModule, Insight, Version, Workspace, BrandKit, Color, Typography as TypographyType } from '@/lib/firestore-types';
-import { BookOpen, Lightbulb, Milestone, Palette, Type } from 'lucide-react';
+import { BookOpen, Lightbulb, Milestone, Palette, Type, Globe } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import Image from 'next/image';
 
-function BrandKitDisplay({ brandKit, isLoading }: { brandKit: BrandKit | null, isLoading: boolean }) {
+
+function BrandKitDisplay({ workspace, brandKit, isLoading }: { workspace: Workspace | null, brandKit: BrandKit | null, isLoading: boolean }) {
     if (isLoading) {
         return (
             <Card>
@@ -23,15 +25,23 @@ function BrandKitDisplay({ brandKit, isLoading }: { brandKit: BrandKit | null, i
                     <Skeleton className="h-6 w-1/4" />
                     <Skeleton className="h-4 w-2/5" />
                 </CardHeader>
-                <CardContent className="space-y-6">
-                    <Skeleton className="h-10 w-full" />
+                <CardContent className="space-y-8">
+                    <Skeleton className="h-24 w-full" />
+                    <Skeleton className="h-24 w-full" />
                     <Skeleton className="h-24 w-full" />
                 </CardContent>
             </Card>
         )
     }
 
-    if (!brandKit) {
+    const allLogos = [
+        ...(workspace?.logoUrl ? [{ name: 'Logo Principal', url: workspace.logoUrl }] : []),
+        ...(brandKit?.logos || [])
+    ];
+    
+    const hasBrandKitContent = (brandKit?.colorPalette && brandKit.colorPalette.length > 0) || (brandKit?.typography && brandKit.typography.length > 0) || (brandKit?.toneOfVoice && brandKit.toneOfVoice.length > 0);
+
+    if (!hasBrandKitContent && allLogos.length === 0) {
         return (
             <Alert>
                 <Palette className="h-4 w-4" />
@@ -43,6 +53,7 @@ function BrandKitDisplay({ brandKit, isLoading }: { brandKit: BrandKit | null, i
         )
     }
 
+
     return (
         <Card>
             <CardHeader>
@@ -50,7 +61,27 @@ function BrandKitDisplay({ brandKit, isLoading }: { brandKit: BrandKit | null, i
                 <CardDescription>A identidade visual e verbal da sua marca, extraída pela IA.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-8">
-                {brandKit.colorPalette && brandKit.colorPalette.length > 0 && (
+                 {allLogos.length > 0 && (
+                     <div>
+                        <h3 className="text-lg font-semibold flex items-center gap-2 mb-4"><Globe className="h-5 w-5" /> Logos e Variações</h3>
+                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            {allLogos.map((logo) => (
+                                <div key={logo.name} className="flex flex-col items-center justify-center gap-2 rounded-lg border p-4 bg-muted/30">
+                                     <div className="relative w-24 h-24">
+                                        <Image
+                                            src={logo.url}
+                                            alt={logo.name}
+                                            fill
+                                            className="object-contain"
+                                        />
+                                    </div>
+                                    <p className="font-medium text-sm text-center mt-2">{logo.name}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+                {brandKit?.colorPalette && brandKit.colorPalette.length > 0 && (
                     <div>
                         <h3 className="text-lg font-semibold flex items-center gap-2 mb-4"><Palette className="h-5 w-5" /> Paleta de Cores</h3>
                         <div className="flex flex-wrap gap-4">
@@ -66,21 +97,21 @@ function BrandKitDisplay({ brandKit, isLoading }: { brandKit: BrandKit | null, i
                         </div>
                     </div>
                 )}
-                 {brandKit.typography && brandKit.typography.length > 0 && (
+                 {brandKit?.typography && brandKit.typography.length > 0 && (
                     <div>
                         <h3 className="text-lg font-semibold flex items-center gap-2 mb-4"><Type className="h-5 w-5" /> Tipografia</h3>
                         <div className="space-y-4">
                             {brandKit.typography.map((typo: TypographyType) => (
-                                <div key={typo.family} className="p-4 rounded-lg bg-muted/50">
+                                <div key={typo.family + typo.name} className="p-4 rounded-lg bg-muted/50">
                                     <p className="text-sm text-muted-foreground">{typo.name}</p>
-                                    <p style={{ fontFamily: typo.family, fontWeight: typo.weight }} className="text-3xl truncate">Aa Bb Cc Dd Ee</p>
+                                    <p style={{ fontFamily: typo.family, fontWeight: typo.weight || '400' }} className="text-3xl truncate">{typo.example || 'Aa Bb Cc Dd Ee'}</p>
                                     <p className="text-sm font-mono mt-2">{typo.family}{typo.weight ? `, ${typo.weight}` : ''}</p>
                                 </div>
                             ))}
                         </div>
                     </div>
                 )}
-                 {brandKit.toneOfVoice && brandKit.toneOfVoice.length > 0 && (
+                 {brandKit?.toneOfVoice && brandKit.toneOfVoice.length > 0 && (
                     <div>
                         <h3 className="text-lg font-semibold flex items-center gap-2 mb-4"><Lightbulb className="h-5 w-5" /> Tom de Voz</h3>
                         <div className="flex flex-wrap gap-2">
@@ -167,7 +198,7 @@ export default function KnowledgePage() {
         );
     }
     
-    if (!publishedKnowledge && !brandKit && !isLoading) {
+    if (!publishedKnowledge && !brandKit && !workspace?.logoUrl && !isLoading) {
          return (
             <div className="p-12">
                 <Alert variant="default" className="bg-secondary">
@@ -244,7 +275,7 @@ export default function KnowledgePage() {
                 </TabsContent>
                 
                 <TabsContent value="brandkit" className="mt-6">
-                   <BrandKitDisplay brandKit={brandKit} isLoading={isBrandKitLoading} />
+                   <BrandKitDisplay workspace={workspace} brandKit={brandKit} isLoading={isLoading} />
                 </TabsContent>
 
                 <TabsContent value="playbooks" className="mt-6">

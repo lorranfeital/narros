@@ -143,6 +143,7 @@ export interface Typography {
     name: string;
     family: string;
     weight?: string;
+    example?: string;
 }
 
 export interface BrandKit {
