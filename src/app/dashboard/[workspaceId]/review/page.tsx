@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Loader2, Sparkles, Trash2, Plus, GripVertical } from 'lucide-react';
+import { Loader2, Sparkles, Trash2, Plus, GripVertical, AlertTriangle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import React, { useEffect, useState } from 'react';
@@ -54,8 +54,7 @@ export default function ReviewPage() {
         if (!firestore || !workspaceId) return null;
         return query(
             collection(firestore, `workspaces/${workspaceId}/draft_knowledge`),
-            where('status', '==', 'draft'),
-            where('version', '==', 1) // For now, we assume v1. This will get more complex with sync.
+            where('status', '==', 'draft')
         );
     }, [firestore, workspaceId]);
     
@@ -100,7 +99,7 @@ export default function ReviewPage() {
         try {
             await publishDraft(workspaceId, draft.id, user.uid);
             toast({ title: 'Sucesso!', description: 'A base de conhecimento foi publicada.' });
-            router.push(`/dashboard/${workspaceId}`);
+            router.push(`/dashboard/${workspaceId}/knowledge`);
         } catch (error) {
             console.error('Error publishing draft:', error);
             toast({ variant: 'destructive', title: 'Erro ao publicar', description: (error as Error).message });
@@ -127,11 +126,11 @@ export default function ReviewPage() {
     if (!draft) {
         return (
             <div className="p-12">
-                <Alert variant="destructive">
+                <Alert>
                     <AlertTriangle className="h-4 w-4" />
                     <AlertTitle>Nenhum rascunho encontrado</AlertTitle>
                     <AlertDescription>
-                        Não há nenhum rascunho para revisar no momento. Gere um novo rascunho na página do workspace.
+                        Não há nenhum rascunho para revisar no momento. Gere um novo rascunho na página de ingestão de conteúdo.
                     </AlertDescription>
                 </Alert>
             </div>
@@ -179,7 +178,7 @@ export default function ReviewPage() {
                                 ))}
                             </Accordion>
                              <Button type="button" variant="outline" size="sm" className="mt-6" onClick={() => append({ categoria: 'Nova Categoria', icone: '✨', itens: [] })}>
-                                <Plus className="mr-2" /> Adicionar Categoria
+                                <Plus className="mr-2 h-4 w-4" /> Adicionar Categoria
                             </Button>
                         </CardContent>
                     </Card>
@@ -231,7 +230,7 @@ function CategoryItems({ control, categoryIndex }: { control: any, categoryIndex
         </div>
       ))}
       <Button type="button" variant="outline" size="sm" className="mt-4" onClick={() => append({ titulo: '', descricao: '' })}>
-        <Plus className="mr-2" /> Adicionar Item
+        <Plus className="mr-2 h-4 w-4" /> Adicionar Item
       </Button>
     </div>
   );

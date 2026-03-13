@@ -3,11 +3,12 @@
 import { cn } from "@/lib/utils";
 import {
   Home,
-  Search,
+  Upload,
   Settings,
   ChevronsUpDown,
   Plus,
   FileCheck,
+  BookOpen,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -90,6 +91,7 @@ export function Sidebar({ className }: { className?: string }) {
   };
 
   const isReviewReady = currentWorkspace?.status === WorkspaceStatus.DRAFT_READY;
+  const isPublished = currentWorkspace?.status === WorkspaceStatus.PUBLISHED;
 
   return (
     <aside
@@ -184,6 +186,17 @@ export function Sidebar({ className }: { className?: string }) {
                     <Home className="h-4 w-4" />
                     <span>Início</span>
                 </Link>
+
+                 <Link
+                    href={currentWorkspace ? `/dashboard/${currentWorkspace.id}` : '#'}
+                    className={cn(
+                        "flex items-center gap-3 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                        pathname === `/dashboard/${currentWorkspace?.id}` && 'bg-muted/50 text-foreground'
+                    )}
+                >
+                    <Upload className="h-4 w-4" />
+                    <span>Ingestão</span>
+                </Link>
                 
                  <Link
                     href={currentWorkspace ? `/dashboard/${currentWorkspace.id}/review` : '#'}
@@ -200,16 +213,18 @@ export function Sidebar({ className }: { className?: string }) {
                     <span>Revisão</span>
                 </Link>
 
-
                 <Link
-                    href={currentWorkspace ? `/dashboard/${currentWorkspace.id}` : '#'}
+                    href={currentWorkspace ? `/dashboard/${currentWorkspace.id}/knowledge` : '#'}
                     className={cn(
                         "flex items-center gap-3 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground",
-                        pathname === `/dashboard/${currentWorkspace?.id}` && 'bg-muted/50 text-foreground'
+                        pathname?.includes('/knowledge') && "bg-muted/50 text-foreground",
+                        !currentWorkspace && "pointer-events-none opacity-50"
                     )}
+                    aria-disabled={!currentWorkspace}
+                    tabIndex={!currentWorkspace ? -1 : undefined}
                 >
-                    <Search className="h-4 w-4" />
-                    <span>Análise</span>
+                    <BookOpen className="h-4 w-4" />
+                    <span>Conhecimento</span>
                 </Link>
 
                 <Link

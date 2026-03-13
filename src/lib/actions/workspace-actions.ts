@@ -10,6 +10,7 @@ import {
   where,
   writeBatch,
   deleteDoc,
+  Timestamp,
 } from 'firebase/firestore';
 import { getApps, FirebaseError } from 'firebase/app';
 import { firebaseConfig } from '@/firebase/config';
@@ -185,20 +186,20 @@ export async function publishDraft(
   const workspaceRef = doc(db, 'workspaces', workspaceId);
 
   const batch = writeBatch(db);
-  const timestamp = serverTimestamp();
-  const currentVersion = (await getDoc(workspaceRef)).data()?.version || 0;
+  const timestamp = Timestamp.now();
+  const workspaceSnap = await getDoc(workspaceRef);
+  const currentVersion = workspaceSnap.data()?.version || 0;
   const newVersion = currentVersion + 1;
 
-  // 1. Copy draft to published_knowledge
-  const publishedRef = doc(
-    collection(db, `workspaces/${workspaceId}/published_knowledge`)
-  );
+  // 1. Set/overwrite the single published knowledge document.
+  // The document ID is the same as the workspace ID for easy retrieval.
+  const publishedRef = doc(db, `workspaces/${workspaceId}/published_knowledge`, workspaceId);
   batch.set(publishedRef, {
     categories: draftData.categories,
     publishedAt: timestamp,
     version: newVersion,
     publishedBy: userId,
-  });
+  }, { merge: true });
 
   // 2. Update status of related playbooks and training_modules to 'published'
   const playbooksQuery = query(
