@@ -1,6 +1,5 @@
 'use client';
 
-import { Logo } from "@/components/logo";
 import { cn } from "@/lib/utils";
 import {
   Home,
@@ -17,6 +16,7 @@ import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { collection, doc, query, where } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const mainNavItems = [
     { icon: Search, label: "Buscar", href: "#" },
@@ -68,7 +68,10 @@ export function Sidebar({ className }: { className?: string }) {
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="w-full justify-start gap-2 px-2 h-11">
-                        <Logo showText={false} iconClassName="w-5 h-5" />
+                        <Avatar className="h-6 w-6">
+                            <AvatarImage src={currentWorkspace?.logoUrl} />
+                            <AvatarFallback>{currentWorkspace?.name?.charAt(0) ?? 'N'}</AvatarFallback>
+                        </Avatar>
                         {isWorkspacesLoading ? (
                             <Skeleton className="h-4 w-32" />
                         ) : (
@@ -83,7 +86,7 @@ export function Sidebar({ className }: { className?: string }) {
                         {isWorkspacesLoading && (
                             <DropdownMenuItem disabled>
                                 <div className="flex items-center gap-2">
-                                     <Skeleton className="h-5 w-5 rounded-full" />
+                                     <Skeleton className="h-6 w-6 rounded-full" />
                                      <div className="flex flex-col gap-1 py-1">
                                         <Skeleton className="h-4 w-24" />
                                         <Skeleton className="h-3 w-16" />
@@ -94,7 +97,10 @@ export function Sidebar({ className }: { className?: string }) {
                         {workspaces?.map((ws) => (
                             <DropdownMenuItem key={ws.id}>
                                 <div className="flex items-center gap-2">
-                                    <Logo showText={false} iconClassName="w-5 h-5" />
+                                    <Avatar className="h-6 w-6">
+                                        <AvatarImage src={ws.logoUrl} />
+                                        <AvatarFallback>{ws.name?.charAt(0)}</AvatarFallback>
+                                    </Avatar>
                                     <div className="flex flex-col">
                                         <span className="text-sm font-medium">{ws.name}</span>
                                         {isProfileLoading ? (
