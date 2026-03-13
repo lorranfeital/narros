@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview An AI assistant flow that answers questions based on a provided knowledge base and chat history.
@@ -16,7 +17,8 @@ import {
   Playbook,
   TrainingModule,
 } from '@/lib/firestore-types';
-import { getApps } from 'firebase/app';
+import { getApps, initializeApp, getApp } from 'firebase/app';
+import { firebaseConfig } from '@/firebase/config';
 
 const ChatMessageSchema = z.object({
   role: z.enum(['user', 'assistant']),
@@ -54,11 +56,9 @@ const prompt = ai.definePrompt({
 // Helper to ensure Firebase is ready on the server
 function getFlowFirestore() {
   if (getApps().length === 0) {
-    // This flow runs on the server and assumes Firebase has been initialized.
-    // The project setup should handle this. If not, it's a fatal error.
-    throw new Error('Firebase has not been initialized on the server for this Genkit flow.');
+    initializeApp(firebaseConfig);
   }
-  return getFirestore();
+  return getFirestore(getApp());
 }
 
 const chatWithKnowledgeAssistantFlow = ai.defineFlow(

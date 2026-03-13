@@ -13,7 +13,7 @@ import {
   Timestamp,
   updateDoc,
 } from 'firebase/firestore';
-import { getApps } from 'firebase/app';
+import { getApps, initializeApp, getApp } from 'firebase/app';
 import {
   analyzeAndStructureContent,
   AnalyzeAndStructureContentOutput,
@@ -32,15 +32,14 @@ import {
   KnowledgeCategory,
 } from '@/lib/firestore-types';
 import { getFirestore } from 'firebase/firestore';
+import { firebaseConfig } from '@/firebase/config';
 
 // Helper to get a server-side Firestore instance
 function getAdminFirestore() {
   if (getApps().length === 0) {
-    throw new Error(
-      'Firebase não foi inicializado no servidor. A configuração está faltando.'
-    );
+    initializeApp(firebaseConfig);
   }
-  return getFirestore();
+  return getFirestore(getApp());
 }
 
 /**
