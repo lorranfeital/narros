@@ -31,18 +31,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     }
 
     // Logic to handle redirects based on workspace existence
-    // We wait until the workspaces query has explicitly returned (workspaces !== null) to avoid race conditions
+    // We wait until the workspaces query has explicitly returned to avoid race conditions
     if (!isUserLoading && user && !isWorkspacesLoading && workspaces !== null) {
       const hasWorkspaces = workspaces.length > 0;
       const isOnNewWorkspacePage = pathname === '/dashboard/new-workspace';
 
       // If user has no workspaces and is not on the creation page, redirect them.
+      // This handles the initial onboarding flow.
       if (!hasWorkspaces && !isOnNewWorkspacePage) {
         router.push('/dashboard/new-workspace');
-      } 
-      // If user has workspaces but is stuck on the creation page, redirect to dashboard.
-      else if (hasWorkspaces && isOnNewWorkspacePage) {
-        router.push('/dashboard');
       }
     }
   }, [user, isUserLoading, workspaces, isWorkspacesLoading, workspacesError, router, pathname]);
@@ -64,9 +61,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     return null;
   }
   
-  // If we are on the new workspace page (and likely being redirected), show children (which is the loading page) or a loader.
-  if (isNewWorkspacePage) {
-    // This allows the new-workspace page to be rendered while the redirect logic runs.
+  // This handles the case where a user has no workspaces and must create one.
+  // The layout is simpler because there's no sidebar.
+  if ((!workspaces || workspaces.length === 0) && isNewWorkspacePage) {
      return <>{children}</>;
   }
   
@@ -83,11 +80,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     )
   }
 
-  // If the user is being redirected to create a workspace, show a loader.
+  // This handles the redirect case where data is loaded, but user has no workspaces yet.
   if (!workspaces || workspaces.length === 0) {
      return (
       <div className="flex min-h-screen items-center justify-center">
-        <p>Carregando...</p>
+        <p>Redirecionando para criação de workspace...</p>
       </div>
     );
   }
