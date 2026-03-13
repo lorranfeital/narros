@@ -89,8 +89,8 @@ service cloud.firestore {
       match /brand_kit/{brandKitId} {
         // Members and server can read.
         allow read, list: if isWorkspaceMember(workspaceId) || isServerProcess();
-        // Server creates/updates.
-        allow create, update, delete: if isServerProcess();
+        // Server or workspace members can create/update/delete.
+        allow create, update, delete: if isWorkspaceMember(workspaceId) || isServerProcess();
       }
 
       // --- Playbooks Subcollection ---
