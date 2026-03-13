@@ -14,13 +14,13 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
-    { icon: Search, label: "Search", href: "#" },
-    { icon: Home, label: "Home", href: "/dashboard" },
+    { icon: Search, label: "Buscar", href: "#" },
+    { icon: Home, label: "Início", href: "/dashboard" },
     { icon: FileText, label: "Conteúdo", href: "#" },
     { icon: Sparkles, label: "Assistente", href: "#" },
     { icon: Inbox, label: "Caixa de Entrada", href: "#" },
     { icon: Library, label: "Playbooks", href: "#" },
-    { icon: Settings, label: "Settings", href: "#" },
+    { icon: Settings, label: "Configurações", href: "#" },
 ]
 
 export function Sidebar({ className }: { className?: string }) {
@@ -54,7 +54,7 @@ export function Sidebar({ className }: { className?: string }) {
       <div className="mt-auto p-4">
         <Button variant="ghost" className="w-full justify-start gap-3">
           <Plus className="h-4 w-4" />
-          <span>New page</span>
+          <span>Nova página</span>
         </Button>
       </div>
     </aside>
