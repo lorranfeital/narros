@@ -25,12 +25,27 @@ import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 
+const sectorEnum = z.enum([
+  'Alimentação',
+  'Contabilidade',
+  'Consultoria',
+  'Educação',
+  'Engenharia',
+  'Financeiro',
+  'Imobiliário',
+  'Jurídico',
+  'Marketing e Publicidade',
+  'Saúde',
+  'Serviços',
+  'Tecnologia',
+  'Varejo',
+  'Outro',
+]);
+
 const formSchema = z.object({
   name: z.string().min(2, 'O nome deve ter pelo menos 2 caracteres.'),
   type: z.enum(['franquia', 'escritório', 'rede', 'outro']),
-  sector: z.enum(['Alimentação', 'Varejo', 'Serviços', 'Saúde', 'Educação', 'Imobiliário', 'Outro'], {
-    required_error: 'Selecione um setor.'
-  }),
+  sector: sectorEnum,
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -128,13 +143,9 @@ export function CreateWorkspaceForm() {
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="Alimentação">Alimentação</SelectItem>
-                  <SelectItem value="Varejo">Varejo</SelectItem>
-                  <SelectItem value="Serviços">Serviços</SelectItem>
-                  <SelectItem value="Saúde">Saúde</SelectItem>
-                  <SelectItem value="Educação">Educação</SelectItem>
-                  <SelectItem value="Imobiliário">Imobiliário</SelectItem>
-                  <SelectItem value="Outro">Outro</SelectItem>
+                  {sectorEnum.options.map((sector) => (
+                    <SelectItem key={sector} value={sector}>{sector}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <FormMessage />

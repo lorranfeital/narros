@@ -64,11 +64,18 @@
           "description": "The business sector of the workspace.",
           "enum": [
             "Alimentação",
-            "Varejo",
-            "Serviços",
-            "Saúde",
+            "Contabilidade",
+            "Consultoria",
             "Educação",
+            "Engenharia",
+            "Financeiro",
             "Imobiliário",
+            "Jurídico",
+            "Marketing e Publicidade",
+            "Saúde",
+            "Serviços",
+            "Tecnologia",
+            "Varejo",
             "Outro"
           ]
         },

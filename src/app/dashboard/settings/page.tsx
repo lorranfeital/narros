@@ -25,10 +25,27 @@ const profileFormSchema = z.object({
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>;
 
+const sectorEnum = z.enum([
+  'Alimentação',
+  'Contabilidade',
+  'Consultoria',
+  'Educação',
+  'Engenharia',
+  'Financeiro',
+  'Imobiliário',
+  'Jurídico',
+  'Marketing e Publicidade',
+  'Saúde',
+  'Serviços',
+  'Tecnologia',
+  'Varejo',
+  'Outro',
+]);
+
 const workspaceFormSchema = z.object({
   name: z.string().min(2, { message: 'O nome do workspace deve ter pelo menos 2 caracteres.' }),
   type: z.enum(['franquia', 'escritório', 'rede', 'outro']),
-  sector: z.enum(['Alimentação', 'Varejo', 'Serviços', 'Saúde', 'Educação', 'Imobiliário', 'Outro']),
+  sector: sectorEnum,
 });
 
 type WorkspaceFormValues = z.infer<typeof workspaceFormSchema>;
@@ -246,13 +263,9 @@ export default function SettingsPage() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="Alimentação">Alimentação</SelectItem>
-                            <SelectItem value="Varejo">Varejo</SelectItem>
-                            <SelectItem value="Serviços">Serviços</SelectItem>
-                            <SelectItem value="Saúde">Saúde</SelectItem>
-                            <SelectItem value="Educação">Educação</SelectItem>
-                            <SelectItem value="Imobiliário">Imobiliário</SelectItem>
-                            <SelectItem value="Outro">Outro</SelectItem>
+                             {sectorEnum.options.map((sector) => (
+                                <SelectItem key={sector} value={sector}>{sector}</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                         <FormMessage />
