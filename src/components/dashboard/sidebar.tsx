@@ -6,17 +6,17 @@ import {
   Home,
   Search,
   Settings,
-  FileText,
   ChevronsUpDown,
   Plus,
-  UserPlus
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuGroup } from "@/components/ui/dropdown-menu";
-import { useAuth } from "@/firebase";
+import { useAuth, useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from "@/firebase";
 import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
+import { collection, doc, query, where } from "firebase/firestore";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const mainNavItems = [
     { icon: Search, label: "Buscar", href: "#" },
@@ -24,23 +24,38 @@ const mainNavItems = [
     { icon: Settings, label: "Configurações", href: "/dashboard/settings" },
 ]
 
-const docItems = [
-    { icon: FileText, label: "Manifesto Beacon", href: "#" },
-    { icon: FileText, label: "Ajustar formulário do difusor", href: "#" },
-    { icon: FileText, label: "Criar post manifesto fixo", href: "#" },
-    { icon: FileText, label: "Publicar 1ª edição da newsletter", href: "#" },
-    { icon: FileText, label: "Novo item", href: "#" },
-]
-
 export function Sidebar({ className }: { className?: string }) {
   const auth = useAuth();
   const router = useRouter();
+  const { user } = useUser();
+  const firestore = useFirestore();
 
   const handleLogout = () => {
     signOut(auth).then(() => {
       router.push('/login');
     });
   };
+
+  const userDocRef = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [user, firestore]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userDocRef);
+
+  const workspacesQuery = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return query(collection(firestore, 'workspaces'), where('members', 'array-contains', user.uid));
+  }, [user, firestore]);
+  const { data: workspaces, isLoading: isWorkspacesLoading } = useCollection<any>(workspacesQuery);
+
+  const currentWorkspace = workspaces && workspaces.length > 0 ? workspaces[0] : null;
+
+  const getPlanName = (plan: string | undefined) => {
+    if (!plan) return '';
+    if (plan === 'free') return 'Plano Grátis';
+    if (plan === 'pro') return 'Plano Pro';
+    return plan;
+  }
 
   return (
     <aside
@@ -54,27 +69,56 @@ export function Sidebar({ className }: { className?: string }) {
                 <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="w-full justify-start gap-2 px-2 h-11">
                         <Logo showText={false} iconClassName="w-5 h-5" />
-                        <span className="font-semibold text-sm">Workspace do Lorran</span>
+                        {isWorkspacesLoading ? (
+                            <Skeleton className="h-4 w-32" />
+                        ) : (
+                            <span className="font-semibold text-sm truncate">{currentWorkspace?.name || 'Sem workspace'}</span>
+                        )}
                         <ChevronsUpDown className="ml-auto h-4 w-4 text-muted-foreground" />
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-[270px]" align="start">
                     <DropdownMenuGroup>
                         <DropdownMenuLabel className="text-xs text-muted-foreground">Workspaces</DropdownMenuLabel>
-                        <DropdownMenuItem>
-                            <div className="flex items-center gap-2">
-                                <Logo showText={false} iconClassName="w-5 h-5" />
-                                <div className="flex flex-col">
-                                    <span className="text-sm font-medium">Workspace do Lorran</span>
-                                    <span className="text-xs text-muted-foreground">Plano Grátis</span>
+                        {isWorkspacesLoading && (
+                            <DropdownMenuItem disabled>
+                                <div className="flex items-center gap-2">
+                                     <Skeleton className="h-5 w-5 rounded-full" />
+                                     <div className="flex flex-col gap-1 py-1">
+                                        <Skeleton className="h-4 w-24" />
+                                        <Skeleton className="h-3 w-16" />
+                                     </div>
                                 </div>
-                            </div>
-                        </DropdownMenuItem>
+                            </DropdownMenuItem>
+                        )}
+                        {workspaces?.map((ws) => (
+                            <DropdownMenuItem key={ws.id}>
+                                <div className="flex items-center gap-2">
+                                    <Logo showText={false} iconClassName="w-5 h-5" />
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-medium">{ws.name}</span>
+                                        {isProfileLoading ? (
+                                            <Skeleton className="h-3 w-16 mt-1" />
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground">{getPlanName(userProfile?.plan)}</span>
+                                        )}
+                                    </div>
+                                </div>
+                            </DropdownMenuItem>
+                        ))}
+                         {!isWorkspacesLoading && (!workspaces || workspaces.length === 0) && (
+                            <DropdownMenuItem disabled>
+                                <span className="text-xs text-muted-foreground">Nenhum workspace encontrado.</span>
+                            </DropdownMenuItem>
+                         )}
+
                     </DropdownMenuGroup>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>
-                        <Plus className="mr-2 h-4 w-4" />
-                        <span>Criar ou entrar em workspace</span>
+                    <DropdownMenuItem asChild>
+                        <Link href="/dashboard/new-workspace">
+                            <Plus className="mr-2 h-4 w-4" />
+                            <span>Criar ou entrar em workspace</span>
+                        </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
                         <Link href="/dashboard/settings">
@@ -101,34 +145,10 @@ export function Sidebar({ className }: { className?: string }) {
                     </Link>
                 ))}
             </nav>
-
-            <div className="">
-                <h3 className="px-2 text-xs font-semibold text-muted-foreground/80 tracking-wider uppercase">Recentes</h3>
-                <nav className="mt-1 flex flex-col gap-0.5">
-                    {docItems.map((item) => (
-                    <Link
-                        key={item.label}
-                        href={item.href}
-                        className="flex items-center gap-3 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                    >
-                        <item.icon className="h-4 w-4" />
-                        <span className="truncate">{item.label}</span>
-                    </Link>
-                    ))}
-                </nav>
-            </div>
         </div>
 
-
       <div className="mt-auto border-t p-2">
-        <Button variant="ghost" className="w-full justify-start gap-2 text-sm font-normal text-muted-foreground">
-          <UserPlus className="h-4 w-4" />
-          <span>Convidar membros</span>
-        </Button>
-        <Button variant="ghost" className="w-full justify-start gap-2 text-sm font-normal text-muted-foreground">
-          <Plus className="h-4 w-4" />
-          <span>Nova página</span>
-        </Button>
+        {/* Placeholder for future items like invites */}
       </div>
     </aside>
   );
