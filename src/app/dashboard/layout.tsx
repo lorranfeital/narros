@@ -91,9 +91,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   // Otherwise, show the full dashboard layout.
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex h-screen bg-background">
       <Sidebar />
-      <main className="flex-1">
+      <main className="flex-1 overflow-y-auto">
         {children}
       </main>
     </div>
