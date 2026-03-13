@@ -26,7 +26,9 @@ const profileFormSchema = z.object({
 type ProfileFormValues = z.infer<typeof profileFormSchema>;
 
 const sectorEnum = z.enum([
+  'Agricultura',
   'Alimentação',
+  'Construção',
   'Contabilidade',
   'Consultoria',
   'Educação',
@@ -35,16 +37,19 @@ const sectorEnum = z.enum([
   'Imobiliário',
   'Jurídico',
   'Marketing e Publicidade',
+  'Mídia e Entretenimento',
   'Saúde',
   'Serviços',
   'Tecnologia',
+  'Transporte e Logística',
+  'Turismo e Hotelaria',
   'Varejo',
   'Outro',
 ]);
 
 const workspaceFormSchema = z.object({
   name: z.string().min(2, { message: 'O nome do workspace deve ter pelo menos 2 caracteres.' }),
-  type: z.enum(['franquia', 'escritório', 'rede', 'outro']),
+  type: z.enum(['franquia', 'rede', 'escritório', 'clínica', 'loja', 'outro']),
   sector: sectorEnum,
 });
 
@@ -241,8 +246,10 @@ export default function SettingsPage() {
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="franquia">Franquia</SelectItem>
-                            <SelectItem value="escritório">Escritório</SelectItem>
                             <SelectItem value="rede">Rede</SelectItem>
+                            <SelectItem value="escritório">Escritório</SelectItem>
+                            <SelectItem value="clínica">Clínica</SelectItem>
+                            <SelectItem value="loja">Loja</SelectItem>
                             <SelectItem value="outro">Outro</SelectItem>
                           </SelectContent>
                         </Select>

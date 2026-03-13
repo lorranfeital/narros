@@ -26,7 +26,9 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 
 const sectorEnum = z.enum([
+  'Agricultura',
   'Alimentação',
+  'Construção',
   'Contabilidade',
   'Consultoria',
   'Educação',
@@ -35,16 +37,19 @@ const sectorEnum = z.enum([
   'Imobiliário',
   'Jurídico',
   'Marketing e Publicidade',
+  'Mídia e Entretenimento',
   'Saúde',
   'Serviços',
   'Tecnologia',
+  'Transporte e Logística',
+  'Turismo e Hotelaria',
   'Varejo',
   'Outro',
 ]);
 
 const formSchema = z.object({
   name: z.string().min(2, 'O nome deve ter pelo menos 2 caracteres.'),
-  type: z.enum(['franquia', 'escritório', 'rede', 'outro']),
+  type: z.enum(['franquia', 'rede', 'escritório', 'clínica', 'loja', 'outro']),
   sector: sectorEnum,
 });
 
@@ -121,8 +126,10 @@ export function CreateWorkspaceForm() {
                 </FormControl>
                 <SelectContent>
                   <SelectItem value="franquia">Franquia</SelectItem>
-                  <SelectItem value="escritório">Escritório</SelectItem>
                   <SelectItem value="rede">Rede</SelectItem>
+                  <SelectItem value="escritório">Escritório</SelectItem>
+                  <SelectItem value="clínica">Clínica</SelectItem>
+                  <SelectItem value="loja">Loja</SelectItem>
                   <SelectItem value="outro">Outro</SelectItem>
                 </SelectContent>
               </Select>

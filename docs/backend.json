@@ -53,8 +53,10 @@
           "type": "string",
           "enum": [
             "franquia",
-            "escritório",
             "rede",
+            "escritório",
+            "clínica",
+            "loja",
             "outro"
           ],
           "description": "The type of the workspace."
@@ -63,7 +65,9 @@
           "type": "string",
           "description": "The business sector of the workspace.",
           "enum": [
+            "Agricultura",
             "Alimentação",
+            "Construção",
             "Contabilidade",
             "Consultoria",
             "Educação",
@@ -72,9 +76,12 @@
             "Imobiliário",
             "Jurídico",
             "Marketing e Publicidade",
+            "Mídia e Entretenimento",
             "Saúde",
             "Serviços",
             "Tecnologia",
+            "Transporte e Logística",
+            "Turismo e Hotelaria",
             "Varejo",
             "Outro"
           ]
