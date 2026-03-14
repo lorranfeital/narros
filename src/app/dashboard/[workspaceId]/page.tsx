@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useFirestore, useDoc, useMemoFirebase, useCollection, useUser } from '@/firebase';
@@ -36,6 +35,11 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 
 // -- BLOCKS & SUB-COMPONENTS --
+
+function capitalizeFirstLetter(str: string | undefined) {
+    if (!str) return '';
+    return str.charAt(0).toUpperCase() + str.slice(1);
+}
 
 function DashboardHeader({ workspace }: { workspace: Workspace | null }) {
     if (!workspace) return <Skeleton className="h-20 w-full" />;
@@ -87,7 +91,7 @@ function DashboardHeader({ workspace }: { workspace: Workspace | null }) {
             <p className="text-sm text-muted-foreground">Bom dia, {useUser().user?.displayName?.split(' ')[0]}</p>
             <h1 className="font-headline text-3xl font-normal tracking-tight mt-1">{workspace.name}</h1>
             <div className="text-sm text-muted-foreground mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span>{workspace.type}</span>
+                <span>{capitalizeFirstLetter(workspace.type)}</span>
                 <span className="text-muted-foreground/50">&middot;</span>
                 <span>{workspace.sector}</span>
                 {workspace.status !== WorkspaceStatus.NEVER_PUBLISHED && (

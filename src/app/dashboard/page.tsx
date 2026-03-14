@@ -29,6 +29,11 @@ function getStatusText(status: WorkspaceStatus | undefined) {
     }
 }
 
+function capitalizeFirstLetter(str: string | undefined) {
+    if (!str) return '';
+    return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
 function WorkspaceCard({ workspace }: { workspace: Workspace }) {
     const status = getStatusText(workspace.status);
     return (
@@ -41,7 +46,7 @@ function WorkspaceCard({ workspace }: { workspace: Workspace }) {
                     </Avatar>
                     <div>
                         <CardTitle className="text-lg font-semibold">{workspace.name}</CardTitle>
-                        <p className="text-sm text-muted-foreground">{workspace.type} &middot; {workspace.sector}</p>
+                        <p className="text-sm text-muted-foreground">{capitalizeFirstLetter(workspace.type)} &middot; {workspace.sector}</p>
                     </div>
                 </CardHeader>
                 <CardFooter className="flex justify-between items-center">
