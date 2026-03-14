@@ -101,7 +101,7 @@ export default function WorkspaceDashboardPage() {
         <div className="p-8 md:p-12 space-y-10">
             {/* Header */}
             <div>
-                <h1 className="text-3xl font-bold tracking-tight">Bom dia, {user?.displayName?.split(' ')[0]}</h1>
+                <h1 className="font-headline text-3xl font-medium tracking-tight">Bom dia, {user?.displayName?.split(' ')[0]}</h1>
                 <p className="text-xl text-muted-foreground mt-1">{workspace.name}</p>
                 <div className="text-sm text-muted-foreground mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
                     <span>{workspace.type} &middot; {workspace.sector}</span>
