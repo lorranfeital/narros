@@ -157,11 +157,11 @@ function AskHeroBlock({ workspace, primaryColor }: { workspace: Workspace, prima
 
     return (
         <div className="rounded-xl border bg-card/50 p-8">
-            <label className="text-xs uppercase tracking-widest text-muted-foreground">Pergunte à sua empresa</label>
+            <label className="text-xs uppercase tracking-widest text-muted-foreground">Assistente da empresa</label>
              <form onSubmit={handleAskQuestion} className="relative mt-4 mb-4">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input 
-                    placeholder="O que você quer saber sobre a operação?"
+                    placeholder="Pergunte qualquer coisa sobre a operação"
                     className="h-14 text-base pl-12 pr-40"
                     value={question}
                     onChange={(e) => setQuestion(e.target.value)}
@@ -283,6 +283,47 @@ function QuickActions({ workspaceId, syncCount }: { workspaceId: string, syncCou
     )
 }
 
+function MostConsultedContent({ isLoading }: { isLoading: boolean }) {
+    const items = [
+        { title: 'Tabela de Tarifas', icon: FileText, href: '#' },
+        { title: 'Processo de cadastro de cliente', icon: BookOpen, href: '#' },
+        { title: 'Política de compliance', icon: FileText, href: '#' },
+    ];
+
+    return (
+        <div className="mt-8">
+            <h3 className="text-base font-semibold mb-4">Conteúdo mais usado</h3>
+            <div className="rounded-lg border bg-card">
+                 {isLoading ? (
+                    <div className="p-4 space-y-2">
+                        <Skeleton className="h-8 w-3/4" />
+                        <Skeleton className="h-8 w-1/2" />
+                        <Skeleton className="h-8 w-2/3" />
+                    </div>
+                ) : items.length > 0 ? (
+                    items.map((item, index) => (
+                        <Link key={item.title} href={item.href}>
+                            <div className={cn(
+                                "flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors",
+                                index < items.length - 1 && "border-b"
+                            )}>
+                                <item.icon className="h-5 w-5 text-muted-foreground" />
+                                <span className="font-medium">{item.title}</span>
+                                <ChevronRight className="h-5 w-5 text-muted-foreground ml-auto" />
+                            </div>
+                        </Link>
+                    ))
+                ) : (
+                    <div className="p-8 text-center">
+                        <p className="text-sm text-muted-foreground">Ainda não há dados de conteúdo mais consultado.</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
+
 function AIInsights({ insights, isLoading }: { insights: Insight[] | null, isLoading: boolean }) {
     const getInsightAppearance = (type: InsightType) => {
         switch (type) {
@@ -330,14 +371,11 @@ function AIInsights({ insights, isLoading }: { insights: Insight[] | null, isLoa
 }
 
 function RecentActivity({ versions, isLoading }: { versions: Version[] | null, isLoading: boolean }) {
-    const getActivityAppearance = (type: VersionEventType) => {
+    const getActivityIcon = (type: VersionEventType) => {
         switch (type) {
-            case VersionEventType.INITIAL_PUBLISH:
-                return { icon: ArrowUpCircle, text: 'Publicação inicial' };
-            case VersionEventType.SYNC_PUBLISH:
-                return { icon: GitPullRequest, text: 'Sincronização' };
-            default:
-                return { icon: FileText, text: 'Edição manual' };
+            case VersionEventType.INITIAL_PUBLISH: return ArrowUpCircle;
+            case VersionEventType.SYNC_PUBLISH: return GitPullRequest;
+            default: return FileText;
         }
     };
 
@@ -348,11 +386,17 @@ function RecentActivity({ versions, isLoading }: { versions: Version[] | null, i
              {!isLoading && versions && versions.length > 0 ? (
                 <div className="flex flex-col md:flex-row gap-x-8 gap-y-2 text-sm text-muted-foreground">
                     {versions.map(version => {
-                        const { icon: Icon, text } = getActivityAppearance(version.type);
+                        const Icon = getActivityIcon(version.type);
+                        const fullSummary = version.summary.includes('Versão') || version.summary.includes('versão')
+                            ? version.summary 
+                            : `${version.summary.replace(/\.$/, '')} · Versão ${version.version}`;
+                        
                         return (
                              <div key={version.id} className="flex items-center gap-2">
                                 <Icon className="h-4 w-4" />
-                                <span>{text} &middot; Versão {version.version} &middot; {formatDistanceToNow(version.createdAt.toDate(), { locale: ptBR, addSuffix: true })}</span>
+                                <span>
+                                    {fullSummary} &middot; {formatDistanceToNow(version.createdAt.toDate(), { locale: ptBR, addSuffix: true })}
+                                </span>
                             </div>
                         )
                     })}
@@ -363,6 +407,7 @@ function RecentActivity({ versions, isLoading }: { versions: Version[] | null, i
         </div>
     )
 }
+
 
 // -- MAIN PAGE COMPONENT --
 export default function WorkspaceDashboardPage() {
@@ -463,6 +508,7 @@ export default function WorkspaceDashboardPage() {
                  <div className="md:col-span-3 space-y-8">
                     <KnowledgeStats data={knowledgeStats} isLoading={isLoading} primaryColor={primaryColor} />
                     <QuickActions workspaceId={workspaceId} syncCount={syncProposals?.length ?? 0} />
+                    <MostConsultedContent isLoading={isLoading} />
                  </div>
                  <div className="md:col-span-2">
                     <AIInsights insights={insights} isLoading={isLoading} />
