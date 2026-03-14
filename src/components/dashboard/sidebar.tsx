@@ -13,6 +13,7 @@ import {
   GitPullRequest,
   Bot,
   LogOut,
+  Waypoints,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -258,6 +259,19 @@ export function Sidebar({ className }: { className?: string }) {
                 >
                     <Bot className="h-4 w-4" />
                     <span>Assistente</span>
+                </Link>
+                <Link
+                    href={currentWorkspace ? `/dashboard/${currentWorkspace.id}/map` : '#'}
+                    className={cn(
+                        "flex items-center gap-3 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                        pathname?.includes('/map') && "bg-muted/50 text-foreground",
+                        !currentWorkspace && "pointer-events-none opacity-50"
+                    )}
+                    aria-disabled={!currentWorkspace}
+                    tabIndex={!currentWorkspace ? -1 : undefined}
+                >
+                    <Waypoints className="h-4 w-4" />
+                    <span>Mapa Operacional</span>
                 </Link>
             </nav>
         </div>
