@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Sidebar } from "@/components/dashboard/sidebar";
@@ -35,11 +36,18 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     if (!isUserLoading && user && !isWorkspacesLoading && workspaces !== null) {
       const hasWorkspaces = workspaces.length > 0;
       const isOnNewWorkspacePage = pathname === '/dashboard/new-workspace';
+      const isOnDashboardRoot = pathname === '/dashboard';
 
       // If user has no workspaces and is not on the creation page, redirect them.
-      // This handles the initial onboarding flow.
       if (!hasWorkspaces && !isOnNewWorkspacePage) {
         router.push('/dashboard/new-workspace');
+        return;
+      }
+
+      // If user has workspaces and lands on the root dashboard, redirect to the first one.
+      if (hasWorkspaces && isOnDashboardRoot) {
+        router.push(`/dashboard/${workspaces[0].id}`);
+        return;
       }
     }
   }, [user, isUserLoading, workspaces, isWorkspacesLoading, workspacesError, router, pathname]);
@@ -85,6 +93,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
      return (
       <div className="flex min-h-screen items-center justify-center">
         <p>Redirecionando para criação de workspace...</p>
+      </div>
+    );
+  }
+  
+  // While redirecting from /dashboard, show a loading message instead of the old page.
+  if (pathname === '/dashboard') {
+     return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p>Carregando seu workspace...</p>
       </div>
     );
   }

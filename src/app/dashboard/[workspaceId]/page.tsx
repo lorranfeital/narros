@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
+import { useFirestore, useDoc, useMemoFirebase, useCollection, useUser } from '@/firebase';
 import { doc, collection, query, where, Timestamp } from 'firebase/firestore';
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -23,9 +23,9 @@ import { chatWithKnowledgeAssistant, ChatWithKnowledgeAssistantOutput } from '@/
 export default function WorkspaceDashboardPage() {
     const firestore = useFirestore();
     const params = useParams();
+    const { user } = useUser();
     const workspaceId = params.workspaceId as string;
     const { toast } = useToast();
-    const { user } = useUser();
 
     const [question, setQuestion] = useState('');
     const [isAsking, setIsAsking] = useState(false);
@@ -101,11 +101,9 @@ export default function WorkspaceDashboardPage() {
         <div className="p-8 md:p-12 space-y-10">
             {/* Header */}
             <div>
-                <h1 className="text-4xl font-bold tracking-tight font-headline">Bom dia, {user?.displayName?.split(' ')[0]}</h1>
-                <p className="text-muted-foreground mt-2">
-                    Você está no workspace <span className="font-semibold text-foreground">{workspace.name}</span>.
-                </p>
-                 <div className="text-sm text-muted-foreground mt-4 flex flex-wrap items-center gap-x-4 gap-y-1">
+                <h1 className="text-3xl font-bold tracking-tight">Bom dia, {user?.displayName?.split(' ')[0]}</h1>
+                <p className="text-xl text-muted-foreground mt-1">{workspace.name}</p>
+                <div className="text-sm text-muted-foreground mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
                     <span>{workspace.type} &middot; {workspace.sector}</span>
                     {workspace.version && <span>Base publicada &middot; Versão {workspace.version}</span>}
                     {lastUpdatedAt && <span>Última atualização: {format(lastUpdatedAt.toDate(), "dd/MM/yyyy", { locale: ptBR })}</span>}
