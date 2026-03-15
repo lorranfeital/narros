@@ -35,43 +35,6 @@ import { chatWithKnowledgeAssistant, ChatWithKnowledgeAssistantOutput } from '@/
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 
-// -- HELPERS --
-
-function hexToHsl(hex: string): string | null {
-  if (!hex) return null;
-  // Expand shorthand form (e.g. "03F") to full form (e.g. "0033FF")
-  const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
-  hex = hex.replace(shorthandRegex, (m, r, g, b) => r + r + g + g + b + b);
-
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!result) return null;
-
-  let r = parseInt(result[1], 16) / 255;
-  let g = parseInt(result[2], 16) / 255;
-  let b = parseInt(result[3], 16) / 255;
-
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h = 0, s = 0, l = (max + min) / 2;
-
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    switch (max) {
-      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-      case g: h = (b - r) / d + 2; break;
-      case b: h = (r - g) / d + 4; break;
-    }
-    h /= 6;
-  }
-
-  h = Math.round(h * 360);
-  s = Math.round(s * 100);
-  l = Math.round(l * 100);
-  
-  return `${h} ${s}% ${l}%`;
-}
-
-
 // -- BLOCKS & SUB-COMPONENTS --
 
 function capitalizeFirstLetter(str: string | undefined) {
@@ -498,12 +461,6 @@ export default function WorkspaceDashboardPage() {
     // -- Derived State & Calculations ---
     const isLoading = isWorkspaceLoading || isKnowledgeLoading || isPlaybooksLoading || isTrainingLoading || isInsightsLoading || isSyncLoading || isVersionsLoading || isBrandKitLoading;
     
-    const primaryHsl = React.useMemo(() => {
-        if (!brandKit?.colorPalette) return null;
-        const primary = brandKit.colorPalette.find(c => c.name.toLowerCase() === 'primária');
-        if (!primary?.hex) return null;
-        return hexToHsl(primary.hex);
-    }, [brandKit]);
 
     let knowledgeStats: any;
     if (workspace?.status === WorkspaceStatus.DRAFT_READY && draftKnowledge) {
@@ -539,7 +496,6 @@ export default function WorkspaceDashboardPage() {
     return (
         <div 
             className="p-12 space-y-10"
-            style={primaryHsl ? { '--primary': primaryHsl } as React.CSSProperties : {}}
         >
             <DashboardHeader workspace={workspace} />
             <AskHeroBlock workspace={workspace} />

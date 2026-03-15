@@ -61,13 +61,6 @@ type MapNodeData = {
   raw_data: any;
 };
 
-// Helper to create safe IDs for React Flow
-const slugify = (str: string) =>
-  str
-    .toLowerCase()
-    .replace(/[^a-z0-9 -]/g, '') // remove invalid chars
-    .replace(/\s+/g, '-') // collapse whitespace and replace by -
-    .replace(/-+/g, '-'); // collapse dashes
 
 // Custom Node Component
 const CustomNode = ({ data }: { data: MapNodeData }) => {
@@ -165,7 +158,7 @@ export default function OperationalMapPage() {
     const categories = publishedKnowledge?.categories || [];
     categories.forEach((category, index) => {
       const angle = (index / categories.length) * 2 * Math.PI;
-      const categoryId = `cat-${slugify(category.categoria)}`;
+      const categoryId = `cat-${index}`;
       newNodes.push({
         id: categoryId,
         type: 'custom',
