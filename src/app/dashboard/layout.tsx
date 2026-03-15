@@ -36,6 +36,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     if (!isUserLoading && user && !isWorkspacesLoading && workspaces !== null) {
       const hasWorkspaces = workspaces.length > 0;
       const isOnNewWorkspacePage = pathname === '/dashboard/new-workspace';
+      const isOnDashboardRoot = pathname === '/dashboard';
+      
+      // If user has workspaces and is on the root dashboard, redirect to the first one.
+      if (hasWorkspaces && isOnDashboardRoot) {
+        router.push(`/dashboard/${workspaces[0].id}`);
+        return;
+      }
 
       // If user has no workspaces and is not on the creation page, redirect them.
       if (!hasWorkspaces && !isOnNewWorkspacePage) {
@@ -47,6 +54,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   const showLoading = isUserLoading || (user && isWorkspacesLoading);
   const isNewWorkspacePage = pathname === '/dashboard/new-workspace';
+  const hasWorkspaces = workspaces && workspaces.length > 0;
+  const isOnDashboardRoot = pathname === '/dashboard';
   
   // While loading user or workspaces, show a loader
   if (showLoading) {
@@ -61,13 +70,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   if (!user) {
     return null;
   }
-  
-  // This handles the case where a user has no workspaces and must create one.
-  // The layout is simpler because there's no sidebar.
-  if ((!workspaces || workspaces.length === 0) && isNewWorkspacePage) {
-     return <>{children}</>;
-  }
-  
+
   // If there was an error loading workspaces, show an error message
   if (workspacesError) {
     return (
@@ -80,10 +83,22 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       </div>
     )
   }
+  
+  // If user has workspaces and is on the root, show redirecting message
+  if (hasWorkspaces && isOnDashboardRoot) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p>Redirecionando para seu workspace...</p>
+      </div>
+    );
+  }
 
-  // This handles the redirect case where data is loaded, but user has no workspaces yet.
-  if (!workspaces || workspaces.length === 0) {
-     return (
+  // If a user has no workspaces, handle creation or show redirect message
+  if (!hasWorkspaces) {
+    if (isNewWorkspacePage) {
+      return <>{children}</>;
+    }
+    return (
       <div className="flex min-h-screen items-center justify-center">
         <p>Redirecionando para criação de workspace...</p>
       </div>
