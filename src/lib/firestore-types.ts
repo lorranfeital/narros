@@ -106,6 +106,7 @@ export interface Source {
 export interface KnowledgeItem {
     titulo: string;
     descricao: string;
+    detalhes?: string;
     sourceRefs?: string[];
 }
 

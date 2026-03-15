@@ -151,7 +151,6 @@ export default function OperationalMapPage() {
         icon: <Network className="h-6 w-6" />,
         raw_data: workspace,
       },
-      draggable: false,
     });
 
     // 2. Category Nodes
@@ -319,4 +318,3 @@ export default function OperationalMapPage() {
     </div>
   );
 }
-

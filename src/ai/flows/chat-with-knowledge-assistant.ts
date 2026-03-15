@@ -54,7 +54,7 @@ const prompt = ai.definePrompt({
   name: 'chatWithKnowledgeAssistantPrompt',
   input: { schema: InternalPromptInputSchema },
   output: { schema: ChatWithKnowledgeAssistantOutputSchema },
-  prompt: `Você é o assistente de conhecimento da empresa {{{workspaceName}}}. Responda com base exclusivamente nas informações da base de conhecimento abaixo. Seja direto, prático e objetivo. Se não souber, diga que a informação não está na base. Após sua resposta, liste os documentos que você usou no campo 'citations', usando os títulos dos documentos encontrados na base de conhecimento (ex: o campo "processo" de um playbook).\n\nBase de Conhecimento:\n{{{json knowledgeBase}}}\n\nHistórico do Chat:\n{{#each chatHistory}}\n  {{this.role}}: {{this.content}}\n{{/each}}\n\nPergunta do usuário: {{{query}}}`,
+  prompt: `Você é o assistente de conhecimento da empresa {{{workspaceName}}}. Responda com base exclusivamente nas informações da base de conhecimento abaixo. Seja direto, prático e objetivo. Ao consultar um item, priorize o conteúdo do campo 'detalhes' se ele existir; o campo 'descricao' é apenas um resumo. Use o conteúdo completo de 'detalhes' para formular sua resposta. Se não souber a resposta, diga que a informação não está na base. Após sua resposta, liste os documentos que você usou no campo 'citations', usando os títulos dos documentos encontrados na base de conhecimento (ex: o campo "processo" de um playbook).\n\nBase de Conhecimento:\n{{{json knowledgeBase}}}\n\nHistórico do Chat:\n{{#each chatHistory}}\n  {{this.role}}: {{this.content}}\n{{/each}}\n\nPergunta do usuário: {{{query}}}`,
 });
 
 

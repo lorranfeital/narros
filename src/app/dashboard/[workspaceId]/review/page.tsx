@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useFirestore, useDoc, useMemoFirebase, useCollection, useUser } from '@/firebase';
@@ -24,6 +25,7 @@ import { publishDraft } from '@/lib/actions/workspace-actions';
 const knowledgeItemSchema = z.object({
   titulo: z.string().min(1, 'Título é obrigatório'),
   descricao: z.string().min(1, 'Descrição é obrigatória'),
+  detalhes: z.string().optional(),
 });
 
 const knowledgeCategorySchema = z.object({
@@ -218,18 +220,24 @@ function CategoryItems({ control, categoryIndex }: { control: any, categoryIndex
                 name={`categories.${categoryIndex}.itens.${itemIndex}.titulo`}
                 render={({ field }) => <Input {...field} placeholder="Título do item" />}
             />
-             <FormLabel>Descrição</FormLabel>
+             <FormLabel>Descrição (resumo para UI)</FormLabel>
              <Controller
                 control={control}
                 name={`categories.${categoryIndex}.itens.${itemIndex}.descricao`}
-                render={({ field }) => <Textarea {...field} placeholder="Descrição do item" />}
+                render={({ field }) => <Textarea {...field} placeholder="Descrição curta e objetiva do item" />}
+            />
+             <FormLabel>Detalhes (conteúdo para IA)</FormLabel>
+             <Controller
+                control={control}
+                name={`categories.${categoryIndex}.itens.${itemIndex}.detalhes`}
+                render={({ field }) => <Textarea {...field} placeholder="Conteúdo completo e estruturado para o assistente de IA..." className="min-h-[120px] font-mono text-xs" />}
             />
             <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2" onClick={() => remove(itemIndex)}>
                 <Trash2 className="h-4 w-4 text-destructive" />
             </Button>
         </div>
       ))}
-      <Button type="button" variant="outline" size="sm" className="mt-4" onClick={() => append({ titulo: '', descricao: '' })}>
+      <Button type="button" variant="outline" size="sm" className="mt-4" onClick={() => append({ titulo: '', descricao: '', detalhes: '' })}>
         <Plus className="mr-2 h-4 w-4" /> Adicionar Item
       </Button>
     </div>

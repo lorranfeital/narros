@@ -51,10 +51,9 @@ const AnalyzeAndStructureContentOutputSchema = z.object({
                 ),
             itens: z.array(
                 z.object({
-                titulo: z.string().describe('Title of the process or information'),
-                descricao: z
-                    .string()
-                    .describe('A clear, objective, and actionable description in 1-2 sentences.'),
+                    titulo: z.string().describe('Title of the process or information'),
+                    descricao: z.string().describe('A clear, objective, and actionable description in 1-2 sentences, for UI display.'),
+                    detalhes: z.string().optional().describe('The full, structured, and dense content about the item. This will be used by the AI assistant to answer questions.'),
                 })
             ),
         })
@@ -121,6 +120,7 @@ Siga estas regras estritamente:
 6.  **Conflitos como Insights:** Se encontrar informações conflitantes entre o novo conteúdo e o existente, crie um 'insight' do tipo 'risco' descrevendo o conflito.
 7.  **Saída Estritamente em JSON:** Sua resposta DEVE ser um único objeto JSON válido, representando a base de conhecimento **COMPLETA E ATUALIZADA**, sem nenhum texto, comentário ou markdown fora do objeto.
 8.  **Brand Kit Específico:** Ao estruturar o 'brandKit', para a **tipografia**, crie uma frase de exemplo curta e relevante (máximo 5 palavras) que demonstre o uso da fonte no campo 'example'.
+9.  **Descrição vs. Detalhes:** Para cada item em 'knowledgeBase', gere uma 'descricao' curta e objetiva (1-2 frases) para a UI, e um campo 'detalhes' com o conteúdo completo, estruturado e denso, que será usado pela IA do assistente. A 'descricao' é um resumo para a interface, enquanto os 'detalhes' são o conhecimento bruto para a IA.
 
 Estruture sua saída nos seguintes blocos:
 

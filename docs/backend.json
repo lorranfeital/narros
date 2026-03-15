@@ -88,7 +88,8 @@
                 "type": "object",
                 "properties": {
                     "titulo": { "type": "string" },
-                    "descricao": { "type": "string" }
+                    "descricao": { "type": "string" },
+                    "detalhes": { "type": "string", "description": "Conteúdo completo e estruturado sobre o item, para ser usado pela IA." }
                 },
                 "required": ["titulo", "descricao"]
             }}
