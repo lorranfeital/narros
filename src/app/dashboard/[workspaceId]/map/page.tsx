@@ -65,7 +65,7 @@ type MapNodeData = {
 // Custom Node Component
 const CustomNode = ({ data }: { data: MapNodeData }) => {
   return (
-    <Card className="w-64 border-2 shadow-lg !rounded-xl">
+    <Card className="w-64 border-2 shadow-lg rounded-xl">
       <CardHeader className="flex-row items-center gap-4 p-4">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
           {data.icon}
@@ -125,8 +125,8 @@ export default function OperationalMapPage() {
 
     const newNodes: Node<MapNodeData>[] = [];
     const newEdges: Edge[] = [];
-    const centerX = 500;
-    const centerY = 300;
+    const centerX = 0;
+    const centerY = 0;
 
     const getInsightsFor = (entityTitle: string) => {
       if (!insights) return { risco: 0, gap: 0, oportunidade: 0 };
