@@ -35,6 +35,43 @@ import { chatWithKnowledgeAssistant, ChatWithKnowledgeAssistantOutput } from '@/
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 
+// -- HELPERS --
+
+function hexToHsl(hex: string): string | null {
+  if (!hex) return null;
+  // Expand shorthand form (e.g. "03F") to full form (e.g. "0033FF")
+  const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+  hex = hex.replace(shorthandRegex, (m, r, g, b) => r + r + g + g + b + b);
+
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) return null;
+
+  let r = parseInt(result[1], 16) / 255;
+  let g = parseInt(result[2], 16) / 255;
+  let b = parseInt(result[3], 16) / 255;
+
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0, l = (max + min) / 2;
+
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+
+  h = Math.round(h * 360);
+  s = Math.round(s * 100);
+  l = Math.round(l * 100);
+  
+  return `${h} ${s}% ${l}%`;
+}
+
+
 // -- BLOCKS & SUB-COMPONENTS --
 
 function capitalizeFirstLetter(str: string | undefined) {
@@ -118,7 +155,7 @@ function DashboardHeader({ workspace }: { workspace: Workspace | null }) {
     );
 }
 
-function AskHeroBlock({ workspace, primaryColor }: { workspace: Workspace, primaryColor?: string }) {
+function AskHeroBlock({ workspace }: { workspace: Workspace }) {
     const { toast } = useToast();
     const router = useRouter();
     const [question, setQuestion] = useState('');
@@ -172,7 +209,6 @@ function AskHeroBlock({ workspace, primaryColor }: { workspace: Workspace, prima
                     size="lg" 
                     className="absolute right-2 top-1/2 -translate-y-1/2 h-10" 
                     disabled={isAsking || !question.trim() || isAssistantDisabled}
-                    style={primaryColor ? { backgroundColor: primaryColor } : {}}
                 >
                     {isAsking ? <Loader2 className="animate-spin" /> : "Perguntar"}
                     {!isAsking && <ArrowRight />}
@@ -214,7 +250,7 @@ function AskHeroBlock({ workspace, primaryColor }: { workspace: Workspace, prima
     )
 }
 
-function KnowledgeStats({ data, isLoading, primaryColor }: { data: any, isLoading: boolean, primaryColor?: string }) {
+function KnowledgeStats({ data, isLoading }: { data: any, isLoading: boolean }) {
 
     const stats = [
         { title: 'Categorias', value: data.categoryCount, icon: BookCopy, href: `/dashboard/${data.workspaceId}/knowledge` },
@@ -238,7 +274,7 @@ function KnowledgeStats({ data, isLoading, primaryColor }: { data: any, isLoadin
                     stats.map(({ title, value, icon: Icon, href }) => (
                          <Link key={title} href={href}>
                             <div className="rounded-lg border bg-card p-6 hover:border-primary/50 transition-colors h-full">
-                                <Icon className="h-7 w-7 text-primary" style={primaryColor ? { color: primaryColor } : {}} />
+                                <Icon className="h-7 w-7 text-primary" />
                                 <p className="font-headline text-4xl mt-2">{value}</p>
                                 <p className="text-sm text-muted-foreground">{title}</p>
                             </div>
@@ -462,10 +498,11 @@ export default function WorkspaceDashboardPage() {
     // -- Derived State & Calculations ---
     const isLoading = isWorkspaceLoading || isKnowledgeLoading || isPlaybooksLoading || isTrainingLoading || isInsightsLoading || isSyncLoading || isVersionsLoading || isBrandKitLoading;
     
-    const primaryColor = React.useMemo(() => {
-        if (!brandKit?.colorPalette) return undefined;
+    const primaryHsl = React.useMemo(() => {
+        if (!brandKit?.colorPalette) return null;
         const primary = brandKit.colorPalette.find(c => c.name.toLowerCase() === 'primária');
-        return primary?.hex;
+        if (!primary?.hex) return null;
+        return hexToHsl(primary.hex);
     }, [brandKit]);
 
     let knowledgeStats: any;
@@ -500,13 +537,16 @@ export default function WorkspaceDashboardPage() {
     }
 
     return (
-        <div className="p-12 space-y-10">
+        <div 
+            className="p-12 space-y-10"
+            style={primaryHsl ? { '--primary': primaryHsl } as React.CSSProperties : {}}
+        >
             <DashboardHeader workspace={workspace} />
-            <AskHeroBlock workspace={workspace} primaryColor={primaryColor} />
+            <AskHeroBlock workspace={workspace} />
 
             <div className="grid grid-cols-1 md:grid-cols-5 gap-8 items-start">
                  <div className="md:col-span-3 space-y-8">
-                    <KnowledgeStats data={knowledgeStats} isLoading={isLoading} primaryColor={primaryColor} />
+                    <KnowledgeStats data={knowledgeStats} isLoading={isLoading} />
                     <QuickActions workspaceId={workspaceId} syncCount={syncProposals?.length ?? 0} />
                     <MostConsultedContent isLoading={isLoading} />
                  </div>

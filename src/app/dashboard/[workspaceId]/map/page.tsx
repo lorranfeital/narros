@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
@@ -61,6 +60,14 @@ type MapNodeData = {
   };
   raw_data: any;
 };
+
+// Helper to create safe IDs for React Flow
+const slugify = (str: string) =>
+  str
+    .toLowerCase()
+    .replace(/[^a-z0-9 -]/g, '') // remove invalid chars
+    .replace(/\s+/g, '-') // collapse whitespace and replace by -
+    .replace(/-+/g, '-'); // collapse dashes
 
 // Custom Node Component
 const CustomNode = ({ data }: { data: MapNodeData }) => {
@@ -158,8 +165,9 @@ export default function OperationalMapPage() {
     const categories = publishedKnowledge?.categories || [];
     categories.forEach((category, index) => {
       const angle = (index / categories.length) * 2 * Math.PI;
+      const categoryId = `cat-${slugify(category.categoria)}`;
       newNodes.push({
-        id: `cat-${category.categoria}`,
+        id: categoryId,
         type: 'custom',
         position: {
           x: centerX + categoryRadius * Math.cos(angle) - 128,
@@ -174,7 +182,7 @@ export default function OperationalMapPage() {
           raw_data: category,
         },
       });
-      newEdges.push({ id: `e-ws-cat-${index}`, source: 'workspace', target: `cat-${category.categoria}`, animated: true });
+      newEdges.push({ id: `e-ws-cat-${index}`, source: 'workspace', target: categoryId, animated: true });
     });
 
     // 3. Playbook Nodes
