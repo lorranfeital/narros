@@ -154,115 +154,129 @@ export default function OperationalMapPage() {
 
   // --- Node and Edge Generation ---
   useEffect(() => {
-     if (isLoading || !workspace || !firestore) return;
+    if (isLoading || !workspace || !firestore) return;
 
     const generateLayout = async () => {
-        const newNodes: Node<MapNodeData>[] = [];
-        const newEdges: Edge[] = [];
-        const centerX = 0;
-        const centerY = 0;
+      const newNodes: Node<MapNodeData>[] = [];
+      const newEdges: Edge[] = [];
+      const centerX = 0;
+      const centerY = 0;
 
-        const getInsightsFor = (entityTitle: string) => {
+      const getInsightsFor = (entityTitle: string) => {
         if (!insights) return { risco: 0, gap: 0, oportunidade: 0 };
         const counts = { risco: 0, gap: 0, oportunidade: 0 };
         const lowerEntityTitle = entityTitle.toLowerCase();
-        insights.forEach(insight => {
-            if (insight.texto.toLowerCase().includes(lowerEntityTitle)) {
+        insights.forEach((insight) => {
+          if (insight.texto.toLowerCase().includes(lowerEntityTitle)) {
             counts[insight.tipo]++;
-            }
+          }
         });
         return counts;
-        };
+      };
 
-        // 1. Central Workspace Node
-        newNodes.push({
-            id: 'workspace',
-            type: 'custom',
-            position: { x: centerX, y: centerY },
-            data: {
-                label: workspace.name,
-                type: 'workspace',
-                icon: <Network className="h-6 w-6" />,
-                raw_data: workspace,
-            },
-        });
+      // 1. Central Workspace Node
+      newNodes.push({
+        id: 'workspace',
+        type: 'custom',
+        position: { x: centerX, y: centerY },
+        data: {
+          label: workspace.name,
+          type: 'workspace',
+          icon: <Network className="h-6 w-6" />,
+          raw_data: workspace,
+        },
+      });
 
-        // 2. Category Nodes
-        const categoryRadius = 350;
-        const categories = publishedKnowledge?.categories || [];
-        categories.forEach((category, index) => {
+      // 2. Category Nodes
+      const categoryRadius = 350;
+      const categories = publishedKnowledge?.categories || [];
+      categories.forEach((category, index) => {
         const angle = (index / (categories.length || 1)) * 2 * Math.PI;
         const categoryId = `cat-${category.categoria.replace(/[^a-zA-Z0-9-_]/g, '')}-${index}`;
         newNodes.push({
-            id: categoryId,
-            type: 'custom',
-            position: {
+          id: categoryId,
+          type: 'custom',
+          position: {
             x: centerX + categoryRadius * Math.cos(angle) - 128,
             y: centerY + categoryRadius * Math.sin(angle) - 70,
-            },
-            data: {
+          },
+          data: {
             label: category.categoria,
             type: 'category',
             icon: <Folder className="h-5 w-5" />,
             subtext: `${category.itens.length} iten(s)`,
             insights: getInsightsFor(category.categoria),
             raw_data: category,
-            },
+          },
         });
-        newEdges.push({ id: `e-ws-${categoryId}`, source: 'workspace', sourceHandle: 'bottom', target: categoryId, targetHandle: 'top', animated: false });
+        newEdges.push({
+          id: `e-ws-${categoryId}`,
+          source: 'workspace',
+          sourceHandle: 'bottom',
+          target: categoryId,
+          targetHandle: 'top',
+          animated: false,
         });
+      });
 
-        // 3. Playbook Nodes
-        const playbookRadius = 600;
-        const publishedPlaybooks = playbooks || [];
-        publishedPlaybooks.forEach((playbook, index) => {
+      // 3. Playbook Nodes
+      const playbookRadius = 600;
+      const publishedPlaybooks = playbooks || [];
+      publishedPlaybooks.forEach((playbook, index) => {
         const angle = (index / (publishedPlaybooks.length || 1)) * 2 * Math.PI;
         const playbookNodeId = `play-${playbook.id}`;
         newNodes.push({
-            id: playbookNodeId,
-            type: 'custom',
-            position: {
+          id: playbookNodeId,
+          type: 'custom',
+          position: {
             x: centerX + playbookRadius * Math.cos(angle) - 128,
             y: centerY + playbookRadius * Math.sin(angle) - 70,
-            },
-            data: {
+          },
+          data: {
             label: playbook.processo,
             type: 'playbook',
             icon: <BookOpen className="h-5 w-5" />,
             subtext: `${playbook.passos.length} passo(s)`,
             insights: getInsightsFor(playbook.processo),
             raw_data: playbook,
-            },
+          },
         });
-        newEdges.push({ id: `e-ws-${playbookNodeId}`, source: 'workspace', sourceHandle: 'bottom', target: playbookNodeId, targetHandle: 'top', animated: false });
+        newEdges.push({
+          id: `e-ws-${playbookNodeId}`,
+          source: 'workspace',
+          sourceHandle: 'bottom',
+          target: playbookNodeId,
+          targetHandle: 'top',
+          animated: false,
         });
-        
-        // --- Load saved layout ---
-        const layoutRef = doc(firestore, `workspaces/${workspaceId}/layouts`, 'map');
-        const layoutSnap = await getDoc(layoutRef);
-        let savedEdges: Edge[] | null = null;
+      });
 
-        if (layoutSnap.exists()) {
-            const layoutData = layoutSnap.data();
-            if (layoutData) {
-                // Load Node Positions
-                if (Array.isArray(layoutData.nodePositions)) {
-                    const savedPositions = new Map(layoutData.nodePositions.map((p: any) => [p.id, { x: p.x, y: p.y }]));
-                    newNodes.forEach(node => {
-                        if (savedPositions.has(node.id)) {
-                            node.position = savedPositions.get(node.id)!;
-                        }
-                    });
-                }
-                // Load Edges
-                if (Array.isArray(layoutData.edges)) {
-                    savedEdges = layoutData.edges;
-                }
+      // --- Load saved layout ---
+      const layoutRef = doc(firestore, `workspaces/${workspaceId}/layouts`, 'map');
+      const layoutSnap = await getDoc(layoutRef);
+      let finalEdges = newEdges;
+
+      if (layoutSnap.exists()) {
+        const layoutData = layoutSnap.data();
+        // Load Node Positions
+        if (Array.isArray(layoutData.nodePositions)) {
+          const savedPositions = new Map(
+            layoutData.nodePositions.map((p: any) => [p.id, { x: p.x, y: p.y }])
+          );
+          newNodes.forEach((node) => {
+            if (savedPositions.has(node.id)) {
+              node.position = savedPositions.get(node.id)!;
             }
+          });
         }
+        // Load Edges: if 'edges' property exists in the saved layout, use it.
+        if (Array.isArray(layoutData.edges)) {
+          finalEdges = layoutData.edges;
+        }
+      }
 
-        setNodes(newNodes);
-        setEdges(savedEdges || newEdges);
+      setNodes(newNodes);
+      setEdges(finalEdges);
     };
 
     generateLayout();
