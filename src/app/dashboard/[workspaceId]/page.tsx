@@ -34,6 +34,7 @@ import { ptBR } from 'date-fns/locale';
 import { chatWithKnowledgeAssistant, ChatWithKnowledgeAssistantOutput } from '@/ai/flows/chat-with-knowledge-assistant';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 // -- BLOCKS & SUB-COMPONENTS --
 
@@ -500,6 +501,36 @@ export default function WorkspaceDashboardPage() {
             <DashboardHeader workspace={workspace} />
             <AskHeroBlock workspace={workspace} />
 
+            {workspace.status === WorkspaceStatus.SYNC_PENDING && syncProposals && syncProposals.length > 0 && (
+                <Alert className="border-blue-500/50 text-blue-600 dark:text-blue-400 [&>svg]:text-blue-500">
+                    <GitPullRequest className="h-4 w-4" />
+                    <AlertTitle className="font-bold text-blue-700 dark:text-blue-300">Sincronização pendente</AlertTitle>
+                    <AlertDescription>
+                        Um novo lote de conteúdo foi processado e há {syncProposals.length} alterações propostas.
+                        <Button variant="link" asChild className="p-0 pl-2 h-auto text-blue-600 dark:text-blue-400">
+                            <Link href={`/dashboard/${workspaceId}/sync`}>
+                                Revisar alterações <ArrowRight className="ml-2 h-4 w-4" />
+                            </Link>
+                        </Button>
+                    </AlertDescription>
+                </Alert>
+            )}
+
+            {workspace.status === WorkspaceStatus.DRAFT_READY && (
+                <Alert className="border-amber-500/50 text-amber-600 dark:text-amber-400 [&>svg]:text-amber-500">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle className="font-bold text-amber-700 dark:text-amber-300">Rascunho pronto para revisão</AlertTitle>
+                    <AlertDescription>
+                        Um novo rascunho foi gerado a partir do último lote de conteúdo.
+                        <Button variant="link" asChild className="p-0 pl-2 h-auto text-amber-600 dark:text-amber-400">
+                            <Link href={`/dashboard/${workspaceId}/review`}>
+                                Revisar agora <ArrowRight className="ml-2 h-4 w-4" />
+                            </Link>
+                        </Button>
+                    </AlertDescription>
+                </Alert>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-5 gap-8 items-start">
                  <div className="md:col-span-3 space-y-8">
                     <KnowledgeStats data={knowledgeStats} isLoading={isLoading} />
@@ -515,5 +546,7 @@ export default function WorkspaceDashboardPage() {
         </div>
     );
 }
+
+    
 
     
