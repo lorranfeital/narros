@@ -122,21 +122,21 @@ service cloud.firestore {
       match /org_charts/{orgChartId} {
         allow read, list: if isWorkspaceMember(workspaceId) || isServerProcess();
         allow create, update: if isServerProcess() || isAdmin(workspaceId);
-        allow delete: if isAdmin(workspaceId);
+        allow delete: if isAdmin(workspaceId) || isServerProcess();
       }
 
       // --- Playbooks Subcollection ---
       match /playbooks/{playbookId} {
         allow read, list: if isWorkspaceMember(workspaceId) || isServerProcess();
         allow create, update: if isServerProcess() || isAdmin(workspaceId);
-        allow delete: if isAdmin(workspaceId);
+        allow delete: if isAdmin(workspaceId) || isServerProcess();
       }
 
       // --- Training Modules Subcollection ---
       match /training_modules/{moduleId} {
         allow read, list: if isWorkspaceMember(workspaceId) || isServerProcess();
         allow create, update: if isServerProcess() || isAdmin(workspaceId);
-        allow delete: if isAdmin(workspaceId);
+        allow delete: if isAdmin(workspaceId) || isServerProcess();
       }
 
       // --- Insights Subcollection ---

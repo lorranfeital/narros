@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useFirestore, useDoc, useMemoFirebase, useCollection, useUser } from '@/firebase';
@@ -468,7 +469,12 @@ export default function ReviewPage() {
             if (values.playbooks) { values.playbooks.forEach(playbook => { const playbookRef = doc(firestore, `workspaces/${workspaceId}/playbooks`, playbook.id); const { id, ...playbookData } = playbook; batch.update(playbookRef, playbookData); }); }
             if (values.trainingModules) { values.trainingModules.forEach(module => { const moduleRef = doc(firestore, `workspaces/${workspaceId}/training_modules`, module.id); const { id, ...moduleData } = module; batch.update(moduleRef, moduleData); }); }
             if (values.brandKit) { const brandKitRef = doc(firestore, `workspaces/${workspaceId}/brand_kit`, 'draft'); batch.set(brandKitRef, values.brandKit, { merge: true }); }
-            if (values.organizationalChart) { const orgChartRef = doc(firestore, `workspaces/${workspaceId}/org_charts`, 'draft'); batch.set(orgChartRef, values.organizationalChart, { merge: true }); }
+            if (values.organizationalChart) {
+                const orgChartRef = doc(firestore, `workspaces/${workspaceId}/org_charts`, 'draft');
+                // Sanitize the object to remove any 'undefined' values, which Firestore rejects.
+                const cleanedOrgChart = JSON.parse(JSON.stringify(values.organizationalChart));
+                batch.set(orgChartRef, cleanedOrgChart, { merge: true });
+            }
             
             await batch.commit();
             toast({ title: 'Rascunho salvo!', description: 'Suas alterações foram salvas.' });
