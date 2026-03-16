@@ -192,10 +192,48 @@ function PlaybookEditor({ control }: { control: any }) {
   return ( <div className="space-y-6"> {fields.map((playbookField, playbookIndex) => ( <div key={playbookField.id} className="border-b pb-6 last:border-b-0"> <FormField control={control} name={`playbooks.${playbookIndex}.processo`} render={({ field }) => ( <FormItem> <FormLabel className="text-xl font-headline font-semibold">Nome do Processo</FormLabel> <FormControl> <Input {...field} className="text-xl font-headline font-semibold" /> </FormControl> <FormMessage /> </FormItem> )} /> <div className="mt-4 space-y-4"> <PlaybookSteps control={control} playbookIndex={playbookIndex} /> </div> </div> ))} </div> );
 }
 
-function PlaybookSteps({ control, playbookIndex }: { control: any, playbookIndex: number }) {
+function PlaybookSteps({ control, playbookIndex }: { control: any; playbookIndex: number }) {
   const { fields } = useFieldArray({ control, name: `playbooks.${playbookIndex}.passos` });
 
-  return ( <> {fields.map((stepField, stepIndex) => ( <div key={stepField.id} className="flex gap-4 items-start"> <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold flex-shrink-0 mt-1"> {control.getValues(`playbooks.${playbookIndex}.passos.${stepIndex}.numero`)} </div> <div className="flex-1 space-y-2"> <FormField control={control} name={`playbooks.${playbookIndex}.passos.${stepIndex}.titulo`} render={({ field }) => ( <FormItem> <FormControl> <Input {...field} placeholder="Título do passo" className="font-semibold" /> </FormControl> <FormMessage /> </FormItem> )} /> <FormField control={control} name={`playbooks.${playbookIndex}.passos.${stepIndex}.descricao`} render={({ field }) => ( <FormItem> <FormControl> <Textarea {...field} placeholder="Descrição do passo" className="text-sm" /> </FormControl> <FormMessage /> </FormItem> )} /> </div> </div> ))} </> );
+  return (
+    <>
+      {fields.map((stepField, stepIndex) => (
+        <div key={stepField.id} className="flex gap-4 items-start">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold flex-shrink-0 mt-1">
+            {control.getValues(`playbooks.${playbookIndex}.passos.${stepIndex}.numero`)}
+          </div>
+          <div className="flex-1 space-y-2">
+            <FormField
+              control={control}
+              name={`playbooks.${playbookIndex}.passos.${stepIndex}.titulo`}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Título do passo</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="Título do passo" className="font-semibold" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={control}
+              name={`playbooks.${playbookIndex}.passos.${stepIndex}.descricao`}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Descrição do passo</FormLabel>
+                  <FormControl>
+                    <Textarea {...field} placeholder="Descrição do passo" className="text-sm" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
+      ))}
+    </>
+  );
 }
 
 function TrainingModuleTopics({ control, moduleIndex }: { control: any; moduleIndex: number }) {
