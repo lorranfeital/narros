@@ -278,8 +278,12 @@ export default function OperationalMapPage() {
             }
           });
         }
-        // Load Edges: if 'edges' property exists in the saved layout, use it. Otherwise, use defaults.
-        setEdges(Array.isArray(layoutData.edges) ? layoutData.edges : defaultEdges);
+        // Load Edges: if 'edges' property exists and is not empty, use it. Otherwise, use defaults.
+        if (layoutData.edges && Array.isArray(layoutData.edges) && layoutData.edges.length > 0) {
+            setEdges(layoutData.edges);
+        } else {
+            setEdges(defaultEdges);
+        }
       } else {
         setEdges(defaultEdges);
       }
@@ -470,4 +474,3 @@ export default function OperationalMapPage() {
     </div>
   );
 }
-
