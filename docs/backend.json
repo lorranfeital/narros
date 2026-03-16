@@ -25,6 +25,14 @@
         "sector": { "type": "string" },
         "ownerId": { "type": "string" },
         "members": { "type": "array", "items": { "type": "string" } },
+        "roles": {
+          "type": "object",
+          "description": "Map of user IDs to their roles within the workspace.",
+          "additionalProperties": {
+            "type": "string",
+            "enum": ["admin", "curator", "member"]
+          }
+        },
         "status": { "type": "string", "enum": ["never_published", "draft_ready", "published", "sync_pending", "archived"] },
         "ingestionState": { "type": "string", "enum": ["idle", "ingesting", "processing"] },
         "createdAt": { "type": "string", "format": "date-time" },

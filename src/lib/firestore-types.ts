@@ -65,6 +65,9 @@ export enum WorkspaceLinkStatus {
     DISABLED = 'disabled'
 }
 
+export type WorkspaceRole = 'admin' | 'curator' | 'member';
+
+
 // ---------
 // Main Document Interfaces
 // ---------
@@ -79,6 +82,7 @@ export interface Workspace {
   sector: string;
   ownerId: string;
   members: string[];
+  roles?: { [key: string]: WorkspaceRole };
   status: WorkspaceStatus;
   ingestionState: IngestionState;
   createdAt: Timestamp;

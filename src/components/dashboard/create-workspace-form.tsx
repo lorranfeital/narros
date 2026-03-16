@@ -76,11 +76,14 @@ export function CreateWorkspaceForm() {
     if (!user || !firestore) return;
 
     try {
-      await addDoc(collection(firestore, 'workspaces'), {
+      const docRef = await addDoc(collection(firestore, 'workspaces'), {
         ...values,
         name_lowercase: values.name.toLowerCase(),
         ownerId: user.uid,
         members: [user.uid],
+        roles: {
+          [user.uid]: 'admin',
+        },
         status: WorkspaceStatus.NEVER_PUBLISHED,
         ingestionState: IngestionState.IDLE,
         createdAt: serverTimestamp(),
@@ -91,7 +94,7 @@ export function CreateWorkspaceForm() {
         title: 'Workspace criado!',
         description: 'Você já pode começar a organizar seu conhecimento.',
       });
-      router.push('/dashboard');
+      router.push(`/dashboard/${docRef.id}`);
     } catch (error) {
       console.error('Error creating workspace:', error);
       toast({
