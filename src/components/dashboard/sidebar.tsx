@@ -169,10 +169,10 @@ export function Sidebar({ className }: { className?: string }) {
                         </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                     <DropdownMenuItem asChild>
-                        <Link href="/dashboard">
-                            <Home className="mr-2 h-4 w-4" />
-                            <span>Ver todos os workspaces</span>
+                    <DropdownMenuItem asChild>
+                         <Link href={currentWorkspace?.id ? `/dashboard/${currentWorkspace.id}/settings` : '/dashboard'}>
+                            <Settings className="mr-2 h-4 w-4" />
+                            <span>Configurações do Workspace</span>
                         </Link>
                     </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -303,7 +303,7 @@ export function Sidebar({ className }: { className?: string }) {
                         <DropdownMenuItem asChild>
                             <Link href={currentWorkspace?.id ? `/dashboard/${currentWorkspace.id}/settings` : '/dashboard'}>
                                 <Settings className="mr-2 h-4 w-4" />
-                                <span>Configurações</span>
+                                <span>Configurações de Perfil</span>
                             </Link>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
