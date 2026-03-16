@@ -2,7 +2,7 @@
 'use client';
 
 import React from 'react';
-import { useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
+import { useFirestore, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking } from '@/firebase';
 import { doc, collection, query, where, orderBy } from 'firebase/firestore';
 import { useParams } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -13,10 +13,12 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PublishedKnowledge, Playbook, TrainingModule, Insight, Version, Workspace, BrandKit, Color, Typography as TypographyType } from '@/lib/firestore-types';
-import { BookOpen, Lightbulb, Milestone, Palette, Type, Globe } from 'lucide-react';
+import { BookOpen, Lightbulb, Milestone, Palette, Type, Globe, CheckCircle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 
 
 function BrandKitDisplay({ workspace, brandKit, isLoading }: { workspace: Workspace | null, brandKit: BrandKit | null, isLoading: boolean }) {
@@ -162,6 +164,7 @@ function BrandKitDisplay({ workspace, brandKit, isLoading }: { workspace: Worksp
 export default function KnowledgePage() {
     const firestore = useFirestore();
     const params = useParams();
+    const { toast } = useToast();
     const workspaceId = params.workspaceId as string;
 
     // Fetch Workspace to get version and last published date
@@ -196,10 +199,10 @@ export default function KnowledgePage() {
     }, [firestore, workspaceId]);
     const { data: trainingModules, isLoading: isTrainingLoading } = useCollection<TrainingModule>(trainingModulesQuery);
 
-    // Fetch insights (for now, all of them)
+    // Fetch insights (only unresolved ones)
     const insightsQuery = useMemoFirebase(() => {
         if (!firestore || !workspaceId) return null;
-        return query(collection(firestore, `workspaces/${workspaceId}/insights`));
+        return query(collection(firestore, `workspaces/${workspaceId}/insights`), where('resolved', '==', false));
     }, [firestore, workspaceId]);
     const { data: insights, isLoading: isInsightsLoading } = useCollection<Insight>(insightsQuery);
 
@@ -212,6 +215,16 @@ export default function KnowledgePage() {
 
 
     const isLoading = isWorkspaceLoading || isKnowledgeLoading || isPlaybooksLoading || isTrainingLoading || isInsightsLoading || isVersionsLoading || isBrandKitLoading;
+    
+    const handleResolveInsight = (insightId: string) => {
+        if (!firestore || !workspaceId) return;
+        const insightRef = doc(firestore, `workspaces/${workspaceId}/insights`, insightId);
+        updateDocumentNonBlocking(insightRef, { resolved: true });
+        toast({
+            title: "Insight Resolvido",
+            description: "O insight foi marcado como resolvido e removido da lista.",
+        });
+    };
 
     if (isLoading) {
         return (
@@ -368,20 +381,34 @@ export default function KnowledgePage() {
                 <TabsContent value="insights" className="mt-6">
                      <Card>
                         <CardHeader>
-                            <CardTitle>Insights Gerados</CardTitle>
-                            <CardDescription>Gaps, riscos e oportunidades identificados pela IA.</CardDescription>
+                            <CardTitle>Insights Acionáveis</CardTitle>
+                            <CardDescription>Gaps, riscos e oportunidades identificados pela IA. Resolva-os para removê-los da lista.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
                            {(insights && insights.length > 0) ? insights.map(insight => (
                                <Alert key={insight.id} variant={insight.tipo === 'risco' ? 'destructive' : 'default'}>
-                                    <Lightbulb className="h-4 w-4" />
-                                    <AlertTitle className="capitalize">{insight.tipo}</AlertTitle>
-                                    <AlertDescription>
-                                        {insight.texto}
-                                    </AlertDescription>
+                                   <div className="flex items-start justify-between">
+                                       <div className="flex-grow">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <Lightbulb className="h-4 w-4" />
+                                                <AlertTitle className="capitalize">{insight.tipo}</AlertTitle>
+                                            </div>
+                                            <AlertDescription>
+                                                {insight.texto}
+                                            </AlertDescription>
+                                       </div>
+                                       <Button variant="ghost" size="sm" onClick={() => handleResolveInsight(insight.id)} className="ml-4 shrink-0">
+                                           <CheckCircle className="mr-2 h-4 w-4" />
+                                           Resolver
+                                       </Button>
+                                   </div>
                                 </Alert>
                            )) : (
-                             <p className="text-muted-foreground">Nenhum insight encontrado.</p>
+                            <div className="text-center p-8 border rounded-lg bg-card/50">
+                                <CheckCircle className="mx-auto h-12 w-12 text-green-500" />
+                                <h3 className="mt-4 text-lg font-medium">Tudo em ordem!</h3>
+                                <p className="mt-1 text-sm text-muted-foreground">Nenhum insight pendente de resolução.</p>
+                            </div>
                            )}
                         </CardContent>
                     </Card>
@@ -417,7 +444,3 @@ export default function KnowledgePage() {
         </div>
     );
 }
-
-    
-
-    
