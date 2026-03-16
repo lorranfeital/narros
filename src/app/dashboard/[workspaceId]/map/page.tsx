@@ -14,6 +14,8 @@ import ReactFlow, {
   Edge,
   NodeChange,
   EdgeChange,
+  Handle,
+  Position,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import {
@@ -67,29 +69,41 @@ type MapNodeData = {
 // Custom Node Component
 const CustomNode = ({ data }: { data: MapNodeData }) => {
   return (
-    <Card className="w-64 border-2 shadow-lg rounded-xl">
-      <CardHeader className="flex-row items-center gap-4 p-4">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          {data.icon}
-        </div>
-        <div className="flex-1 overflow-hidden">
-          <CardTitle className="truncate text-base font-bold">{data.label}</CardTitle>
-          <CardDescription className="text-xs">{data.type}</CardDescription>
-        </div>
-      </CardHeader>
-      {(data.subtext || (data.insights && (data.insights.risco > 0 || data.insights.gap > 0 || data.insights.oportunidade > 0))) && (
-        <CardContent className="border-t p-4 text-xs text-muted-foreground">
-          {data.subtext && <p className="mb-2">{data.subtext}</p>}
-          {data.insights && (
-            <div className="flex flex-wrap gap-1">
-              {data.insights.risco > 0 && <Badge variant="destructive" className="text-xs"><AlertTriangle className="mr-1 h-3 w-3" /> {data.insights.risco} Risco(s)</Badge>}
-              {data.insights.gap > 0 && <Badge variant="default" className="text-xs"><MapPin className="mr-1 h-3 w-3" /> {data.insights.gap} Gap(s)</Badge>}
-              {data.insights.oportunidade > 0 && <Badge variant="success" className="text-xs"><Lightbulb className="mr-1 h-3 w-3" /> {data.insights.oportunidade} Oport.</Badge>}
-            </div>
-          )}
-        </CardContent>
-      )}
-    </Card>
+    <>
+      <Handle
+        type="target"
+        position={Position.Top}
+        style={{ opacity: 0 }}
+      />
+      <Card className="w-64 border-2 shadow-lg rounded-xl">
+        <CardHeader className="flex-row items-center gap-4 p-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            {data.icon}
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <CardTitle className="truncate text-base font-bold">{data.label}</CardTitle>
+            <CardDescription className="text-xs">{data.type}</CardDescription>
+          </div>
+        </CardHeader>
+        {(data.subtext || (data.insights && (data.insights.risco > 0 || data.insights.gap > 0 || data.insights.oportunidade > 0))) && (
+          <CardContent className="border-t p-4 text-xs text-muted-foreground">
+            {data.subtext && <p className="mb-2">{data.subtext}</p>}
+            {data.insights && (
+              <div className="flex flex-wrap gap-1">
+                {data.insights.risco > 0 && <Badge variant="destructive" className="text-xs"><AlertTriangle className="mr-1 h-3 w-3" /> {data.insights.risco} Risco(s)</Badge>}
+                {data.insights.gap > 0 && <Badge variant="default" className="text-xs"><MapPin className="mr-1 h-3 w-3" /> {data.insights.gap} Gap(s)</Badge>}
+                {data.insights.oportunidade > 0 && <Badge variant="success" className="text-xs"><Lightbulb className="mr-1 h-3 w-3" /> {data.insights.oportunidade} Oport.</Badge>}
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        style={{ opacity: 0 }}
+      />
+    </>
   );
 };
 
@@ -160,7 +174,7 @@ export default function OperationalMapPage() {
     const categories = publishedKnowledge?.categories || [];
     categories.forEach((category, index) => {
       const angle = (index / (categories.length || 1)) * 2 * Math.PI;
-      const categoryId = `cat-${index}`;
+      const categoryId = `cat-${category.categoria.replace(/[^a-zA-Z0-9]/g, '-')}-${index}`;
       newNodes.push({
         id: categoryId,
         type: 'custom',
@@ -185,8 +199,9 @@ export default function OperationalMapPage() {
     const publishedPlaybooks = playbooks || [];
     publishedPlaybooks.forEach((playbook, index) => {
       const angle = (index / (publishedPlaybooks.length || 1)) * 2 * Math.PI;
+      const playbookNodeId = `play-${playbook.id}`;
       newNodes.push({
-        id: `play-${playbook.id}`,
+        id: playbookNodeId,
         type: 'custom',
         position: {
           x: centerX + playbookRadius * Math.cos(angle) - 128,
@@ -201,7 +216,7 @@ export default function OperationalMapPage() {
           raw_data: playbook,
         },
       });
-      newEdges.push({ id: `e-ws-play-${index}`, source: 'workspace', target: `play-${playbook.id}` });
+      newEdges.push({ id: `e-ws-${playbookNodeId}`, source: 'workspace', target: playbookNodeId });
     });
 
     setNodes(newNodes);
