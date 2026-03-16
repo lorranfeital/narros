@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useTransition, useMemo, useEffect } from 'react';
@@ -121,7 +120,7 @@ export function MembersManager() {
     const memberIds = useMemo(() => workspace?.members || [], [workspace]);
 
     useEffect(() => {
-        if (!firestore) return;
+        if (!firestore || !workspace) return;
 
         if (memberIds.length === 0) {
             setMembers([]);
@@ -147,7 +146,7 @@ export function MembersManager() {
         };
 
         fetchMembers();
-    }, [firestore, memberIds, toast]);
+    }, [firestore, workspace, memberIds, toast]);
     
     const handleInviteUser = () => {
         if (!currentUser) return;
