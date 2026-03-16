@@ -58,6 +58,13 @@ export enum VersionEventType {
   MANUAL_EDIT = 'manual_edit',
 }
 
+export enum WorkspaceLinkStatus {
+    PENDING = 'pending',
+    ACTIVE = 'active',
+    REJECTED = 'rejected',
+    DISABLED = 'disabled'
+}
+
 // ---------
 // Main Document Interfaces
 // ---------
@@ -80,6 +87,21 @@ export interface Workspace {
   pendingSyncCount?: number;
   visibility?: 'public' | 'private';
   version?: number;
+}
+
+export interface WorkspaceLink {
+    id: string;
+    sourceWorkspaceId: string;
+    sourceWorkspaceName: string;
+    sourceWorkspaceLogoUrl?: string;
+    targetWorkspaceId: string;
+    targetWorkspaceName: string;
+    targetWorkspaceLogoUrl?: string;
+    status: WorkspaceLinkStatus;
+    createdBy: string;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+    updatedBy?: string;
 }
 
 // ---------

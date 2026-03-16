@@ -36,6 +36,24 @@
       },
       "required": ["name", "type", "sector", "ownerId", "members", "status", "ingestionState", "createdAt"]
     },
+    "WorkspaceLink": {
+      "title": "Workspace Link",
+      "type": "object",
+      "properties": {
+        "sourceWorkspaceId": { "type": "string", "description": "ID of the workspace initiating the connection." },
+        "sourceWorkspaceName": { "type": "string", "description": "Name of the source workspace." },
+        "sourceWorkspaceLogoUrl": { "type": "string", "format": "uri", "description": "Logo URL of the source workspace." },
+        "targetWorkspaceId": { "type": "string", "description": "ID of the workspace receiving the connection request." },
+        "targetWorkspaceName": { "type": "string", "description": "Name of the target workspace." },
+        "targetWorkspaceLogoUrl": { "type": "string", "format": "uri", "description": "Logo URL of the target workspace." },
+        "status": { "type": "string", "enum": ["pending", "active", "rejected", "disabled"] },
+        "createdBy": { "type": "string", "description": "UID of the user who initiated the request." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string", "description": "UID of the user who last updated the request (e.g., approved/rejected)." }
+      },
+      "required": ["sourceWorkspaceId", "sourceWorkspaceName", "targetWorkspaceId", "targetWorkspaceName", "status", "createdBy", "createdAt"]
+    },
     "Source": {
       "title": "Source",
       "type": "object",
@@ -245,6 +263,10 @@
       {
         "path": "/workspaces/{workspaceId}",
         "definition": { "schema": { "$ref": "#/backend/entities/Workspace" } }
+      },
+       {
+        "path": "/workspaceLinks/{linkId}",
+        "definition": { "schema": { "$ref": "#/backend/entities/WorkspaceLink" } }
       },
       {
         "path": "/workspaces/{workspaceId}/sources/{sourceId}",
