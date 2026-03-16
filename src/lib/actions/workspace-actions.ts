@@ -12,6 +12,9 @@ import {
   writeBatch,
   Timestamp,
   updateDoc,
+  addDoc,
+  deleteDoc,
+  Query,
 } from 'firebase/firestore';
 import { getApps, initializeApp, getApp } from 'firebase/app';
 import {
@@ -32,6 +35,9 @@ import {
   KnowledgeCategory,
   BrandKit,
   SourceType,
+  OrgChart,
+  Playbook,
+  TrainingModule,
 } from '@/lib/firestore-types';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage, ref, getBytes } from 'firebase/storage';
@@ -54,64 +60,74 @@ function getAdminStorage() {
     return getStorage(getApp());
 }
 
+type Proposal = Omit<SyncProposal, 'id' | 'workspaceId' | 'sourceBatchId' | 'approvalStatus' | 'createdAt'>;
 
 /**
  * Diffs two knowledge bases and creates proposals.
  */
-function diffKnowledge(
-  oldKnowledge: KnowledgeCategory[],
-  newKnowledge: KnowledgeCategory[]
-): Omit<SyncProposal, 'id' | 'workspaceId' | 'sourceBatchId' | 'approvalStatus' | 'createdAt'>[] {
-  const proposals: Omit<SyncProposal, 'id' | 'workspaceId' | 'sourceBatchId' | 'approvalStatus' | 'createdAt'>[] = [];
-  const oldItems = new Map(
-    oldKnowledge.flatMap((cat) =>
-      cat.itens.map((item) => [item.titulo.toLowerCase(), { ...item, categoria: cat.categoria }])
-    )
-  );
-  const newItems = new Map(
-    newKnowledge.flatMap((cat) =>
-      cat.itens.map((item) => [item.titulo.toLowerCase(), { ...item, categoria: cat.categoria }])
-    )
-  );
+function diffKnowledge(oldKnowledge: KnowledgeCategory[], newKnowledge: KnowledgeCategory[]): Proposal[] {
+  const proposals: Proposal[] = [];
+  const oldItems = new Map(oldKnowledge.flatMap(cat => cat.itens.map(item => [item.titulo.toLowerCase(), { ...item, categoria: cat.categoria }])));
+  const newItems = new Map(newKnowledge.flatMap(cat => cat.itens.map(item => [item.titulo.toLowerCase(), { ...item, categoria: cat.categoria }])));
 
-  // Check for new and updated items
   for (const [title, newItem] of newItems.entries()) {
     const oldItem = oldItems.get(title);
     if (!oldItem) {
-      proposals.push({
-        type: SyncProposalType.NEW,
-        entityType: 'knowledge',
-        entityId: newItem.titulo,
-        before: null,
-        after: newItem,
-      });
-    } else if (newItem.descricao !== oldItem.descricao) {
-      proposals.push({
-        type: SyncProposalType.UPDATED,
-        entityType: 'knowledge',
-        entityId: newItem.titulo,
-        before: oldItem,
-        after: newItem,
-      });
+      proposals.push({ type: SyncProposalType.NEW, entityType: 'knowledge', entityId: newItem.titulo, before: null, after: newItem });
+    } else if (JSON.stringify(newItem) !== JSON.stringify(oldItem)) {
+      proposals.push({ type: SyncProposalType.UPDATED, entityType: 'knowledge', entityId: newItem.titulo, before: oldItem, after: newItem });
     }
   }
 
-  // Check for obsolete items
   for (const [title, oldItem] of oldItems.entries()) {
     if (!newItems.has(title)) {
-      proposals.push({
-        type: SyncProposalType.OBSOLETE,
-        entityType: 'knowledge',
-        entityId: oldItem.titulo,
-        before: oldItem,
-        after: null,
-      });
+      proposals.push({ type: SyncProposalType.OBSOLETE, entityType: 'knowledge', entityId: oldItem.titulo, before: oldItem, after: null });
     }
   }
-
   return proposals;
 }
 
+function diffGenericArray<T extends { id: string }>(
+  oldItems: T[],
+  newItems: T[],
+  keyField: keyof T,
+  entityType: 'playbook' | 'training'
+): Proposal[] {
+  const proposals: Proposal[] = [];
+  const oldMap = new Map(oldItems.map(item => [String(item[keyField]).toLowerCase(), item]));
+  const newMap = new Map(newItems.map(item => [String(item[keyField]).toLowerCase(), item]));
+
+  for (const [key, newItem] of newMap.entries()) {
+    const oldItem = oldMap.get(key);
+    const entityId = newItem[keyField] as string;
+    if (!oldItem) {
+      proposals.push({ type: SyncProposalType.NEW, entityType, entityId, before: null, after: newItem });
+    } else if (JSON.stringify(newItem) !== JSON.stringify(oldItem)) {
+      proposals.push({ type: SyncProposalType.UPDATED, entityType, entityId, before: oldItem, after: newItem });
+    }
+  }
+
+  for (const [key, oldItem] of oldMap.entries()) {
+    if (!newMap.has(key)) {
+      proposals.push({ type: SyncProposalType.OBSOLETE, entityType, entityId: oldItem[keyField] as string, before: oldItem, after: null });
+    }
+  }
+  return proposals;
+}
+
+function diffSingleObject<T>(oldData: T | null, newData: T | undefined | null, entityType: 'brand_kit' | 'org_chart', entityId: string): Proposal[] {
+    const proposals: Proposal[] = [];
+    const newExists = newData && Object.keys(newData).length > 0;
+    
+    if (!oldData && newExists) {
+        proposals.push({ type: SyncProposalType.NEW, entityType, entityId, before: null, after: newData });
+    } else if (oldData && !newExists) {
+        proposals.push({ type: SyncProposalType.OBSOLETE, entityType, entityId, before: oldData, after: null });
+    } else if (oldData && newExists && JSON.stringify(oldData) !== JSON.stringify(newData)) {
+        proposals.push({ type: SyncProposalType.UPDATED, entityType, entityId, before: oldData, after: newData });
+    }
+    return proposals;
+}
 
 export async function processContentBatch(
   workspaceId: string,
@@ -190,17 +206,20 @@ export async function processContentBatch(
     // Fetch all existing published knowledge to pass to the AI for context
     const publishedKnowledgeRef = doc(db, `workspaces/${workspaceId}/published_knowledge`, workspaceId);
     const brandKitRef = doc(db, `workspaces/${workspaceId}/brand_kit`, 'live');
+    const orgChartRef = doc(db, `workspaces/${workspaceId}/org_charts`, 'live');
     const playbooksQuery = query(collection(db, `workspaces/${workspaceId}/playbooks`), where('status', '==', 'published'));
     const trainingQuery = query(collection(db, `workspaces/${workspaceId}/training_modules`), where('status', '==', 'published'));
     
     const [
         publishedKnowledgeSnap,
         brandKitSnap,
+        orgChartSnap,
         playbooksSnap,
         trainingSnap
     ] = await Promise.all([
         getDoc(publishedKnowledgeRef),
         getDoc(brandKitRef),
+        getDoc(orgChartRef),
         getDocs(playbooksQuery),
         getDocs(trainingQuery)
     ]);
@@ -212,6 +231,7 @@ export async function processContentBatch(
         existingKnowledgeForAI = {
             knowledgeBase: publishedKnowledgeSnap.data()?.categories || [],
             brandKit: brandKitSnap.data() || {},
+            organizationalChart: orgChartSnap.data() || {},
             playbooks: playbooksSnap.docs.map(d => d.data()) || [],
             trainingModules: trainingSnap.docs.map(d => d.data()) || [],
         }
@@ -228,33 +248,6 @@ export async function processContentBatch(
     // 4. Start final batch write
     const finalBatch = writeBatch(db);
     const workspaceSnap = await getDoc(workspaceRef);
-    const currentVersion = workspaceSnap.data()?.version || 0;
-    const newVersion = currentVersion + 1;
-
-    // 5. Handle Brand Kit (create a draft)
-    if (aiResult.brandKit && Object.keys(aiResult.brandKit).length > 0) {
-      const brandKitDraftRef = doc(db, `workspaces/${workspaceId}/brand_kit`, 'draft');
-      finalBatch.set(brandKitDraftRef, {
-        ...aiResult.brandKit,
-        sourceRefs: sourceIds,
-        sourceBatchId: batchId,
-        status: 'draft',
-        workspaceId: workspaceId,
-      }, { merge: true });
-    }
-
-    // Handle Org Chart (create a draft)
-    if (aiResult.organizationalChart && aiResult.organizationalChart.nodes.length > 0) {
-        const orgChartDraftRef = doc(db, `workspaces/${workspaceId}/org_charts`, 'draft');
-        finalBatch.set(orgChartDraftRef, {
-            ...aiResult.organizationalChart,
-            sourceRefs: sourceIds,
-            sourceBatchId: batchId,
-            status: 'draft',
-            workspaceId: workspaceId,
-            createdAt: timestamp,
-        }, { merge: true });
-    }
     
     if (!publishedKnowledgeSnap.exists()) {
       // --- INITIAL DRAFT FLOW ---
@@ -283,10 +276,16 @@ export async function processContentBatch(
     } else {
       // --- SYNC PROPOSAL FLOW ---
       const publishedKnowledge = publishedKnowledgeSnap.data() as PublishedKnowledge;
-      const proposals = diffKnowledge(publishedKnowledge.categories, aiResult.knowledgeBase);
+      const knowledgeProposals = diffKnowledge(publishedKnowledge.categories, aiResult.knowledgeBase);
+      const playbookProposals = diffGenericArray(playbooksSnap.docs.map(d => ({ ...d.data(), id: d.id })) as Playbook[], aiResult.playbooks, 'processo', 'playbook');
+      const trainingProposals = diffGenericArray(trainingSnap.docs.map(d => ({ ...d.data(), id: d.id })) as TrainingModule[], aiResult.trainingModules, 'titulo', 'training');
+      const brandKitProposals = diffSingleObject(brandKitSnap.data() as BrandKit | null, aiResult.brandKit, 'brand_kit', 'live');
+      const orgChartProposals = diffSingleObject(orgChartSnap.data() as OrgChart | null, aiResult.organizationalChart, 'org_chart', 'live');
+
+      const allProposals = [...knowledgeProposals, ...playbookProposals, ...trainingProposals, ...brandKitProposals, ...orgChartProposals];
       
-      if (proposals.length > 0) {
-          proposals.forEach(proposal => {
+      if (allProposals.length > 0) {
+          allProposals.forEach(proposal => {
               const proposalRef = doc(collection(db, `workspaces/${workspaceId}/sync_proposals`));
               finalBatch.set(proposalRef, {
                   ...proposal,
@@ -300,7 +299,7 @@ export async function processContentBatch(
               ingestionState: IngestionState.IDLE,
               status: WorkspaceStatus.SYNC_PENDING,
               lastProcessedAt: timestamp,
-              pendingSyncCount: proposals.length,
+              pendingSyncCount: allProposals.length,
           });
       } else {
           // No changes found, so reset the status to published
@@ -311,6 +310,16 @@ export async function processContentBatch(
               lastProcessedAt: timestamp,
           });
       }
+    }
+    
+    // Create drafts for brand kit and org chart regardless of flow
+    if (aiResult.brandKit && Object.keys(aiResult.brandKit).length > 0) {
+      const brandKitDraftRef = doc(db, `workspaces/${workspaceId}/brand_kit`, 'draft');
+      finalBatch.set(brandKitDraftRef, { ...aiResult.brandKit, sourceRefs: sourceIds, sourceBatchId: batchId, status: 'draft', workspaceId: workspaceId }, { merge: true });
+    }
+    if (aiResult.organizationalChart && aiResult.organizationalChart.nodes.length > 0) {
+        const orgChartDraftRef = doc(db, `workspaces/${workspaceId}/org_charts`, 'draft');
+        finalBatch.set(orgChartDraftRef, { ...aiResult.organizationalChart, sourceRefs: sourceIds, sourceBatchId: batchId, status: 'draft', workspaceId: workspaceId, createdAt: timestamp }, { merge: true });
     }
 
     // Insights are always created
@@ -486,44 +495,56 @@ export async function publishSync(workspaceId: string, userId: string) {
     }
     const publishedData = publishedSnap.data() as PublishedKnowledge;
     let newCategories = [...publishedData.categories];
+    const timestamp = Timestamp.now();
+    const batch = writeBatch(db);
 
-    // 3. Apply changes locally
-    proposalsSnap.forEach(proposalDoc => {
+    // Helper function to find a document ID by a field value
+    const findDocId = async (collectionName: string, fieldName: string, value: string): Promise<string | null> => {
+        const q = query(collection(db, `workspaces/${workspaceId}/${collectionName}`), where(fieldName, '==', value), where('status', '==', 'published'));
+        const snap = await getDocs(q);
+        return snap.empty ? null : snap.docs[0].id;
+    }
+
+    // 3. Apply changes locally and to batch
+    for (const proposalDoc of proposalsSnap.docs) {
         const proposal = proposalDoc.data() as SyncProposal;
         
         if (proposal.entityType === 'knowledge') {
             const itemTitle = proposal.entityId;
-            
             if (proposal.type === SyncProposalType.NEW) {
-                // Find or create category
                 let category = newCategories.find(c => c.categoria === proposal.after.categoria);
-                if (category) {
-                    category.itens.push(proposal.after);
-                } else {
-                    newCategories.push({ categoria: proposal.after.categoria, icone: '✨', itens: [proposal.after]});
-                }
+                if (category) { category.itens.push(proposal.after); } 
+                else { newCategories.push({ categoria: proposal.after.categoria, icone: '✨', itens: [proposal.after]}); }
             } else if (proposal.type === SyncProposalType.UPDATED) {
-                newCategories = newCategories.map(cat => ({
-                    ...cat,
-                    itens: cat.itens.map(item => item.titulo.toLowerCase() === itemTitle.toLowerCase() ? proposal.after : item)
-                }));
+                newCategories = newCategories.map(cat => ({ ...cat, itens: cat.itens.map(item => item.titulo.toLowerCase() === itemTitle.toLowerCase() ? proposal.after : item) }));
             } else if (proposal.type === SyncProposalType.OBSOLETE) {
-                 newCategories = newCategories.map(cat => ({
-                    ...cat,
-                    itens: cat.itens.filter(item => item.titulo.toLowerCase() !== itemTitle.toLowerCase())
-                })).filter(cat => cat.itens.length > 0);
+                 newCategories = newCategories.map(cat => ({ ...cat, itens: cat.itens.filter(item => item.titulo.toLowerCase() !== itemTitle.toLowerCase()) })).filter(cat => cat.itens.length > 0);
+            }
+        } else if (proposal.entityType === 'playbook') {
+            const docId = await findDocId('playbooks', 'processo', proposal.entityId);
+            if (proposal.type === SyncProposalType.NEW) {
+                batch.set(doc(collection(db, `workspaces/${workspaceId}/playbooks`)), { ...proposal.after, status: 'published', updatedAt: timestamp });
+            } else if (proposal.type === SyncProposalType.UPDATED && docId) {
+                batch.update(doc(db, `workspaces/${workspaceId}/playbooks`, docId), { ...proposal.after, status: 'published', updatedAt: timestamp });
+            } else if (proposal.type === SyncProposalType.OBSOLETE && docId) {
+                batch.delete(doc(db, `workspaces/${workspaceId}/playbooks`, docId));
+            }
+        } else if (proposal.entityType === 'brand_kit') {
+             const brandKitRef = doc(db, `workspaces/${workspaceId}/brand_kit`, 'live');
+             if (proposal.type === SyncProposalType.NEW || proposal.type === SyncProposalType.UPDATED) {
+                batch.set(brandKitRef, { ...proposal.after, status: 'published', publishedAt: timestamp, publishedBy: userId }, { merge: true });
+            } else if (proposal.type === SyncProposalType.OBSOLETE) {
+                batch.delete(brandKitRef);
             }
         }
-        // TODO: Implement logic for 'playbook' and 'training' entity types
-    });
+        // TODO: Implement for training and org chart
+    };
     
     // 4. Start a batch write
     const orgChartDraftRef = doc(db, `workspaces/${workspaceId}/org_charts`, 'draft');
     const orgChartDraftSnap = await getDoc(orgChartDraftRef);
     const firstProposalSourceBatchId = proposalsSnap.docs[0]?.data().sourceBatchId;
 
-    const batch = writeBatch(db);
-    const timestamp = Timestamp.now();
     const workspaceRef = doc(db, 'workspaces', workspaceId);
     const workspaceSnap = await getDoc(workspaceRef);
     const currentVersion = workspaceSnap.data()?.version || 0;

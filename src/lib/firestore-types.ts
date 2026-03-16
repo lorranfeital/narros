@@ -179,8 +179,10 @@ export interface BrandKit {
   typography?: Typography[];
   toneOfVoice?: string[];
   sourceRefs?: string[];
-  publishedAt: Timestamp;
-  version: number;
+  publishedAt?: Timestamp;
+  version?: number;
+  sourceBatchId?: string;
+  status?: 'draft' | 'published';
 }
 
 export interface OrgChartNode {
@@ -251,7 +253,7 @@ export interface SyncProposal {
   id: string;
   workspaceId: string;
   type: SyncProposalType;
-  entityType: 'knowledge' | 'playbook' | 'training';
+  entityType: 'knowledge' | 'playbook' | 'training' | 'brand_kit' | 'org_chart';
   entityId: string;
   before: any;
   after: any;
