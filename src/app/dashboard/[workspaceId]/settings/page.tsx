@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useUser, useFirestore, useMemoFirebase, useStorage } from '@/firebase';
@@ -17,7 +16,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { updateProfile } from 'firebase/auth';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
@@ -25,13 +23,6 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Label } from '@/components/ui/label';
 import { BrandKit } from '@/lib/firestore-types';
 import { ConnectionsManager } from '@/components/dashboard/connections-manager';
-
-const profileFormSchema = z.object({
-  name: z.string().min(2, { message: 'O nome deve ter pelo menos 2 caracteres.' }),
-  email: z.string().email({ message: 'Por favor, insira um e-mail válido.' }).optional(),
-});
-
-type ProfileFormValues = z.infer<typeof profileFormSchema>;
 
 const sectorEnum = z.enum([
   'Agricultura',
@@ -77,47 +68,6 @@ export default function SettingsPage() {
   const [isUploadingPrincipal, setIsUploadingPrincipal] = React.useState(false);
   const [logoNegativoFile, setLogoNegativoFile] = React.useState<File | null>(null);
   const [isUploadingNegativo, setIsUploadingNegativo] = React.useState(false);
-
-  // User Profile Form
-  const userDocRef = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
-    return doc(firestore, 'users', user.uid);
-  }, [user, firestore]);
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userDocRef);
-  const profileForm = useForm<ProfileFormValues>({
-    resolver: zodResolver(profileFormSchema),
-    defaultValues: { name: '', email: '' },
-  });
-
-  React.useEffect(() => {
-    if (userProfile) {
-      profileForm.reset({
-        name: userProfile.name || '',
-        email: userProfile.email || '',
-      });
-    }
-  }, [userProfile, profileForm]);
-
-  async function onProfileSubmit(data: ProfileFormValues) {
-    if (!user || !userDocRef) return;
-    try {
-      await updateDoc(userDocRef, { name: data.name });
-      if (user.displayName !== data.name) {
-        await updateProfile(user, { displayName: data.name });
-      }
-      toast({
-        title: 'Perfil atualizado!',
-        description: 'Suas informações foram salvas com sucesso.',
-      });
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Uh oh! Algo deu errado.',
-        description: 'Não foi possível atualizar seu perfil. Tente novamente.',
-      });
-    }
-  }
 
   // Workspace Form
   const workspaceDocRef = useMemoFirebase(() => {
@@ -250,74 +200,20 @@ export default function SettingsPage() {
 
   return (
     <div className="p-12">
-      <h1 className="text-4xl font-bold tracking-tight">Configurações</h1>
-      <p className="text-muted-foreground mt-2">Gerencie as configurações da sua conta e de seus workspaces.</p>
+      <h1 className="text-4xl font-bold tracking-tight">Configurações do Workspace</h1>
+      <p className="text-muted-foreground mt-2">Gerencie as configurações deste workspace e suas conexões.</p>
 
-      <Tabs defaultValue="profile" className="mt-10 max-w-2xl">
-        <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="profile">Perfil</TabsTrigger>
+      <Tabs defaultValue="workspace" className="mt-10 max-w-2xl">
+        <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="workspace">Workspace</TabsTrigger>
             <TabsTrigger value="connections">Conexões</TabsTrigger>
         </TabsList>
-        <TabsContent value="profile">
-          <Card>
-            <CardHeader>
-              <CardTitle>Perfil</CardTitle>
-              <CardDescription>
-                Estas são suas informações. O e-mail não pode ser alterado.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isProfileLoading ? (
-                <div className="space-y-4">
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-32" />
-                </div>
-              ) : (
-                <Form {...profileForm}>
-                  <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-8">
-                    <FormField
-                      control={profileForm.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Nome</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Seu nome" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={profileForm.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Seu e-mail" {...field} disabled />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <Button type="submit" disabled={profileForm.formState.isSubmitting}>
-                      {profileForm.formState.isSubmitting ? 'Salvando...' : 'Salvar alterações'}
-                    </Button>
-                  </form>
-                </Form>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
         <TabsContent value="workspace">
           <Card>
             <CardHeader>
-              <CardTitle>Workspace</CardTitle>
+              <CardTitle>Informações</CardTitle>
               <CardDescription>
-                Gerencie as informações do seu workspace principal.
+                Gerencie as informações do seu workspace.
               </CardDescription>
             </CardHeader>
             <CardContent>

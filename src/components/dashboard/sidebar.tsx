@@ -301,7 +301,7 @@ export function Sidebar({ className }: { className?: string }) {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="w-[240px] mb-2" side="top" align="start">
                         <DropdownMenuItem asChild>
-                            <Link href={currentWorkspace?.id ? `/dashboard/${currentWorkspace.id}/settings` : '/dashboard'}>
+                            <Link href="/dashboard/profile">
                                 <Settings className="mr-2 h-4 w-4" />
                                 <span>Configurações de Perfil</span>
                             </Link>
