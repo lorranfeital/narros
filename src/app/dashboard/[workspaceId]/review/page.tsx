@@ -2,7 +2,7 @@
 'use client';
 
 import { useFirestore, useDoc, useMemoFirebase, useCollection, useUser } from '@/firebase';
-import { doc, collection, query, where, updateDoc } from 'firebase/firestore';
+import { doc, collection, query, where, updateDoc, writeBatch } from 'firebase/firestore';
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -37,8 +37,22 @@ const knowledgeCategorySchema = z.object({
   itens: z.array(knowledgeItemSchema),
 });
 
+const playbookStepSchema = z.object({
+  numero: z.number().int(),
+  titulo: z.string().min(1, "Título do passo é obrigatório"),
+  descricao: z.string().min(1, "Descrição do passo é obrigatória"),
+});
+
+const playbookSchema = z.object({
+  id: z.string(), // Keep the ID to update the correct doc
+  processo: z.string().min(1, "Nome do processo é obrigatório"),
+  passos: z.array(playbookStepSchema),
+});
+
+
 const formSchema = z.object({
   categories: z.array(knowledgeCategorySchema),
+  playbooks: z.array(playbookSchema),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -167,6 +181,83 @@ function BrandKitDisplay({ workspace, brandKit, isLoading }: { workspace: Worksp
     );
 }
 
+function PlaybookEditor({ control }: { control: any }) {
+  const { fields } = useFieldArray({
+    control,
+    name: "playbooks",
+  });
+
+  return (
+    <div className="space-y-6">
+      {fields.map((playbookField, playbookIndex) => (
+        <div key={playbookField.id} className="border-b pb-6 last:border-b-0">
+          <FormField
+            control={control}
+            name={`playbooks.${playbookIndex}.processo`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-xl font-headline font-semibold">Nome do Processo</FormLabel>
+                <FormControl>
+                  <Input {...field} className="text-xl font-headline font-semibold" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <div className="mt-4 space-y-4">
+            <PlaybookSteps control={control} playbookIndex={playbookIndex} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PlaybookSteps({ control, playbookIndex }: { control: any, playbookIndex: number }) {
+  const { fields } = useFieldArray({
+    control,
+    name: `playbooks.${playbookIndex}.passos`,
+  });
+
+  return (
+    <>
+      {fields.map((stepField, stepIndex) => (
+        <div key={stepField.id} className="flex gap-4 items-start">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold flex-shrink-0 mt-1">
+            {control.getValues(`playbooks.${playbookIndex}.passos.${stepIndex}.numero`)}
+          </div>
+          <div className="flex-1 space-y-2">
+            <FormField
+              control={control}
+              name={`playbooks.${playbookIndex}.passos.${stepIndex}.titulo`}
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <Input {...field} placeholder="Título do passo" className="font-semibold" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={control}
+              name={`playbooks.${playbookIndex}.passos.${stepIndex}.descricao`}
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <Textarea {...field} placeholder="Descrição do passo" className="text-sm" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
 
 export default function ReviewPage() {
     const { user } = useUser();
@@ -216,6 +307,7 @@ export default function ReviewPage() {
         resolver: zodResolver(formSchema),
         defaultValues: {
             categories: [],
+            playbooks: [],
         },
     });
 
@@ -227,15 +319,33 @@ export default function ReviewPage() {
     // Populate form with fetched draft data
     useEffect(() => {
         if (draft) {
-            form.reset({ categories: draft.categories });
+            form.reset({
+                categories: draft.categories || [],
+                playbooks: playbooks || [],
+            });
         }
-    }, [draft, form]);
+    }, [draft, playbooks, form]);
 
     const handleSaveChanges = async (values: FormValues) => {
-        if (!draft) return;
+        if (!draft || !firestore) return;
         try {
+            const batch = writeBatch(firestore);
+
+            // Update DraftKnowledge doc
             const draftRef = doc(firestore, `workspaces/${workspaceId}/draft_knowledge`, draft.id);
-            await updateDoc(draftRef, { categories: values.categories });
+            batch.update(draftRef, { categories: values.categories });
+
+            // Update Playbook docs
+            if (values.playbooks) {
+                values.playbooks.forEach(playbook => {
+                    const playbookRef = doc(firestore, `workspaces/${workspaceId}/playbooks`, playbook.id);
+                    const { id, ...playbookData } = playbook; // Exclude ID from data payload
+                    batch.update(playbookRef, playbookData);
+                });
+            }
+            
+            await batch.commit();
+
             toast({ title: 'Rascunho salvo!', description: 'Suas alterações foram salvas.' });
         } catch (error) {
             console.error('Error saving draft:', error);
@@ -248,6 +358,7 @@ export default function ReviewPage() {
         setIsPublishing(true);
         toast({ title: 'Publicando...', description: 'Sua base de conhecimento está sendo publicada.' });
         try {
+            await form.handleSubmit(handleSaveChanges)(); // Save any pending changes before publishing
             await publishDraft(workspaceId, draft.id, user.uid);
             toast({ title: 'Sucesso!', description: 'A base de conhecimento foi publicada.' });
             router.push(`/dashboard/${workspaceId}/knowledge`);
@@ -355,30 +466,16 @@ export default function ReviewPage() {
                         <Card>
                             <CardHeader>
                                 <CardTitle>Playbooks Propostos</CardTitle>
-                                <CardDescription>Estes são os processos passo a passo identificados pela IA. Eles serão criados ao publicar.</CardDescription>
+                                <CardDescription>Estes são os processos passo a passo identificados pela IA. Você pode editá-los antes de publicar.</CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-6">
-                                {isPlaybooksLoading ? <Skeleton className="h-24 w-full" /> : (
-                                    playbooks?.map(playbook => (
-                                    <div key={playbook.id} className="border-b pb-6 last:border-b-0">
-                                        <h3 className="text-xl font-headline font-semibold">{playbook.processo}</h3>
-                                        <div className="mt-4 space-y-4">
-                                            {playbook.passos.map(step => (
-                                                <div key={step.numero} className="flex gap-4">
-                                                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold">{step.numero}</div>
-                                                    <div>
-                                                        <h5 className="font-semibold">{step.titulo}</h5>
-                                                        <p className="text-muted-foreground text-sm">{step.descricao}</p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ))
-                                )}
+                            <CardContent>
+                                {isPlaybooksLoading ? <Skeleton className="h-24 w-full" /> : 
+                                    <PlaybookEditor control={form.control} />
+                                }
                             </CardContent>
                         </Card>
                     )}
+
 
                     {/* Training Modules Section */}
                     {(isTrainingLoading || (trainingModules && trainingModules.length > 0)) && (
