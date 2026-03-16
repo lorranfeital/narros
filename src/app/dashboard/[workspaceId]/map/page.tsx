@@ -31,6 +31,7 @@ import {
   X,
   Save,
   Loader2,
+  LayoutGrid,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -60,6 +61,7 @@ import {
   Insight,
   KnowledgeCategory,
 } from '@/lib/firestore-types';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 
 // Type definitions for our nodes
@@ -164,7 +166,55 @@ export default function OperationalMapPage() {
 
   const isLoading = isWorkspaceLoading || isKnowledgeLoading || isPlaybooksLoading || isInsightsLoading;
 
-  // --- Node and Edge Generation ---
+  // --- Layout and Node/Edge Generation ---
+  
+  const handleAutoLayout = () => {
+    const getDefaultLayoutPositions = (nodesToLayout: Node<MapNodeData>[]) => {
+      const positions = new Map<string, { x: number, y: number }>();
+      const centerX = 0;
+      const centerY = 0;
+  
+      const categoryNodes = nodesToLayout.filter(n => n.data.type === 'category');
+      const playbookNodes = nodesToLayout.filter(n => n.data.type === 'playbook');
+  
+      const categoryRadius = 350;
+      const playbookRadius = 600;
+  
+      positions.set('workspace', { x: centerX, y: centerY });
+  
+      categoryNodes.forEach((node, index) => {
+        const angle = (index / (categoryNodes.length || 1)) * 2 * Math.PI;
+        positions.set(node.id, {
+          x: centerX + categoryRadius * Math.cos(angle) - 128,
+          y: centerY + categoryRadius * Math.sin(angle) - 70,
+        });
+      });
+  
+      playbookNodes.forEach((node, index) => {
+        const angle = (index / (playbookNodes.length || 1)) * 2 * Math.PI;
+        positions.set(node.id, {
+          x: centerX + playbookRadius * Math.cos(angle) - 128,
+          y: centerY + playbookRadius * Math.sin(angle) - 70,
+        });
+      });
+  
+      return positions;
+    };
+    
+    setNodes(currentNodes => {
+      const defaultPositions = getDefaultLayoutPositions(currentNodes);
+      return currentNodes.map(node => ({
+        ...node,
+        position: defaultPositions.get(node.id) || node.position
+      }));
+    });
+    
+    toast({
+      title: "Layout Redefinido",
+      description: "O mapa foi reorganizado para a visualização hierárquica padrão."
+    });
+  };
+
   useEffect(() => {
     if (isLoading || !workspace || !firestore) return;
 
@@ -273,8 +323,9 @@ export default function OperationalMapPage() {
             layoutData.nodePositions.map((p: any) => [p.id, { x: p.x, y: p.y }])
           );
           newNodes.forEach((node) => {
-            if (savedPositions.has(node.id)) {
-              node.position = savedPositions.get(node.id)!;
+            const savedPosition = savedPositions.get(node.id);
+            if (savedPosition) {
+                node.position = savedPosition;
             }
           });
         }
@@ -364,11 +415,26 @@ export default function OperationalMapPage() {
 
   return (
     <div className="w-full h-full relative">
-       <div className="absolute top-6 left-6 z-10">
+       <div className="absolute top-6 left-6 z-10 flex items-center gap-2">
             <Button onClick={handleSaveLayout} disabled={isSaving || nodes.length === 0}>
-                {isSaving ? <Loader2 className="mr-2 animate-spin" /> : <Save className="mr-2" />}
+                {isSaving ? <Loader2 className="mr-2" /> : <Save className="mr-2" />}
                 Salvar Layout
             </Button>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="outline">
+                        <LayoutGrid className="mr-2 h-4 w-4" />
+                        Layout
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                    <DropdownMenuLabel>Estilo de Layout</DropdownMenuLabel>
+                    <DropdownMenuItem onSelect={handleAutoLayout}>
+                        Hierárquico (Redefinir)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem disabled>Adaptativo (Em breve)</DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
        </div>
        <Button asChild variant="outline" className="absolute top-6 right-6 z-10 h-12 w-12 rounded-full p-0 bg-background/80 hover:bg-background">
             <Link href={`/dashboard/${workspaceId}`}>
