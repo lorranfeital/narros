@@ -196,12 +196,17 @@ export default function KnowledgePage() {
     const trainingModulesQuery = useMemoFirebase(() => {
         if (!firestore || !workspaceId) return null;
         return query(
-            collection(firestore, `workspaces/${workspaceId}/training_modules`), 
-            where('status', '==', 'published'),
+            collection(firestore, `workspaces/${workspaceId}/training_modules`),
             orderBy('modulo', 'asc')
         );
     }, [firestore, workspaceId]);
-    const { data: trainingModules, isLoading: isTrainingLoading } = useCollection<TrainingModule>(trainingModulesQuery);
+    const { data: allTrainingModules, isLoading: isTrainingLoading } = useCollection<TrainingModule>(trainingModulesQuery);
+    
+    // Filter for published modules on the client side
+    const trainingModules = React.useMemo(() => 
+        allTrainingModules?.filter(module => module.status === 'published'), 
+    [allTrainingModules]);
+
 
     // Fetch insights (only unresolved ones)
     const insightsQuery = useMemoFirebase(() => {
