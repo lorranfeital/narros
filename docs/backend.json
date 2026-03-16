@@ -14,6 +14,18 @@
       },
       "required": ["id", "name", "email", "plan", "createdAt"]
     },
+    "PlatformAdmin": {
+      "title": "Platform Admin",
+      "type": "object",
+      "description": "Represents a user with global administrative privileges on the Narros platform.",
+      "properties": {
+        "role": { "type": "string", "enum": ["platform_super_admin", "platform_ops_admin", "platform_support", "platform_billing_admin", "platform_readonly"] },
+        "status": { "type": "string", "enum": ["active", "disabled"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["role", "status", "createdAt"]
+    },
     "Workspace": {
       "title": "Workspace",
       "type": "object",
@@ -311,6 +323,10 @@
       {
         "path": "/users/{userId}",
         "definition": { "schema": { "$ref": "#/backend/entities/User" } }
+      },
+      {
+        "path": "/platformAdmins/{userId}",
+        "definition": { "schema": { "$ref": "#/backend/entities/PlatformAdmin" } }
       },
       {
         "path": "/workspaces/{workspaceId}",

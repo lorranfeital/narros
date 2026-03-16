@@ -67,6 +67,8 @@ export enum WorkspaceLinkStatus {
 
 export type WorkspaceRole = 'admin' | 'curator' | 'member';
 
+export type PlatformAdminRole = 'platform_super_admin' | 'platform_ops_admin' | 'platform_support' | 'platform_billing_admin' | 'platform_readonly';
+
 
 // ---------
 // Main Document Interfaces
@@ -78,6 +80,14 @@ export interface User {
   email: string;
   plan?: string;
   createdAt?: Timestamp;
+}
+
+export interface PlatformAdmin {
+  id: string; // This will be the user's UID
+  role: PlatformAdminRole;
+  status: 'active' | 'disabled';
+  createdAt: Timestamp;
+  updatedAt?: Timestamp;
 }
 
 export interface Workspace {

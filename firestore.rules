@@ -42,13 +42,27 @@ service cloud.firestore {
         return request.auth == null;
     }
 
+    function isPlatformAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/platformAdmins/$(request.auth.uid));
+    }
+
 
     // ------------------------------------------------------------------------
     // User Profile Rules
     // ------------------------------------------------------------------------
     match /users/{userId} {
       allow read, write: if isOwner(userId);
-      allow list: if false;
+      allow list: if isPlatformAdmin();
+    }
+    
+    // ------------------------------------------------------------------------
+    // Platform Admin Rules
+    // ------------------------------------------------------------------------
+    match /platformAdmins/{userId} {
+      allow read: if isPlatformAdmin() || isServerProcess();
+      allow list: if isPlatformAdmin();
+      // Only server processes can grant/change roles for now.
+      allow write: if isServerProcess();
     }
 
     // ------------------------------------------------------------------------
@@ -70,7 +84,7 @@ service cloud.firestore {
       allow get: if isWorkspaceMember(workspaceId) || isServerProcess();
       allow update: if isAdmin(workspaceId) || isServerProcess();
       allow delete: if isWorkspaceOwner(workspaceId);
-      allow list: if isSignedIn() || isServerProcess();
+      allow list: if isPlatformAdmin() || isSignedIn() || isServerProcess();
 
       // --- Node Relations Subcollection ---
       match /nodeRelations/{relationId} {
