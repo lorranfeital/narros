@@ -195,7 +195,11 @@ export default function KnowledgePage() {
     // Fetch published training modules
     const trainingModulesQuery = useMemoFirebase(() => {
         if (!firestore || !workspaceId) return null;
-        return query(collection(firestore, `workspaces/${workspaceId}/training_modules`), where('status', '==', 'published'));
+        return query(
+            collection(firestore, `workspaces/${workspaceId}/training_modules`), 
+            where('status', '==', 'published'),
+            orderBy('modulo', 'asc')
+        );
     }, [firestore, workspaceId]);
     const { data: trainingModules, isLoading: isTrainingLoading } = useCollection<TrainingModule>(trainingModulesQuery);
 
@@ -370,6 +374,10 @@ export default function KnowledgePage() {
                                     <ul className="list-disc list-inside text-muted-foreground text-sm space-y-1">
                                         {module.topicos.map(topic => <li key={topic}>{topic}</li>)}
                                     </ul>
+                                    <div className="mt-6 bg-secondary/50 p-3 rounded-md">
+                                        <h4 className="font-semibold text-sm flex items-center gap-2"><Lightbulb className="h-4 w-4 text-amber-500" /> Próximos Passos</h4>
+                                        <p className="text-sm text-muted-foreground mt-2">Use este roteiro sugerido pela IA como base para criar o material final do seu treinamento, seja em formato de vídeo, apresentação ou um guia prático.</p>
+                                    </div>
                                </div>
                            )) : (
                             <p className="text-muted-foreground">Nenhum módulo de treinamento publicado.</p>

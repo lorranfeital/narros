@@ -3,7 +3,7 @@
 'use client';
 
 import { useFirestore, useDoc, useMemoFirebase, useCollection, useUser } from '@/firebase';
-import { doc, collection, query, where, updateDoc, writeBatch, setDoc } from 'firebase/firestore';
+import { doc, collection, query, where, updateDoc, writeBatch, setDoc, orderBy } from 'firebase/firestore';
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -426,7 +426,11 @@ export default function ReviewPage() {
     const playbooksQuery = useMemoFirebase(() => !firestore || !draft?.sourceBatchId ? null : query(collection(firestore, `workspaces/${workspaceId}/playbooks`), where('sourceBatchId', '==', draft.sourceBatchId)), [firestore, draft?.sourceBatchId]);
     const { data: playbooks, isLoading: isPlaybooksLoading } = useCollection<Playbook>(playbooksQuery);
 
-    const trainingModulesQuery = useMemoFirebase(() => !firestore || !draft?.sourceBatchId ? null : query(collection(firestore, `workspaces/${workspaceId}/training_modules`), where('sourceBatchId', '==', draft.sourceBatchId)), [firestore, draft?.sourceBatchId]);
+    const trainingModulesQuery = useMemoFirebase(() => !firestore || !draft?.sourceBatchId ? null : query(
+        collection(firestore, `workspaces/${workspaceId}/training_modules`), 
+        where('sourceBatchId', '==', draft.sourceBatchId),
+        orderBy('modulo', 'asc')
+    ), [firestore, draft?.sourceBatchId]);
     const { data: trainingModules, isLoading: isTrainingLoading } = useCollection<TrainingModule>(trainingModulesQuery);
     
     const brandKitDraftRef = useMemoFirebase(() => firestore ? doc(firestore, `workspaces/${workspaceId}/brand_kit`, 'draft') : null, [firestore, workspaceId]);
