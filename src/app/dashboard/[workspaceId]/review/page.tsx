@@ -7,14 +7,14 @@ import { useParams, useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Loader2, Sparkles, Trash2, Plus, GripVertical, AlertTriangle } from 'lucide-react';
+import { Loader2, Sparkles, Trash2, Plus, GripVertical, AlertTriangle, Palette, Globe, Type, Lightbulb } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import React, { useEffect, useState } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { DraftKnowledge, Playbook, TrainingModule, Insight } from '@/lib/firestore-types';
+import { DraftKnowledge, Playbook, TrainingModule, Insight, Workspace, BrandKit, Color, Typography as TypographyType } from '@/lib/firestore-types';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -22,6 +22,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Separator } from '@/components/ui/separator';
 import { publishDraft } from '@/lib/actions/workspace-actions';
 import { Badge } from '@/components/ui/badge';
+import Image from 'next/image';
+import { cn } from '@/lib/utils';
 
 const knowledgeItemSchema = z.object({
   titulo: z.string().min(1, 'Título é obrigatório'),
@@ -41,6 +43,130 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+function BrandKitDisplay({ workspace, brandKit, isLoading }: { workspace: Workspace | null, brandKit: BrandKit | null, isLoading: boolean }) {
+    React.useEffect(() => {
+        if (!brandKit?.typography) return;
+
+        // Use a Set to avoid requesting the same font family multiple times
+        const fontFamilies = new Set(brandKit.typography.map(t => t.family.replace(/ /g, '+')));
+        
+        if (fontFamilies.size === 0) return;
+
+        const queryString = Array.from(fontFamilies).map(family => `family=${family}`).join('&');
+        const linkId = 'dynamic-google-fonts-stylesheet';
+        const newHref = `https://fonts.googleapis.com/css2?${queryString}&display=swap`;
+        
+        let link = document.getElementById(linkId) as HTMLLinkElement | null;
+        
+        if (link) {
+            if (link.href !== newHref) {
+                link.href = newHref;
+            }
+        } else {
+            link = document.createElement('link');
+            link.id = linkId;
+            link.rel = 'stylesheet';
+            link.href = newHref;
+            document.head.appendChild(link);
+        }
+    }, [brandKit]);
+
+    if (isLoading) {
+        return (
+             <div className="space-y-8">
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
+            </div>
+        )
+    }
+
+    const logos = [
+        ...(workspace?.logoUrl ? [{ name: 'Ícone', url: workspace.logoUrl, darkBg: false }] : []),
+        ...(brandKit?.logoPrincipalUrl ? [{ name: 'Logo Principal', url: brandKit.logoPrincipalUrl, darkBg: false }] : []),
+        ...(brandKit?.logoNegativoUrl ? [{ name: 'Logo Negativo', url: brandKit.logoNegativoUrl, darkBg: true }] : [])
+    ];
+    
+    const hasBrandKitContent = logos.length > 0 || (brandKit?.colorPalette && brandKit.colorPalette.length > 0) || (brandKit?.typography && brandKit.typography.length > 0) || (brandKit?.toneOfVoice && brandKit.toneOfVoice.length > 0);
+
+    if (!hasBrandKitContent && !isLoading) {
+        return (
+            <Alert>
+                <Palette className="h-4 w-4" />
+                <AlertTitle>Nenhum Brand Kit proposto</AlertTitle>
+                <AlertDescription>
+                    Nenhuma informação de marca foi extraída neste lote.
+                </AlertDescription>
+            </Alert>
+        )
+    }
+
+    return (
+        <div className="space-y-8">
+             {logos.length > 0 && (
+                 <div>
+                    <h3 className="text-lg font-semibold flex items-center gap-2 mb-4"><Globe className="h-5 w-5" /> Logos e Variações</h3>
+                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {logos.map((logo) => (
+                            <div key={logo.name} className={cn("flex flex-col items-center justify-center gap-2 rounded-lg border p-4", logo.darkBg ? 'bg-foreground' : 'bg-muted/30')}>
+                                 <div className="relative w-24 h-24">
+                                    <Image
+                                        src={logo.url}
+                                        alt={logo.name}
+                                        fill
+                                        className="object-contain"
+                                    />
+                                </div>
+                                <p className={cn("font-medium text-sm text-center mt-2", logo.darkBg ? 'text-background' : '')}>{logo.name}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+            {brandKit?.colorPalette && brandKit.colorPalette.length > 0 && (
+                <div>
+                    <h3 className="text-lg font-semibold flex items-center gap-2 mb-4"><Palette className="h-5 w-5" /> Paleta de Cores</h3>
+                    <div className="flex flex-wrap gap-4">
+                        {brandKit.colorPalette.map((color: Color) => (
+                            <div key={color.hex} className="flex flex-col items-center gap-2">
+                                <div className="w-20 h-20 rounded-lg shadow-inner border" style={{ backgroundColor: color.hex }} />
+                                <div className="text-center">
+                                    <p className="font-medium text-sm">{color.name}</p>
+                                    <p className="text-xs text-muted-foreground uppercase font-mono">{color.hex}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+             {brandKit?.typography && brandKit.typography.length > 0 && (
+                <div>
+                    <h3 className="text-lg font-semibold flex items-center gap-2 mb-4"><Type className="h-5 w-5" /> Tipografia</h3>
+                    <div className="space-y-4">
+                        {brandKit.typography.map((typo: TypographyType) => (
+                            <div key={typo.family + typo.name} className="p-4 rounded-lg bg-muted/50">
+                                <p className="text-sm text-muted-foreground">{typo.name}</p>
+                                <p style={{ fontFamily: typo.family, fontWeight: typo.weight || '400' }} className="text-3xl truncate">{typo.example || 'Aa Bb Cc Dd Ee'}</p>
+                                <p className="text-sm font-mono mt-2">{typo.family}{typo.weight ? `, ${typo.weight}` : ''}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+             {brandKit?.toneOfVoice && brandKit.toneOfVoice.length > 0 && (
+                <div>
+                    <h3 className="text-lg font-semibold flex items-center gap-2 mb-4"><Lightbulb className="h-5 w-5" /> Tom de Voz</h3>
+                    <div className="flex flex-wrap gap-2">
+                        {brandKit.toneOfVoice.map((tone: string) => (
+                            <Badge key={tone} variant="secondary" className="text-base py-1 px-3">{tone}</Badge>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 
 export default function ReviewPage() {
     const { user } = useUser();
@@ -51,6 +177,9 @@ export default function ReviewPage() {
     const workspaceId = params.workspaceId as string;
 
     const [isPublishing, setIsPublishing] = useState(false);
+    
+    const workspaceDocRef = useMemoFirebase(() => firestore ? doc(firestore, 'workspaces', workspaceId) : null, [firestore, workspaceId]);
+    const { data: workspace, isLoading: isWorkspaceLoading } = useDoc<Workspace>(workspaceDocRef);
 
     // Fetch the draft knowledge document
     const draftQuery = useMemoFirebase(() => {
@@ -76,7 +205,12 @@ export default function ReviewPage() {
         return query(collection(firestore, `workspaces/${workspaceId}/training_modules`), where('sourceBatchId', '==', draft.sourceBatchId));
     }, [firestore, workspaceId, draft?.sourceBatchId]);
     const { data: trainingModules, isLoading: isTrainingLoading } = useCollection<TrainingModule>(trainingModulesQuery);
-
+    
+    const brandKitDraftRef = useMemoFirebase(() => {
+        if (!firestore || !workspaceId) return null;
+        return doc(firestore, `workspaces/${workspaceId}/brand_kit`, 'draft');
+    }, [firestore, workspaceId]);
+    const { data: brandKitDraft, isLoading: isBrandKitLoading } = useDoc<BrandKit>(brandKitDraftRef);
 
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
@@ -124,7 +258,7 @@ export default function ReviewPage() {
         }
     };
 
-    const isLoading = isDraftLoading || isPlaybooksLoading || isTrainingLoading;
+    const isLoading = isWorkspaceLoading || isDraftLoading || isPlaybooksLoading || isTrainingLoading || isBrandKitLoading;
 
     if (isLoading && !draft) {
         return (
@@ -201,6 +335,20 @@ export default function ReviewPage() {
                             </Button>
                         </CardContent>
                     </Card>
+
+                    {(isBrandKitLoading || brandKitDraft) && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Brand Kit Proposto</CardTitle>
+                                <CardDescription>Esta é a identidade visual e verbal que a IA extraiu. Ela será publicada junto com a base de conhecimento.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {isBrandKitLoading ? <Skeleton className="h-48 w-full" /> : 
+                                    <BrandKitDisplay workspace={workspace} brandKit={brandKitDraft} isLoading={isBrandKitLoading} />
+                                }
+                            </CardContent>
+                        </Card>
+                    )}
                     
                     {/* Playbooks Section */}
                     {(isPlaybooksLoading || (playbooks && playbooks.length > 0)) && (
@@ -316,5 +464,3 @@ function CategoryItems({ control, categoryIndex }: { control: any, categoryIndex
     </div>
   );
 }
-
-    

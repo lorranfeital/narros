@@ -231,14 +231,14 @@ export async function processContentBatch(
     const currentVersion = workspaceSnap.data()?.version || 0;
     const newVersion = currentVersion + 1;
 
-    // 5. Handle Brand Kit (always update/create)
+    // 5. Handle Brand Kit (create a draft)
     if (aiResult.brandKit && Object.keys(aiResult.brandKit).length > 0) {
-      const brandKitDocRef = doc(db, `workspaces/${workspaceId}/brand_kit`, 'live');
-      finalBatch.set(brandKitDocRef, {
+      const brandKitDraftRef = doc(db, `workspaces/${workspaceId}/brand_kit`, 'draft');
+      finalBatch.set(brandKitDraftRef, {
         ...aiResult.brandKit,
         sourceRefs: sourceIds,
-        publishedAt: timestamp,
-        version: newVersion,
+        sourceBatchId: batchId,
+        status: 'draft',
         workspaceId: workspaceId,
       }, { merge: true });
     }
@@ -348,6 +348,26 @@ export async function publishDraft(
   const workspaceSnap = await getDoc(workspaceRef);
   const currentVersion = workspaceSnap.data()?.version || 0;
   const newVersion = currentVersion + 1;
+  
+  const brandKitDraftRef = doc(db, `workspaces/${workspaceId}/brand_kit`, 'draft');
+  const brandKitDraftSnap = await getDoc(brandKitDraftRef);
+
+  // 1a. Handle Brand Kit publishing
+  if (brandKitDraftSnap.exists() && brandKitDraftSnap.data().sourceBatchId === draftData.sourceBatchId) {
+      const brandKitLiveData = { ...brandKitDraftSnap.data() };
+      delete brandKitLiveData.status;
+      delete brandKitLiveData.sourceBatchId;
+
+      const brandKitLiveRef = doc(db, `workspaces/${workspaceId}/brand_kit`, 'live');
+      batch.set(brandKitLiveRef, {
+          ...brandKitLiveData,
+          publishedAt: timestamp,
+          version: newVersion,
+          publishedBy: userId,
+      }, { merge: true });
+
+      batch.delete(brandKitDraftRef);
+  }
 
   // 1. Set/overwrite the single published knowledge document.
   const publishedRef = doc(db, `workspaces/${workspaceId}/published_knowledge`, workspaceId);
