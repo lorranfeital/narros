@@ -28,6 +28,11 @@ type SearchResultWithStatus = SearchableWorkspace & {
     connectionStatus: 'connect' | 'pending' | 'connected';
 };
 
+type PendingAction = {
+    linkId: string;
+    type: 'accept' | 'reject' | 'delete' | 'cancel';
+}
+
 export function ConnectionsManager() {
     const params = useParams();
     const { toast } = useToast();
@@ -39,7 +44,7 @@ export function ConnectionsManager() {
     const [searchResults, setSearchResults] = useState<SearchResultWithStatus[]>([]);
     const [isSearching, startSearchTransition] = useTransition();
     const [requestingId, setRequestingId] = useState<string | null>(null);
-    const [actionId, setActionId] = useState<string | null>(null);
+    const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
     const [isActionPending, startActionTransition] = useTransition();
 
     // Fetch all existing connections related to the current workspace
@@ -145,30 +150,31 @@ export function ConnectionsManager() {
     
     const handleUpdateRequest = (linkId: string, status: WorkspaceLinkStatus.ACTIVE | WorkspaceLinkStatus.REJECTED) => {
         if (!user) return;
-        setActionId(linkId);
+        const type = status === WorkspaceLinkStatus.ACTIVE ? 'accept' : 'reject';
+        setPendingAction({ linkId, type });
         startActionTransition(async () => {
             try {
                 await updateWorkspaceLinkStatus(linkId, status, user.uid, workspaceId);
-                toast({ title: `Solicitação ${status === 'active' ? 'aceita' : 'recusada'}!` });
+                toast({ title: `Solicitação ${type === 'accept' ? 'aceita' : 'recusada'}!` });
             } catch (error) {
                 toast({ variant: 'destructive', title: "Erro ao processar solicitação", description: (error as Error).message });
             } finally {
-                setActionId(null);
+                setPendingAction(null);
             }
         });
     }
 
-    const handleDeleteRequest = (linkId: string) => {
+    const handleDeleteRequest = (linkId: string, type: 'delete' | 'cancel') => {
         if (!user) return;
-        setActionId(linkId);
+        setPendingAction({ linkId, type });
         startActionTransition(async () => {
             try {
                 await deleteWorkspaceLink(linkId, user.uid, workspaceId);
-                toast({ title: 'Conexão removida.' });
+                toast({ title: type === 'delete' ? 'Conexão removida.' : 'Solicitação cancelada.' });
             } catch (error) {
-                toast({ variant: 'destructive', title: "Erro ao remover conexão", description: (error as Error).message });
+                toast({ variant: 'destructive', title: "Erro ao remover", description: (error as Error).message });
             } finally {
-                setActionId(null);
+                setPendingAction(null);
             }
         });
     }
@@ -249,11 +255,11 @@ export function ConnectionsManager() {
                                             <p className="font-medium">{link.sourceWorkspaceName}</p>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <Button variant="outline" size="sm" onClick={() => handleUpdateRequest(link.id, WorkspaceLinkStatus.REJECTED)} disabled={isActionPending && actionId === link.id}>
-                                                {(isActionPending && actionId === link.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />} Recusar
+                                            <Button variant="outline" size="sm" onClick={() => handleUpdateRequest(link.id, WorkspaceLinkStatus.REJECTED)} disabled={isActionPending && pendingAction?.linkId === link.id}>
+                                                {(isActionPending && pendingAction?.linkId === link.id && pendingAction?.type === 'reject') ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />} Recusar
                                             </Button>
-                                            <Button size="sm" onClick={() => handleUpdateRequest(link.id, WorkspaceLinkStatus.ACTIVE)} disabled={isActionPending && actionId === link.id}>
-                                                 {(isActionPending && actionId === link.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Aceitar
+                                            <Button size="sm" onClick={() => handleUpdateRequest(link.id, WorkspaceLinkStatus.ACTIVE)} disabled={isActionPending && pendingAction?.linkId === link.id}>
+                                                 {(isActionPending && pendingAction?.linkId === link.id && pendingAction?.type === 'accept') ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Aceitar
                                             </Button>
                                         </div>
                                     </div>
@@ -284,8 +290,8 @@ export function ConnectionsManager() {
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <Badge variant="success" className="gap-1.5"><CheckCircle className="h-3 w-3" /> Conectado</Badge>
-                                                <Button variant="destructive" size="sm" onClick={() => handleDeleteRequest(link.id)} disabled={isActionPending && actionId === link.id}>
-                                                     {(isActionPending && actionId === link.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Desconectar
+                                                <Button variant="destructive" size="sm" onClick={() => handleDeleteRequest(link.id, 'delete')} disabled={isActionPending && pendingAction?.linkId === link.id}>
+                                                     {(isActionPending && pendingAction?.linkId === link.id && pendingAction?.type === 'delete') ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Desconectar
                                                 </Button>
                                             </div>
                                         </div>
@@ -315,8 +321,8 @@ export function ConnectionsManager() {
                                         </div>
                                         <div className="flex items-center gap-2">
                                              <Badge variant="secondary" className="gap-1.5"><Hourglass className="h-3 w-3" /> Pendente</Badge>
-                                             <Button variant="outline" size="sm" onClick={() => handleDeleteRequest(link.id)} disabled={isActionPending && actionId === link.id}>
-                                                {(isActionPending && actionId === link.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Cancelar
+                                             <Button variant="outline" size="sm" onClick={() => handleDeleteRequest(link.id, 'cancel')} disabled={isActionPending && pendingAction?.linkId === link.id}>
+                                                {(isActionPending && pendingAction?.linkId === link.id && pendingAction?.type === 'cancel') ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Cancelar
                                             </Button>
                                         </div>
                                     </div>
