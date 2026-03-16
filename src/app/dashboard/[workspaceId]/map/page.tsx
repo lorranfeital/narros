@@ -209,7 +209,7 @@ export default function OperationalMapPage() {
             raw_data: category,
             },
         });
-        newEdges.push({ id: `e-ws-${categoryId}`, source: 'workspace', sourceHandle: Position.Bottom, target: categoryId, targetHandle: Position.Top, animated: false });
+        newEdges.push({ id: `e-ws-${categoryId}`, source: 'workspace', sourceHandle: 'bottom', target: categoryId, targetHandle: 'top', animated: false });
         });
 
         // 3. Playbook Nodes
@@ -234,27 +234,35 @@ export default function OperationalMapPage() {
             raw_data: playbook,
             },
         });
-        newEdges.push({ id: `e-ws-${playbookNodeId}`, source: 'workspace', sourceHandle: Position.Bottom, target: playbookNodeId, targetHandle: Position.Top, animated: false });
+        newEdges.push({ id: `e-ws-${playbookNodeId}`, source: 'workspace', sourceHandle: 'bottom', target: playbookNodeId, targetHandle: 'top', animated: false });
         });
         
         // --- Load saved layout ---
         const layoutRef = doc(firestore, `workspaces/${workspaceId}/layouts`, 'map');
         const layoutSnap = await getDoc(layoutRef);
+        let savedEdges: Edge[] | null = null;
 
         if (layoutSnap.exists()) {
             const layoutData = layoutSnap.data();
-            if (layoutData && Array.isArray(layoutData.nodePositions)) {
-                 const savedPositions = new Map(layoutData.nodePositions.map((p: any) => [p.id, { x: p.x, y: p.y }]));
-                newNodes.forEach(node => {
-                    if (savedPositions.has(node.id)) {
-                        node.position = savedPositions.get(node.id)!;
-                    }
-                });
+            if (layoutData) {
+                // Load Node Positions
+                if (Array.isArray(layoutData.nodePositions)) {
+                    const savedPositions = new Map(layoutData.nodePositions.map((p: any) => [p.id, { x: p.x, y: p.y }]));
+                    newNodes.forEach(node => {
+                        if (savedPositions.has(node.id)) {
+                            node.position = savedPositions.get(node.id)!;
+                        }
+                    });
+                }
+                // Load Edges
+                if (Array.isArray(layoutData.edges)) {
+                    savedEdges = layoutData.edges;
+                }
             }
         }
 
         setNodes(newNodes);
-        setEdges(newEdges);
+        setEdges(savedEdges || newEdges);
     };
 
     generateLayout();
@@ -283,13 +291,14 @@ export default function OperationalMapPage() {
           x: node.position.x,
           y: node.position.y,
         })),
+        edges: edges,
       };
       const layoutRef = doc(firestore, `workspaces/${workspaceId}/layouts`, 'map');
       await setDoc(layoutRef, layoutData, { merge: true });
 
       toast({
         title: "Layout Salvo!",
-        description: "A posição dos seus nós foi salva com sucesso."
+        description: "A posição dos seus nós e as conexões foram salvas."
       });
     } catch (error) {
       console.error("Error saving layout:", error);
