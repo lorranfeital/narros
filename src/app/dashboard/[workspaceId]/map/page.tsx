@@ -10,10 +10,12 @@ import ReactFlow, {
   Background,
   applyNodeChanges,
   applyEdgeChanges,
+  addEdge,
   Node,
   Edge,
   NodeChange,
   EdgeChange,
+  Connection,
   Handle,
   Position,
 } from 'reactflow';
@@ -69,13 +71,29 @@ type MapNodeData = {
 // Custom Node Component
 const CustomNode = ({ data }: { data: MapNodeData }) => {
   return (
-    <>
+    <div className="relative group transition-all duration-300">
       <Handle
         type="target"
-        position={Position.Top}
-        style={{ opacity: 0 }}
+        position={Position.Left}
+        className="!bg-primary !w-3 !h-3 opacity-0 group-hover:opacity-100 transition-opacity"
       />
-      <Card className="w-64 border-2 shadow-lg rounded-xl">
+       <Handle
+        type="target"
+        position={Position.Top}
+        className="!bg-primary !w-3 !h-3 opacity-0 group-hover:opacity-100 transition-opacity"
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="!bg-primary !w-3 !h-3 opacity-0 group-hover:opacity-100 transition-opacity"
+      />
+       <Handle
+        type="source"
+        position={Position.Bottom}
+        className="!bg-primary !w-3 !h-3 opacity-0 group-hover:opacity-100 transition-opacity"
+      />
+      
+      <Card className="w-64 border-2 shadow-lg rounded-xl group-hover:border-primary/50 transition-colors">
         <CardHeader className="flex-row items-center gap-4 p-4">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
             {data.icon}
@@ -98,12 +116,7 @@ const CustomNode = ({ data }: { data: MapNodeData }) => {
           </CardContent>
         )}
       </Card>
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        style={{ opacity: 0 }}
-      />
-    </>
+    </div>
   );
 };
 
@@ -174,7 +187,7 @@ export default function OperationalMapPage() {
     const categories = publishedKnowledge?.categories || [];
     categories.forEach((category, index) => {
       const angle = (index / (categories.length || 1)) * 2 * Math.PI;
-      const categoryId = `cat-${category.categoria.replace(/[^a-zA-Z0-9]/g, '-')}-${index}`;
+      const categoryId = `cat-${category.categoria.replace(/[^a-zA-Z0-9-_]/g, '')}-${index}`;
       newNodes.push({
         id: categoryId,
         type: 'custom',
@@ -227,6 +240,11 @@ export default function OperationalMapPage() {
   const onNodesChange = useCallback((changes: NodeChange[]) => setNodes((nds) => applyNodeChanges(changes, nds)), []);
   const onEdgesChange = useCallback((changes: EdgeChange[]) => setEdges((eds) => applyEdgeChanges(changes, eds)), []);
   
+  const onConnect = useCallback(
+    (connection: Connection) => setEdges((eds) => addEdge(connection, eds)),
+    [setEdges]
+  );
+
   const handleNodeClick = (_event: React.MouseEvent, node: Node<MapNodeData>) => {
     setSelectedNode(node);
   };
@@ -264,6 +282,7 @@ export default function OperationalMapPage() {
               edges={edges}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
               onNodeClick={handleNodeClick}
               nodeTypes={nodeTypes}
               fitView
