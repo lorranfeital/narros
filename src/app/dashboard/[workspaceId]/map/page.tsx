@@ -3,7 +3,7 @@
 
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
-import { doc, collection, query, where } from 'firebase/firestore';
+import { doc, collection, query, where, getDoc, setDoc } from 'firebase/firestore';
 import { useParams } from 'next/navigation';
 import ReactFlow, {
   Controls,
@@ -21,16 +21,16 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import {
-  BookCopy,
   BookOpen,
   Network,
   Lightbulb,
   AlertTriangle,
   MapPin,
   ChevronRight,
-  GitCommit,
   Folder,
   X,
+  Save,
+  Loader2,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -40,18 +40,16 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
 
 import {
   Workspace,
   PublishedKnowledge,
   Playbook,
   Insight,
-  InsightType,
   KnowledgeCategory,
-  KnowledgeItem,
 } from '@/lib/firestore-types';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+
 
 // Type definitions for our nodes
 type MapNodeData = {
@@ -128,9 +126,11 @@ export default function OperationalMapPage() {
   const [nodes, setNodes] = useState<Node<MapNodeData>[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [selectedNode, setSelectedNode] = useState<Node<MapNodeData> | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const firestore = useFirestore();
   const params = useParams();
+  const { toast } = useToast();
   const workspaceId = params.workspaceId as string;
 
   // --- Data Fetching ---
@@ -150,91 +150,111 @@ export default function OperationalMapPage() {
 
   // --- Node and Edge Generation ---
   useEffect(() => {
-    if (isLoading || !workspace) return;
+     if (isLoading || !workspace || !firestore) return;
 
-    const newNodes: Node<MapNodeData>[] = [];
-    const newEdges: Edge[] = [];
-    const centerX = 0;
-    const centerY = 0;
+    const generateLayout = async () => {
+        const newNodes: Node<MapNodeData>[] = [];
+        const newEdges: Edge[] = [];
+        const centerX = 0;
+        const centerY = 0;
 
-    const getInsightsFor = (entityTitle: string) => {
-      if (!insights) return { risco: 0, gap: 0, oportunidade: 0 };
-      const counts = { risco: 0, gap: 0, oportunidade: 0 };
-      const lowerEntityTitle = entityTitle.toLowerCase();
-      insights.forEach(insight => {
-        if (insight.texto.toLowerCase().includes(lowerEntityTitle)) {
-          counts[insight.tipo]++;
+        const getInsightsFor = (entityTitle: string) => {
+        if (!insights) return { risco: 0, gap: 0, oportunidade: 0 };
+        const counts = { risco: 0, gap: 0, oportunidade: 0 };
+        const lowerEntityTitle = entityTitle.toLowerCase();
+        insights.forEach(insight => {
+            if (insight.texto.toLowerCase().includes(lowerEntityTitle)) {
+            counts[insight.tipo]++;
+            }
+        });
+        return counts;
+        };
+
+        // 1. Central Workspace Node
+        newNodes.push({
+            id: 'workspace',
+            type: 'custom',
+            position: { x: centerX, y: centerY },
+            data: {
+                label: workspace.name,
+                type: 'workspace',
+                icon: <Network className="h-6 w-6" />,
+                raw_data: workspace,
+            },
+        });
+
+        // 2. Category Nodes
+        const categoryRadius = 350;
+        const categories = publishedKnowledge?.categories || [];
+        categories.forEach((category, index) => {
+        const angle = (index / (categories.length || 1)) * 2 * Math.PI;
+        const categoryId = `cat-${category.categoria.replace(/[^a-zA-Z0-9-_]/g, '')}-${index}`;
+        newNodes.push({
+            id: categoryId,
+            type: 'custom',
+            position: {
+            x: centerX + categoryRadius * Math.cos(angle) - 128,
+            y: centerY + categoryRadius * Math.sin(angle) - 70,
+            },
+            data: {
+            label: category.categoria,
+            type: 'category',
+            icon: <Folder className="h-5 w-5" />,
+            subtext: `${category.itens.length} iten(s)`,
+            insights: getInsightsFor(category.categoria),
+            raw_data: category,
+            },
+        });
+        newEdges.push({ id: `e-ws-${categoryId}`, source: 'workspace', sourceHandle: Position.Bottom, target: categoryId, targetHandle: Position.Top, animated: false });
+        });
+
+        // 3. Playbook Nodes
+        const playbookRadius = 600;
+        const publishedPlaybooks = playbooks || [];
+        publishedPlaybooks.forEach((playbook, index) => {
+        const angle = (index / (publishedPlaybooks.length || 1)) * 2 * Math.PI;
+        const playbookNodeId = `play-${playbook.id}`;
+        newNodes.push({
+            id: playbookNodeId,
+            type: 'custom',
+            position: {
+            x: centerX + playbookRadius * Math.cos(angle) - 128,
+            y: centerY + playbookRadius * Math.sin(angle) - 70,
+            },
+            data: {
+            label: playbook.processo,
+            type: 'playbook',
+            icon: <BookOpen className="h-5 w-5" />,
+            subtext: `${playbook.passos.length} passo(s)`,
+            insights: getInsightsFor(playbook.processo),
+            raw_data: playbook,
+            },
+        });
+        newEdges.push({ id: `e-ws-${playbookNodeId}`, source: 'workspace', sourceHandle: Position.Bottom, target: playbookNodeId, targetHandle: Position.Top, animated: false });
+        });
+        
+        // --- Load saved layout ---
+        const layoutRef = doc(firestore, `workspaces/${workspaceId}/layouts`, 'map');
+        const layoutSnap = await getDoc(layoutRef);
+
+        if (layoutSnap.exists()) {
+            const layoutData = layoutSnap.data();
+            if (layoutData && Array.isArray(layoutData.nodePositions)) {
+                 const savedPositions = new Map(layoutData.nodePositions.map((p: any) => [p.id, { x: p.x, y: p.y }]));
+                newNodes.forEach(node => {
+                    if (savedPositions.has(node.id)) {
+                        node.position = savedPositions.get(node.id)!;
+                    }
+                });
+            }
         }
-      });
-      return counts;
+
+        setNodes(newNodes);
+        setEdges(newEdges);
     };
 
-    // 1. Central Workspace Node
-    newNodes.push({
-      id: 'workspace',
-      type: 'custom',
-      position: { x: centerX, y: centerY },
-      data: {
-        label: workspace.name,
-        type: 'workspace',
-        icon: <Network className="h-6 w-6" />,
-        raw_data: workspace,
-      },
-    });
-
-    // 2. Category Nodes
-    const categoryRadius = 350;
-    const categories = publishedKnowledge?.categories || [];
-    categories.forEach((category, index) => {
-      const angle = (index / (categories.length || 1)) * 2 * Math.PI;
-      const categoryId = `cat-${category.categoria.replace(/[^a-zA-Z0-9-_]/g, '')}-${index}`;
-      newNodes.push({
-        id: categoryId,
-        type: 'custom',
-        position: {
-          x: centerX + categoryRadius * Math.cos(angle) - 128,
-          y: centerY + categoryRadius * Math.sin(angle) - 70,
-        },
-        data: {
-          label: category.categoria,
-          type: 'category',
-          icon: <Folder className="h-5 w-5" />,
-          subtext: `${category.itens.length} iten(s)`,
-          insights: getInsightsFor(category.categoria),
-          raw_data: category,
-        },
-      });
-      newEdges.push({ id: `e-ws-${categoryId}`, source: 'workspace', target: categoryId, animated: true });
-    });
-
-    // 3. Playbook Nodes
-    const playbookRadius = 600;
-    const publishedPlaybooks = playbooks || [];
-    publishedPlaybooks.forEach((playbook, index) => {
-      const angle = (index / (publishedPlaybooks.length || 1)) * 2 * Math.PI;
-      const playbookNodeId = `play-${playbook.id}`;
-      newNodes.push({
-        id: playbookNodeId,
-        type: 'custom',
-        position: {
-          x: centerX + playbookRadius * Math.cos(angle) - 128,
-          y: centerY + playbookRadius * Math.sin(angle) - 70,
-        },
-        data: {
-          label: playbook.processo,
-          type: 'playbook',
-          icon: <BookOpen className="h-5 w-5" />,
-          subtext: `${playbook.passos.length} passo(s)`,
-          insights: getInsightsFor(playbook.processo),
-          raw_data: playbook,
-        },
-      });
-      newEdges.push({ id: `e-ws-${playbookNodeId}`, source: 'workspace', target: playbookNodeId });
-    });
-
-    setNodes(newNodes);
-    setEdges(newEdges);
-  }, [isLoading, workspace, publishedKnowledge, playbooks, insights]);
+    generateLayout();
+  }, [isLoading, workspace, publishedKnowledge, playbooks, insights, firestore, workspaceId]);
 
 
   const onNodesChange = useCallback((changes: NodeChange[]) => setNodes((nds) => applyNodeChanges(changes, nds)), []);
@@ -248,6 +268,36 @@ export default function OperationalMapPage() {
   const handleNodeClick = (_event: React.MouseEvent, node: Node<MapNodeData>) => {
     setSelectedNode(node);
   };
+  
+  const handleSaveLayout = async () => {
+    if (!firestore || !workspaceId || nodes.length === 0) return;
+    setIsSaving(true);
+    try {
+      const layoutData = {
+        nodePositions: nodes.map(node => ({
+          id: node.id,
+          x: node.position.x,
+          y: node.position.y,
+        })),
+      };
+      const layoutRef = doc(firestore, `workspaces/${workspaceId}/layouts`, 'map');
+      await setDoc(layoutRef, layoutData, { merge: true });
+
+      toast({
+        title: "Layout Salvo!",
+        description: "A posição dos seus nós foi salva com sucesso."
+      });
+    } catch (error) {
+      console.error("Error saving layout:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao salvar layout.",
+        description: (error as Error).message,
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
 
   if (isLoading) {
@@ -260,6 +310,12 @@ export default function OperationalMapPage() {
 
   return (
     <div className="w-full h-full relative">
+       <div className="absolute top-6 left-6 z-10">
+            <Button onClick={handleSaveLayout} disabled={isSaving || nodes.length === 0}>
+                {isSaving ? <Loader2 className="mr-2 animate-spin" /> : <Save className="mr-2" />}
+                Salvar Layout
+            </Button>
+       </div>
        <Button asChild variant="outline" className="absolute top-6 right-6 z-10 h-12 w-12 rounded-full p-0 bg-background/80 hover:bg-background">
             <Link href={`/dashboard/${workspaceId}`}>
               <X className="h-6 w-6" />

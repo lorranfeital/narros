@@ -132,6 +132,12 @@ service cloud.firestore {
         // Version records are immutable after creation.
         allow update, delete: if false;
       }
+      
+      // --- Layouts Subcollection ---
+      match /layouts/{layoutId} {
+        // Members can read and write their own layouts.
+        allow read, write: if isWorkspaceMember(workspaceId);
+      }
 
       // --- Assistant Threads & Messages Subcollections ---
       match /assistant_threads/{threadId} {
