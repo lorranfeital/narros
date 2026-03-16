@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
@@ -25,6 +26,7 @@ import {
   ChevronRight,
   GitCommit,
   Folder,
+  X,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -158,7 +160,7 @@ export default function OperationalMapPage() {
     const categories = publishedKnowledge?.categories || [];
     categories.forEach((category, index) => {
       const angle = (index / categories.length) * 2 * Math.PI;
-      const categoryId = `cat-${index}`;
+      const categoryId = `cat-${category.categoria.replace(/[^a-zA-Z0-9]/g, '-')}`;
       newNodes.push({
         id: categoryId,
         type: 'custom',
@@ -175,7 +177,7 @@ export default function OperationalMapPage() {
           raw_data: category,
         },
       });
-      newEdges.push({ id: `e-ws-cat-${index}`, source: 'workspace', target: categoryId, animated: true });
+      newEdges.push({ id: `e-ws-${categoryId}`, source: 'workspace', target: categoryId, animated: true });
     });
 
     // 3. Playbook Nodes
@@ -217,26 +219,20 @@ export default function OperationalMapPage() {
 
   if (isLoading) {
     return (
-      <div className="p-12 space-y-6">
-        <Skeleton className="h-10 w-1/3" />
-        <Skeleton className="h-4 w-2/3" />
-        <Skeleton className="h-[60vh] w-full" />
-      </div>
+      <Skeleton className="h-screen w-screen" />
     );
   }
 
   const noContent = !publishedKnowledge && (!playbooks || playbooks.length === 0);
 
   return (
-    <div className="p-12 space-y-8 h-screen flex flex-col">
-      <div>
-        <h1 className="text-4xl font-bold tracking-tight">Mapa Operacional</h1>
-        <p className="text-muted-foreground mt-2">
-          Uma visualização de como os processos, categorias e playbooks da sua empresa se conectam.
-        </p>
-      </div>
-
-      <div className="flex-grow rounded-lg border bg-card overflow-hidden relative">
+    <div className="w-full h-full relative">
+       <Button asChild variant="outline" className="absolute top-6 right-6 z-10 h-12 w-12 rounded-full p-0 bg-background/80 hover:bg-background">
+            <Link href={`/dashboard/${workspaceId}`}>
+              <X className="h-6 w-6" />
+            </Link>
+        </Button>
+      
         {noContent ? (
              <div className="flex h-full items-center justify-center">
                  <Alert className="max-w-md">
@@ -262,8 +258,7 @@ export default function OperationalMapPage() {
               <Background />
             </ReactFlow>
         )}
-      </div>
-
+      
       <Sheet open={!!selectedNode} onOpenChange={(isOpen) => !isOpen && setSelectedNode(null)}>
         <SheetContent className="w-[400px] sm:w-[540px]">
           {selectedNode && (

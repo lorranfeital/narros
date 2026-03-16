@@ -56,6 +56,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const isNewWorkspacePage = pathname === '/dashboard/new-workspace';
   const hasWorkspaces = workspaces && workspaces.length > 0;
   const isOnDashboardRoot = pathname === '/dashboard';
+  const isMapPage = pathname?.includes('/map');
   
   // While loading user or workspaces, show a loader
   if (showLoading) {
@@ -105,6 +106,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     );
   }
   
+  if (isMapPage) {
+    return <div className="h-screen w-screen">{children}</div>;
+  }
+
   // Otherwise, show the full dashboard layout.
   return (
     <div className="flex h-screen bg-background">
