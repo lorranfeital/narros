@@ -31,7 +31,6 @@ import {
   X,
   Save,
   Loader2,
-  LayoutGrid,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -61,7 +60,6 @@ import {
   Insight,
   KnowledgeCategory,
 } from '@/lib/firestore-types';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 
 // Type definitions for our nodes
@@ -164,61 +162,15 @@ export default function OperationalMapPage() {
   const insightsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, `workspaces/${workspaceId}/insights`)) : null, [firestore, workspaceId]);
   const { data: insights, isLoading: isInsightsLoading } = useCollection<Insight>(insightsQuery);
 
-  const isLoading = isWorkspaceLoading || isKnowledgeLoading || isPlaybooksLoading || isInsightsLoading;
+  const allDataLoaded = !isWorkspaceLoading && !isKnowledgeLoading && !isPlaybooksLoading && !isInsightsLoading;
 
   // --- Layout and Node/Edge Generation ---
-  
-  const handleAutoLayout = () => {
-    const getDefaultLayoutPositions = (nodesToLayout: Node<MapNodeData>[]) => {
-      const positions = new Map<string, { x: number, y: number }>();
-      const centerX = 0;
-      const centerY = 0;
-  
-      const categoryNodes = nodesToLayout.filter(n => n.data.type === 'category');
-      const playbookNodes = nodesToLayout.filter(n => n.data.type === 'playbook');
-  
-      const categoryRadius = 350;
-      const playbookRadius = 600;
-  
-      positions.set('workspace', { x: centerX, y: centerY });
-  
-      categoryNodes.forEach((node, index) => {
-        const angle = (index / (categoryNodes.length || 1)) * 2 * Math.PI;
-        positions.set(node.id, {
-          x: centerX + categoryRadius * Math.cos(angle) - 128,
-          y: centerY + categoryRadius * Math.sin(angle) - 70,
-        });
-      });
-  
-      playbookNodes.forEach((node, index) => {
-        const angle = (index / (playbookNodes.length || 1)) * 2 * Math.PI;
-        positions.set(node.id, {
-          x: centerX + playbookRadius * Math.cos(angle) - 128,
-          y: centerY + playbookRadius * Math.sin(angle) - 70,
-        });
-      });
-  
-      return positions;
-    };
-    
-    setNodes(currentNodes => {
-      const defaultPositions = getDefaultLayoutPositions(currentNodes);
-      return currentNodes.map(node => ({
-        ...node,
-        position: defaultPositions.get(node.id) || node.position
-      }));
-    });
-    
-    toast({
-      title: "Layout Redefinido",
-      description: "O mapa foi reorganizado para a visualização hierárquica padrão."
-    });
-  };
-
   useEffect(() => {
-    if (isLoading || !workspace || !firestore) return;
+    // Wait until all data is loaded before doing anything
+    if (!allDataLoaded || !workspace || !firestore) return;
 
-    const generateLayout = async () => {
+    // This function will only run once all data is available.
+    const generateAndSetLayout = async () => {
       const newNodes: Node<MapNodeData>[] = [];
       const defaultEdges: Edge[] = [];
       const centerX = 0;
@@ -317,6 +269,15 @@ export default function OperationalMapPage() {
       
       if (layoutSnap.exists()) {
         const layoutData = layoutSnap.data();
+        
+        // Use saved edges if the 'edges' property exists as an array, otherwise use defaults.
+        // This respects a saved empty array.
+        if (layoutData.edges && Array.isArray(layoutData.edges)) {
+            setEdges(layoutData.edges);
+        } else {
+            setEdges(defaultEdges);
+        }
+
         // Load Node Positions
         if (Array.isArray(layoutData.nodePositions)) {
           const savedPositions = new Map(
@@ -329,12 +290,6 @@ export default function OperationalMapPage() {
             }
           });
         }
-        // Load Edges: if 'edges' property exists and is not empty, use it. Otherwise, use defaults.
-        if (layoutData.edges && Array.isArray(layoutData.edges) && layoutData.edges.length > 0) {
-            setEdges(layoutData.edges);
-        } else {
-            setEdges(defaultEdges);
-        }
       } else {
         setEdges(defaultEdges);
       }
@@ -342,8 +297,8 @@ export default function OperationalMapPage() {
       setNodes(newNodes);
     };
 
-    generateLayout();
-  }, [isLoading, workspace, publishedKnowledge, playbooks, insights, firestore, workspaceId]);
+    generateAndSetLayout();
+  }, [allDataLoaded, workspace, publishedKnowledge, playbooks, insights, firestore, workspaceId]);
 
 
   const onNodesChange = useCallback((changes: NodeChange[]) => setNodes((nds) => applyNodeChanges(changes, nds)), []);
@@ -405,7 +360,7 @@ export default function OperationalMapPage() {
   };
 
 
-  if (isLoading) {
+  if (!allDataLoaded) {
     return (
       <Skeleton className="h-screen w-screen" />
     );
@@ -420,21 +375,6 @@ export default function OperationalMapPage() {
                 {isSaving ? <Loader2 className="mr-2" /> : <Save className="mr-2" />}
                 Salvar Layout
             </Button>
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button variant="outline">
-                        <LayoutGrid className="mr-2 h-4 w-4" />
-                        Layout
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                    <DropdownMenuLabel>Estilo de Layout</DropdownMenuLabel>
-                    <DropdownMenuItem onSelect={handleAutoLayout}>
-                        Hierárquico (Redefinir)
-                    </DropdownMenuItem>
-                    <DropdownMenuItem disabled>Adaptativo (Em breve)</DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
        </div>
        <Button asChild variant="outline" className="absolute top-6 right-6 z-10 h-12 w-12 rounded-full p-0 bg-background/80 hover:bg-background">
             <Link href={`/dashboard/${workspaceId}`}>
