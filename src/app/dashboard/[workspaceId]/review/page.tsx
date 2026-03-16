@@ -11,7 +11,7 @@ import { Loader2, Sparkles, Trash2, Plus, GripVertical, AlertTriangle, Palette, 
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import React, { useEffect, useState } from 'react';
-import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { useForm, useFieldArray, Controller, useFormContext } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { DraftKnowledge, Playbook, TrainingModule, Insight, Workspace, BrandKit, Color, Typography as TypographyType, OrgChart, OrgChartNode } from '@/lib/firestore-types';
@@ -25,6 +25,8 @@ import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { refineText } from '@/lib/actions/ai-actions';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 // Schemas for form validation
 const knowledgeItemSchema = z.object({
@@ -369,6 +371,90 @@ export default function ReviewPage() {
 
 function CategoryItems({ control, categoryIndex }: { control: any, categoryIndex: number }) {
   const { fields, append, remove } = useFieldArray({ control, name: `categories.${categoryIndex}.itens` });
+  const { getValues, setValue } = useFormContext();
+  const { toast } = useToast();
+  const [refiningIndex, setRefiningIndex] = useState<number | null>(null);
 
-  return ( <div className="space-y-6 pt-4"> {fields.map((itemField, itemIndex) => ( <div key={itemField.id} className="space-y-2 rounded-md border p-4 bg-background/50 relative pr-12"> <FormLabel>Título</FormLabel> <Controller control={control} name={`categories.${categoryIndex}.itens.${itemIndex}.titulo`} render={({ field }) => <Input {...field} placeholder="Título do item" />} /> <FormLabel>Descrição (resumo para UI)</FormLabel> <Controller control={control} name={`categories.${categoryIndex}.itens.${itemIndex}.descricao`} render={({ field }) => <Textarea {...field} placeholder="Descrição curta e objetiva do item" />} /> <FormLabel>Detalhes (conteúdo para IA)</FormLabel> <Controller control={control} name={`categories.${categoryIndex}.itens.${itemIndex}.detalhes`} render={({ field }) => <Textarea {...field} placeholder="Conteúdo completo e estruturado para o assistente de IA..." className="min-h-[120px] font-mono text-xs" />} /> <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2" onClick={() => remove(itemIndex)}> <Trash2 className="h-4 w-4 text-destructive" /> </Button> </div> ))} <Button type="button" variant="outline" size="sm" className="mt-4" onClick={() => append({ titulo: '', descricao: '', detalhes: '' })}> <Plus className="mr-2 h-4 w-4" /> Adicionar Item </Button> </div> );
+  const handleRefine = async (
+    itemIndex: number,
+    refinementType: 'clarify' | 'simplify' | 'expand' | 'summarize'
+  ) => {
+    setRefiningIndex(itemIndex);
+    const fieldName = `categories.${categoryIndex}.itens.${itemIndex}.detalhes`;
+    const currentText = getValues(fieldName);
+
+    if (!currentText || currentText.trim().length < 10) {
+        toast({
+            variant: "destructive",
+            title: "Texto muito curto",
+            description: "Escreva um pouco mais antes de usar a IA para refinar.",
+        });
+        setRefiningIndex(null);
+        return;
+    }
+
+    try {
+        const result = await refineText({
+            textToRefine: currentText,
+            refinementType: refinementType,
+        });
+        setValue(fieldName, result.refinedText, { shouldDirty: true });
+        toast({
+            title: "Texto refinado!",
+            description: "O conteúdo foi atualizado pela IA.",
+        });
+    } catch (error) {
+        console.error("Error refining text:", error);
+        toast({
+            variant: "destructive",
+            title: "Erro ao refinar texto",
+            description: (error as Error).message,
+        });
+    } finally {
+        setRefiningIndex(null);
+    }
+  };
+
+
+  return (
+    <div className="space-y-6 pt-4">
+      {fields.map((itemField, itemIndex) => {
+        const isRefining = refiningIndex === itemIndex;
+        return (
+          <div key={itemField.id} className="space-y-2 rounded-md border p-4 bg-background/50 relative pr-12">
+            <FormLabel>Título</FormLabel>
+            <Controller control={control} name={`categories.${categoryIndex}.itens.${itemIndex}.titulo`} render={({ field }) => <Input {...field} placeholder="Título do item" />} />
+            <FormLabel>Descrição (resumo para UI)</FormLabel>
+            <Controller control={control} name={`categories.${categoryIndex}.itens.${itemIndex}.descricao`} render={({ field }) => <Textarea {...field} placeholder="Descrição curta e objetiva do item" />} />
+            
+            <div className="flex justify-between items-center pt-2">
+              <FormLabel>Detalhes (conteúdo para IA)</FormLabel>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 gap-2" disabled={isRefining}>
+                    {isRefining ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    Melhorar com IA
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => handleRefine(itemIndex, 'clarify')} disabled={isRefining}>Clarificar</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => handleRefine(itemIndex, 'simplify')} disabled={isRefining}>Simplificar</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => handleRefine(itemIndex, 'expand')} disabled={isRefining}>Expandir</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => handleRefine(itemIndex, 'summarize')} disabled={isRefining}>Resumir</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            <Controller control={control} name={`categories.${categoryIndex}.itens.${itemIndex}.detalhes`} render={({ field }) => <Textarea {...field} placeholder="Conteúdo completo e estruturado para o assistente de IA..." className="min-h-[120px] font-mono text-xs" />} />
+            <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2" onClick={() => remove(itemIndex)}>
+              <Trash2 className="h-4 w-4 text-destructive" />
+            </Button>
+          </div>
+        );
+      })}
+      <Button type="button" variant="outline" size="sm" className="mt-4" onClick={() => append({ titulo: '', descricao: '', detalhes: '' })}>
+        <Plus className="mr-2 h-4 w-4" /> Adicionar Item
+      </Button>
+    </div>
+  );
 }
