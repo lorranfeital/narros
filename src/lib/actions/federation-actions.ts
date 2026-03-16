@@ -1,7 +1,7 @@
 
 'use server';
 
-import { collection, getDocs, query, where, doc, getDoc, or, and } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, getDoc, or, and, Timestamp } from 'firebase/firestore';
 import { getApps, initializeApp, getApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { firebaseConfig } from '@/firebase/config';
@@ -11,6 +11,30 @@ function getAdminFirestore() {
   if (getApps().length === 0) { initializeApp(firebaseConfig); }
   return getFirestore(getApp());
 }
+
+// Helper to recursively convert Firestore Timestamps to serializable ISO strings
+function serializeData(data: any): any {
+  if (data === null || data === undefined || typeof data !== 'object') {
+    return data;
+  }
+  
+  if (data instanceof Timestamp) {
+    return data.toDate().toISOString();
+  }
+
+  if (Array.isArray(data)) {
+    return data.map(item => serializeData(item));
+  }
+
+  const result: { [key: string]: any } = {};
+  for (const key in data) {
+    if (Object.prototype.hasOwnProperty.call(data, key)) {
+      result[key] = serializeData(data[key]);
+    }
+  }
+  return result;
+}
+
 
 export interface FederatedMapData {
     workspace: Workspace & { id: string };
@@ -41,7 +65,7 @@ export async function getFederatedMapData(
   });
 
   const allWorkspaceIds = [currentWorkspaceId, ...connectedIds];
-  const federatedData: { [workspaceId: string]: FederatedMapData } = {};
+  const federatedData: { [workspaceId: string]: any } = {};
 
   // 2. Fetch data for each workspace
   await Promise.all(
@@ -57,11 +81,12 @@ export async function getFederatedMapData(
         ]);
 
         if (wsSnap.exists()) {
-            federatedData[id] = {
+            const dataToSerialize: FederatedMapData = {
                 workspace: { ...(wsSnap.data() as Workspace), id: wsSnap.id },
                 knowledge: knowledgeSnap.exists() ? (knowledgeSnap.data() as PublishedKnowledge) : null,
                 playbooks: playbooksSnap.docs.map(d => ({ ...(d.data() as Playbook), id: d.id }))
             };
+            federatedData[id] = serializeData(dataToSerialize);
         }
     })
   );
