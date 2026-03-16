@@ -53,10 +53,10 @@ service cloud.firestore {
     match /workspaceLinks/{linkId} {
         // Allow read if user is a member of either the source or target workspace
         allow read: if isWorkspaceMember(resource.data.sourceWorkspaceId) || isWorkspaceMember(resource.data.targetWorkspaceId);
-        // Allow list for any signed-in user. Client must filter for relevance.
-        allow list: if isSignedIn();
-        // Allow create if the user is a member of the source workspace
-        allow create: if isWorkspaceMember(request.resource.data.sourceWorkspaceId);
+        // Allow list for any signed-in user or server processes
+        allow list: if isSignedIn() || isServerProcess();
+        // Allow create if the user is a member of the source workspace or it's a server process
+        allow create: if isWorkspaceMember(request.resource.data.sourceWorkspaceId) || isServerProcess();
         // Allow update (approve/reject) if user is a member of the target workspace
         allow update: if isWorkspaceMember(resource.data.targetWorkspaceId);
         // Allow delete (cancel request) if user is a member of the source workspace
