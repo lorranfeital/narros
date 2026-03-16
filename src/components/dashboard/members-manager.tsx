@@ -3,8 +3,8 @@
 
 import React, { useState, useTransition, useMemo, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { useFirestore, useUser, useDoc, useCollection, useMemoFirebase } from '@/firebase';
-import { doc, collection, query, where } from 'firebase/firestore';
+import { useFirestore, useUser, useDoc } from '@/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import { User, Workspace, WorkspaceRole } from '@/lib/firestore-types';
 
 import {
@@ -110,19 +110,44 @@ export function MembersManager() {
     const [inviteRole, setInviteRole] = useState<WorkspaceRole>('member');
     const [isSubmitting, startTransition] = useTransition();
 
-    const workspaceDocRef = useMemoFirebase(() => {
+    const workspaceDocRef = useMemo(() => {
         if (!firestore || !workspaceId) return null;
         return doc(firestore, 'workspaces', workspaceId);
     }, [firestore, workspaceId]);
     const { data: workspace, isLoading: isWorkspaceLoading } = useDoc<Workspace>(workspaceDocRef);
 
+    const [members, setMembers] = useState<User[]>([]);
+    const [areMembersLoading, setAreMembersLoading] = useState(true);
     const memberIds = useMemo(() => workspace?.members || [], [workspace]);
 
-    const membersQuery = useMemoFirebase(() => {
-        if (!firestore || memberIds.length === 0) return null;
-        return query(collection(firestore, 'users'), where('id', 'in', memberIds));
-    }, [firestore, memberIds]);
-    const { data: members, isLoading: areMembersLoading } = useCollection<User>(membersQuery);
+    useEffect(() => {
+        if (!firestore) return;
+
+        if (memberIds.length === 0) {
+            setMembers([]);
+            setAreMembersLoading(false);
+            return;
+        }
+
+        const fetchMembers = async () => {
+            setAreMembersLoading(true);
+            try {
+                const userPromises = memberIds.map(uid => getDoc(doc(firestore, 'users', uid)));
+                const userSnaps = await Promise.all(userPromises);
+                const fetchedUsers = userSnaps
+                    .filter(snap => snap.exists())
+                    .map(snap => ({ ...snap.data(), id: snap.id } as User));
+                setMembers(fetchedUsers);
+            } catch (error: any) {
+                console.error("Failed to fetch members:", error);
+                toast({ variant: 'destructive', title: "Erro ao buscar membros", description: "Você pode não ter permissão para ver todos os membros." });
+            } finally {
+                setAreMembersLoading(false);
+            }
+        };
+
+        fetchMembers();
+    }, [firestore, memberIds, toast]);
     
     const handleInviteUser = () => {
         if (!currentUser) return;
