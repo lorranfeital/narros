@@ -24,6 +24,7 @@ import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Label } from '@/components/ui/label';
 import { BrandKit } from '@/lib/firestore-types';
+import { ConnectionsManager } from '@/components/dashboard/connections-manager';
 
 const profileFormSchema = z.object({
   name: z.string().min(2, { message: 'O nome deve ter pelo menos 2 caracteres.' }),
@@ -465,46 +466,7 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
         <TabsContent value="connections">
-            <Card>
-                <CardHeader>
-                  <CardTitle>Conexões</CardTitle>
-                  <CardDescription>
-                    Gerencie conexões com outros workspaces para compartilhar conhecimento.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-8">
-                    <div>
-                      <h3 className="text-lg font-medium">Solicitar Nova Conexão</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Procure por um workspace para enviar uma solicitação de conexão.
-                      </p>
-                      <div className="mt-4 flex gap-2">
-                        <Input placeholder="Nome do workspace..." />
-                        <Button>Buscar</Button>
-                      </div>
-                    </div>
-
-                    <Separator />
-
-                    <div>
-                      <h3 className="text-lg font-medium">Conexões Ativas</h3>
-                      <div className="mt-4 rounded-lg border border-dashed border-muted-foreground/30 p-8 text-center">
-                        <p className="text-sm text-muted-foreground">Nenhuma conexão ativa ainda.</p>
-                      </div>
-                    </div>
-
-                      <Separator />
-
-                      <div>
-                          <h3 className="text-lg font-medium">Solicitações Pendentes</h3>
-                          <div className="mt-4 rounded-lg border border-dashed border-muted-foreground/30 p-8 text-center">
-                          <p className="text-sm text-muted-foreground">Nenhuma solicitação pendente.</p>
-                          </div>
-                      </div>
-                  </div>
-                </CardContent>
-            </Card>
+            <ConnectionsManager />
         </TabsContent>
       </Tabs>
     </div>
