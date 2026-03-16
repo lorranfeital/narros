@@ -150,7 +150,7 @@ function BrandKitEditor({ control }: { control: any }) {
                  <div className="space-y-2">
                     {toneFields.map((field, index) => (
                         <div key={field.id} className="flex items-center gap-2">
-                            <FormField control={control} name={`brandKit.toneOfVoice.${index}`} render={({ field }) => ( <FormItem className="flex-1"><FormControl><Input {...field} placeholder="Adjetivo ou frase..." /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={control} name={`brandKit.toneOfVoice.${index}`} render={({ field }) => ( <FormItem className="flex-1"><FormLabel className="sr-only">Tom de Voz {index + 1}</FormLabel><FormControl><Input {...field} placeholder="Adjetivo ou frase..." /></FormControl><FormMessage /></FormItem> )} />
                             <Button type="button" variant="ghost" size="icon" onClick={() => removeTone(index)}><Trash2 className="h-4 w-4" /></Button>
                         </div>
                     ))}
@@ -174,10 +174,10 @@ function OrgChartEditor({ control }: { control: any }) {
             </div>
             {fields.map((field, index) => (
                 <div key={field.id} className="grid grid-cols-[1fr_1fr_1fr_1fr_auto] items-start gap-2">
-                    <FormField control={control} name={`organizationalChart.nodes.${index}.id`} render={({ field }) => ( <FormItem><FormControl><Input {...field} disabled className="font-mono text-xs" /></FormControl><FormMessage /></FormItem> )} />
-                    <FormField control={control} name={`organizationalChart.nodes.${index}.name`} render={({ field }) => ( <FormItem><FormControl><Input {...field} placeholder="João Silva" /></FormControl><FormMessage /></FormItem> )} />
-                    <FormField control={control} name={`organizationalChart.nodes.${index}.title`} render={({ field }) => ( <FormItem><FormControl><Input {...field} placeholder="Diretor de Vendas" /></FormControl><FormMessage /></FormItem> )} />
-                    <FormField control={control} name={`organizationalChart.nodes.${index}.parentId`} render={({ field }) => ( <FormItem><FormControl><Input {...field} placeholder="ceo" className="font-mono text-xs" /></FormControl><FormMessage /></FormItem> )} />
+                    <FormField control={control} name={`organizationalChart.nodes.${index}.id`} render={({ field }) => ( <FormItem><FormLabel className="sr-only">ID do Nó</FormLabel><FormControl><Input {...field} disabled className="font-mono text-xs" /></FormControl><FormMessage /></FormItem> )} />
+                    <FormField control={control} name={`organizationalChart.nodes.${index}.name`} render={({ field }) => ( <FormItem><FormLabel className="sr-only">Nome (Pessoa/Departamento)</FormLabel><FormControl><Input {...field} placeholder="João Silva" /></FormControl><FormMessage /></FormItem> )} />
+                    <FormField control={control} name={`organizationalChart.nodes.${index}.title`} render={({ field }) => ( <FormItem><FormLabel className="sr-only">Cargo/Título</FormLabel><FormControl><Input {...field} placeholder="Diretor de Vendas" /></FormControl><FormMessage /></FormItem> )} />
+                    <FormField control={control} name={`organizationalChart.nodes.${index}.parentId`} render={({ field }) => ( <FormItem><FormLabel className="sr-only">ID do Pai</FormLabel><FormControl><Input {...field} placeholder="ceo" className="font-mono text-xs" /></FormControl><FormMessage /></FormItem> )} />
                     <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                 </div>
             ))}
@@ -239,7 +239,7 @@ function PlaybookSteps({ control, playbookIndex }: { control: any; playbookIndex
 function TrainingModuleTopics({ control, moduleIndex }: { control: any; moduleIndex: number }) {
   const { fields, append, remove } = useFieldArray({ control, name: `trainingModules.${moduleIndex}.topicos` });
 
-  return ( <div className="space-y-2 mt-2"> {fields.map((topicField, topicIndex) => ( <div key={topicField.id} className="flex items-center gap-2"> <FormField control={control} name={`trainingModules.${moduleIndex}.topicos.${topicIndex}`} render={({ field }) => ( <FormItem className="flex-1"> <FormControl> <Input {...field} placeholder="Descreva o tópico" /> </FormControl> <FormMessage /> </FormItem> )} /> <Button type="button" variant="ghost" size="icon" onClick={() => remove(topicIndex)}> <Trash2 className="h-4 w-4 text-muted-foreground" /> </Button> </div> ))} <Button type="button" variant="outline" size="sm" onClick={() => append('')}> <Plus className="mr-2 h-4 w-4" /> Adicionar Tópico </Button> </div> );
+  return ( <div className="space-y-2 mt-2"> {fields.map((topicField, topicIndex) => ( <div key={topicField.id} className="flex items-center gap-2"> <FormField control={control} name={`trainingModules.${moduleIndex}.topicos.${topicIndex}`} render={({ field }) => ( <FormItem className="flex-1"> <FormLabel className="sr-only">Tópico {topicIndex + 1}</FormLabel> <FormControl> <Input {...field} placeholder="Descreva o tópico" /> </FormControl> <FormMessage /> </FormItem> )} /> <Button type="button" variant="ghost" size="icon" onClick={() => remove(topicIndex)}> <Trash2 className="h-4 w-4 text-muted-foreground" /> </Button> </div> ))} <Button type="button" variant="outline" size="sm" onClick={() => append('')}> <Plus className="mr-2 h-4 w-4" /> Adicionar Tópico </Button> </div> );
 }
 
 function TrainingModuleEditor({ control }: { control: any }) {
@@ -459,31 +459,62 @@ function CategoryItems({ control, categoryIndex }: { control: any, categoryIndex
       {fields.map((itemField, itemIndex) => {
         const isRefining = refiningIndex === itemIndex;
         return (
-          <div key={itemField.id} className="space-y-2 rounded-md border p-4 bg-background/50 relative pr-12">
-            <FormLabel>Título</FormLabel>
-            <Controller control={control} name={`categories.${categoryIndex}.itens.${itemIndex}.titulo`} render={({ field }) => <Input {...field} placeholder="Título do item" />} />
-            <FormLabel>Descrição (resumo para UI)</FormLabel>
-            <Controller control={control} name={`categories.${categoryIndex}.itens.${itemIndex}.descricao`} render={({ field }) => <Textarea {...field} placeholder="Descrição curta e objetiva do item" />} />
-            
-            <div className="flex justify-between items-center pt-2">
-              <FormLabel>Detalhes (conteúdo para IA)</FormLabel>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 gap-2" disabled={isRefining}>
-                    {isRefining ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                    Melhorar com IA
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={() => handleRefine(itemIndex, 'clarify')} disabled={isRefining}>Clarificar</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => handleRefine(itemIndex, 'simplify')} disabled={isRefining}>Simplificar</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => handleRefine(itemIndex, 'expand')} disabled={isRefining}>Expandir</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => handleRefine(itemIndex, 'summarize')} disabled={isRefining}>Resumir</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            <Controller control={control} name={`categories.${categoryIndex}.itens.${itemIndex}.detalhes`} render={({ field }) => <Textarea {...field} placeholder="Conteúdo completo e estruturado para o assistente de IA..." className="min-h-[120px] font-mono text-xs" />} />
+          <div key={itemField.id} className="space-y-4 rounded-md border p-4 bg-background/50 relative pr-12">
+            <FormField
+              control={control}
+              name={`categories.${categoryIndex}.itens.${itemIndex}.titulo`}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Título</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="Título do item" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+             <FormField
+              control={control}
+              name={`categories.${categoryIndex}.itens.${itemIndex}.descricao`}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Descrição (resumo para UI)</FormLabel>
+                  <FormControl>
+                    <Textarea {...field} placeholder="Descrição curta e objetiva do item" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+             <FormField
+              control={control}
+              name={`categories.${categoryIndex}.itens.${itemIndex}.detalhes`}
+              render={({ field }) => (
+                <FormItem>
+                    <div className="flex justify-between items-center">
+                        <FormLabel>Detalhes (conteúdo para IA)</FormLabel>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 gap-2" disabled={isRefining}>
+                                {isRefining ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                                Melhorar com IA
+                            </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                            <DropdownMenuItem onSelect={() => handleRefine(itemIndex, 'clarify')} disabled={isRefining}>Clarificar</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => handleRefine(itemIndex, 'simplify')} disabled={isRefining}>Simplificar</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => handleRefine(itemIndex, 'expand')} disabled={isRefining}>Expandir</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => handleRefine(itemIndex, 'summarize')} disabled={isRefining}>Resumir</DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                  <FormControl>
+                    <Textarea {...field} placeholder="Conteúdo completo e estruturado para o assistente de IA..." className="min-h-[120px] font-mono text-xs" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2" onClick={() => remove(itemIndex)}>
               <Trash2 className="h-4 w-4 text-destructive" />
             </Button>
