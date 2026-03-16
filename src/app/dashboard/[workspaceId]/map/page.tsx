@@ -371,7 +371,7 @@ export default function OperationalMapPage() {
       existingRelationsSnap.forEach(relationDoc => batch.delete(relationDoc.ref));
       edges.forEach(edge => {
           const newRelationRef = doc(relationsCollectionRef);
-          batch.set(newRelationRef, { fromNodeId: edge.source, toNodeId: edge.target, sourceHandle: edge.sourceHandle, targetHandle: edge.targetHandle, relationType: 'related_to', createdBy: user.uid, createdAt: serverTimestamp() });
+          batch.set(newRelationRef, { fromNodeId: edge.source, toNodeId: edge.target, sourceHandle: edge.sourceHandle || null, targetHandle: edge.targetHandle || null, relationType: 'related_to', createdBy: user.uid, createdAt: serverTimestamp() });
       });
       
       await batch.commit();
