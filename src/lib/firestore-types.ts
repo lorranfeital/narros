@@ -72,6 +72,14 @@ export type WorkspaceRole = 'admin' | 'curator' | 'member';
 // Main Document Interfaces
 // ---------
 
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  plan?: string;
+  createdAt?: Timestamp;
+}
+
 export interface Workspace {
   id: string;
   name: string;

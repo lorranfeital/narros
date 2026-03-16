@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useUser, useFirestore, useMemoFirebase, useStorage } from '@/firebase';
@@ -23,6 +24,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Label } from '@/components/ui/label';
 import { BrandKit } from '@/lib/firestore-types';
 import { ConnectionsManager } from '@/components/dashboard/connections-manager';
+import { MembersManager } from '@/components/dashboard/members-manager';
 
 const sectorEnum = z.enum([
   'Agricultura',
@@ -201,12 +203,13 @@ export default function SettingsPage() {
   return (
     <div className="p-12">
       <h1 className="text-4xl font-bold tracking-tight">Configurações do Workspace</h1>
-      <p className="text-muted-foreground mt-2">Gerencie as configurações deste workspace e suas conexões.</p>
+      <p className="text-muted-foreground mt-2">Gerencie as configurações deste workspace, membros e suas conexões.</p>
 
       <Tabs defaultValue="workspace" className="mt-10 max-w-2xl">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="workspace">Workspace</TabsTrigger>
             <TabsTrigger value="connections">Conexões</TabsTrigger>
+            <TabsTrigger value="members">Membros</TabsTrigger>
         </TabsList>
         <TabsContent value="workspace">
           <Card>
@@ -366,6 +369,9 @@ export default function SettingsPage() {
         </TabsContent>
         <TabsContent value="connections">
             <ConnectionsManager />
+        </TabsContent>
+         <TabsContent value="members">
+            <MembersManager />
         </TabsContent>
       </Tabs>
     </div>
