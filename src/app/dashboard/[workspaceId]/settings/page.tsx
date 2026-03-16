@@ -24,6 +24,7 @@ import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Label } from '@/components/ui/label';
 import { BrandKit } from '@/lib/firestore-types';
+import { ConnectionsPlaceholder } from '@/components/dashboard/connections-placeholder';
 
 const profileFormSchema = z.object({
   name: z.string().min(2, { message: 'O nome deve ter pelo menos 2 caracteres.' }),
@@ -250,9 +251,10 @@ export default function SettingsPage() {
       <p className="text-muted-foreground mt-2">Gerencie as configurações da sua conta e de seus workspaces.</p>
 
       <Tabs defaultValue="profile" className="mt-10 max-w-2xl">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="profile">Perfil</TabsTrigger>
             <TabsTrigger value="workspace">Workspace</TabsTrigger>
+            <TabsTrigger value="connections">Conexões</TabsTrigger>
         </TabsList>
         <TabsContent value="profile">
           <Card>
@@ -462,6 +464,19 @@ export default function SettingsPage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+        <TabsContent value="connections">
+            <Card>
+                <CardHeader>
+                  <CardTitle>Conexões</CardTitle>
+                  <CardDescription>
+                    Gerencie conexões com outros workspaces para compartilhar conhecimento.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ConnectionsPlaceholder />
+                </CardContent>
+            </Card>
         </TabsContent>
       </Tabs>
     </div>
