@@ -242,6 +242,19 @@ export async function processContentBatch(
         workspaceId: workspaceId,
       }, { merge: true });
     }
+
+    // Handle Org Chart (create a draft)
+    if (aiResult.organizationalChart && aiResult.organizationalChart.nodes.length > 0) {
+        const orgChartDraftRef = doc(db, `workspaces/${workspaceId}/org_charts`, 'draft');
+        finalBatch.set(orgChartDraftRef, {
+            ...aiResult.organizationalChart,
+            sourceRefs: sourceIds,
+            sourceBatchId: batchId,
+            status: 'draft',
+            workspaceId: workspaceId,
+            createdAt: timestamp,
+        }, { merge: true });
+    }
     
     if (!publishedKnowledgeSnap.exists()) {
       // --- INITIAL DRAFT FLOW ---
@@ -352,6 +365,9 @@ export async function publishDraft(
   const brandKitDraftRef = doc(db, `workspaces/${workspaceId}/brand_kit`, 'draft');
   const brandKitDraftSnap = await getDoc(brandKitDraftRef);
 
+  const orgChartDraftRef = doc(db, `workspaces/${workspaceId}/org_charts`, 'draft');
+  const orgChartDraftSnap = await getDoc(orgChartDraftRef);
+
   // 1a. Handle Brand Kit publishing
   if (brandKitDraftSnap.exists() && brandKitDraftSnap.data().sourceBatchId === draftData.sourceBatchId) {
       const brandKitLiveData = { ...brandKitDraftSnap.data() };
@@ -367,6 +383,23 @@ export async function publishDraft(
       }, { merge: true });
 
       batch.delete(brandKitDraftRef);
+  }
+
+  // 1b. Handle Org Chart publishing
+  if (orgChartDraftSnap.exists() && orgChartDraftSnap.data().sourceBatchId === draftData.sourceBatchId) {
+    const orgChartLiveData = { ...orgChartDraftSnap.data() };
+    delete orgChartLiveData.status;
+    delete orgChartLiveData.sourceBatchId;
+
+    const orgChartLiveRef = doc(db, `workspaces/${workspaceId}/org_charts`, 'live');
+    batch.set(orgChartLiveRef, {
+        ...orgChartLiveData,
+        publishedAt: timestamp,
+        version: newVersion,
+        publishedBy: userId,
+        status: 'published',
+    }, { merge: true });
+    batch.delete(orgChartDraftRef);
   }
 
   // 1. Set/overwrite the single published knowledge document.
@@ -485,12 +518,26 @@ export async function publishSync(workspaceId: string, userId: string) {
     });
     
     // 4. Start a batch write
+    const orgChartDraftRef = doc(db, `workspaces/${workspaceId}/org_charts`, 'draft');
+    const orgChartDraftSnap = await getDoc(orgChartDraftRef);
+    const firstProposalSourceBatchId = proposalsSnap.docs[0]?.data().sourceBatchId;
+
     const batch = writeBatch(db);
     const timestamp = Timestamp.now();
     const workspaceRef = doc(db, 'workspaces', workspaceId);
     const workspaceSnap = await getDoc(workspaceRef);
     const currentVersion = workspaceSnap.data()?.version || 0;
     const newVersion = currentVersion + 1;
+
+    // Publish org chart if it came from the same batch
+    if (orgChartDraftSnap.exists() && orgChartDraftSnap.data().sourceBatchId === firstProposalSourceBatchId) {
+        const orgChartLiveData = { ...orgChartDraftSnap.data() };
+        delete orgChartLiveData.status;
+        delete orgChartLiveData.sourceBatchId;
+        const orgChartLiveRef = doc(db, `workspaces/${workspaceId}/org_charts`, 'live');
+        batch.set(orgChartLiveRef, { ...orgChartLiveData, status: 'published', publishedAt: timestamp, version: newVersion, publishedBy: userId }, { merge: true });
+        batch.delete(orgChartDraftRef);
+    }
     
     // 5. Update published knowledge
     batch.set(publishedRef, { ...publishedData, categories: newCategories, version: newVersion, publishedAt: timestamp, publishedBy: userId });

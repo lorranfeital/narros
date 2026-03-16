@@ -108,6 +108,14 @@ service cloud.firestore {
         // Server or workspace members can create/update/delete.
         allow create, update, delete: if isWorkspaceMember(workspaceId) || isServerProcess();
       }
+      
+      // --- Org Charts Subcollection ---
+      match /org_charts/{orgChartId} {
+        // Server creates/updates, members can read
+        allow create, update: if isServerProcess();
+        allow read, list: if isWorkspaceMember(workspaceId) || isServerProcess();
+        allow delete: if isWorkspaceMember(workspaceId);
+      }
 
       // --- Playbooks Subcollection ---
       match /playbooks/{playbookId} {

@@ -183,6 +183,27 @@ export interface BrandKit {
   version: number;
 }
 
+export interface OrgChartNode {
+  id: string;
+  name: string;
+  title?: string;
+  parentId?: string;
+}
+
+export interface OrgChart {
+  id: string;
+  workspaceId: string;
+  nodes: OrgChartNode[];
+  sourceRefs?: string[];
+  status: 'draft' | 'published';
+  createdAt: Timestamp;
+  version?: number;
+  publishedAt?: Timestamp;
+  publishedBy?: string;
+  sourceBatchId?: string;
+}
+
+
 export interface PlaybookStep {
     numero: number;
     titulo: string;

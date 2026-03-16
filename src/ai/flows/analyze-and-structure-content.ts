@@ -38,6 +38,18 @@ const BrandKitSchema = z.object({
     sourceRefs: z.array(z.string()).optional().describe("IDs dos documentos de origem."),
 }).describe("O Brand Kit estruturado contendo a identidade visual e verbal da marca.");
 
+const OrgChartNodeSchema = z.object({
+    id: z.string().describe("A unique identifier for this node in kebab-case (e.g., 'ceo', 'dept-sales'). This ID is used for parentId references."),
+    name: z.string().describe("Name of the person, role, or department (e.g., 'João Silva', 'Vendas')."),
+    title: z.string().optional().describe("Job title or functional role (e.g., 'CEO', 'Diretor de Vendas')."),
+    parentId: z.string().optional().describe("The 'id' of the parent node in the hierarchy. Root nodes have no parentId."),
+});
+
+const OrgChartSchema = z.object({
+    nodes: z.array(OrgChartNodeSchema).describe("A flat list of all nodes in the org chart. The hierarchy is defined by the parentId properties."),
+    sourceRefs: z.array(z.string()).optional().describe("IDs of the source documents."),
+}).describe("The organizational chart structure.");
+
 
 const AnalyzeAndStructureContentOutputSchema = z.object({
     knowledgeBase: z.array(
@@ -59,6 +71,7 @@ const AnalyzeAndStructureContentOutputSchema = z.object({
         })
     ).describe('The structured knowledge base.'),
     brandKit: BrandKitSchema.optional(),
+    organizationalChart: OrgChartSchema.optional().describe("An organizational chart if detected in the content."),
     playbooks: z.array(
         z.object({
             processo: z.string().describe('Name of the operational process'),
@@ -126,6 +139,7 @@ Estruture sua saída nos seguintes blocos:
 
 -   **knowledgeBase:** Organize o conhecimento GERAL e OPERACIONAL em categorias. Cada categoria deve ter um ícone emoji simples e relevante.
 -   **brandKit:** Extraia ou atualize as diretrizes de marca (cores, tipografia, tom de voz). Não extraia logos.
+-   **organizationalChart:** Se um organograma, estrutura de equipe ou hierarquia for descrito, extraia-o como uma lista de nós. Cada nó deve ter um 'id' único em kebab-case, 'name' (pessoa/departamento), 'title' (cargo), e um 'parentId' opcional para criar a hierarquia.
 -   **playbooks:** Extraia ou atualize processos passo a passo.
 -   **trainingModules:** Crie ou atualize módulos de treinamento práticos.
 -   **insights:** Identifique gaps, oportunidades ou riscos com base na análise.

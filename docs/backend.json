@@ -249,6 +249,50 @@
         }
       },
       "required": []
+    },
+    "OrgChart": {
+      "title": "Organizational Chart",
+      "type": "object",
+      "description": "Represents the organizational structure of the company.",
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/backend/entities/OrgChartNode"
+          }
+        },
+        "sourceRefs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["nodes"]
+    },
+    "OrgChartNode": {
+      "title": "Org Chart Node",
+      "type": "object",
+      "description": "A single node within the organizational chart, representing a role, department, or person.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "A unique identifier for this node (e.g., 'ceo', 'dept-sales')."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the person, role, or department (e.g., 'João Silva', 'Vendas')."
+        },
+        "title": {
+          "type": "string",
+          "description": "Job title or functional role (e.g., 'CEO', 'Diretor de Vendas')."
+        },
+        "parentId": {
+          "type": "string",
+          "description": "The 'id' of the parent node in the hierarchy. Root nodes have no parentId."
+        }
+      },
+      "required": ["id", "name"]
     }
   },
   "auth": {
@@ -283,6 +327,10 @@
       {
         "path": "/workspaces/{workspaceId}/brand_kit/{brandKitId}",
         "definition": { "schema": { "$ref": "#/backend/entities/BrandKit" } }
+      },
+      {
+        "path": "/workspaces/{workspaceId}/org_charts/{orgChartId}",
+        "definition": { "schema": { "$ref": "#/backend/entities/OrgChart" } }
       },
       {
         "path": "/workspaces/{workspaceId}/playbooks/{playbookId}",
