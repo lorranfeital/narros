@@ -73,21 +73,25 @@ const CustomNode = ({ data }: { data: MapNodeData }) => {
       <Handle
         type="both"
         position={Position.Left}
+        id="left"
         className="!bg-primary !w-3 !h-3 opacity-0 group-hover:opacity-100 transition-opacity"
       />
        <Handle
         type="both"
         position={Position.Top}
+        id="top"
         className="!bg-primary !w-3 !h-3 opacity-0 group-hover:opacity-100 transition-opacity"
       />
       <Handle
         type="both"
         position={Position.Right}
+        id="right"
         className="!bg-primary !w-3 !h-3 opacity-0 group-hover:opacity-100 transition-opacity"
       />
        <Handle
         type="both"
         position={Position.Bottom}
+        id="bottom"
         className="!bg-primary !w-3 !h-3 opacity-0 group-hover:opacity-100 transition-opacity"
       />
       
