@@ -390,7 +390,7 @@ export default function OperationalMapPage() {
          <Skeleton className="h-full w-full" />
          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-2 text-muted-foreground">
             <Loader2 className="animate-spin" />
-            Carregando mapa federado...
+            Carregando mapa operacional...
         </div>
       </div>
     );
