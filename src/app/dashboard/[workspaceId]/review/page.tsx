@@ -21,6 +21,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Separator } from '@/components/ui/separator';
 import { publishDraft } from '@/lib/actions/workspace-actions';
+import { Badge } from '@/components/ui/badge';
 
 const knowledgeItemSchema = z.object({
   titulo: z.string().min(1, 'Título é obrigatório'),
@@ -62,6 +63,20 @@ export default function ReviewPage() {
     
     const { data: drafts, isLoading: isDraftLoading } = useCollection<DraftKnowledge>(draftQuery);
     const draft = drafts?.[0];
+
+    // Fetch related draft entities
+    const playbooksQuery = useMemoFirebase(() => {
+        if (!firestore || !workspaceId || !draft?.sourceBatchId) return null;
+        return query(collection(firestore, `workspaces/${workspaceId}/playbooks`), where('sourceBatchId', '==', draft.sourceBatchId));
+    }, [firestore, workspaceId, draft?.sourceBatchId]);
+    const { data: playbooks, isLoading: isPlaybooksLoading } = useCollection<Playbook>(playbooksQuery);
+
+    const trainingModulesQuery = useMemoFirebase(() => {
+        if (!firestore || !workspaceId || !draft?.sourceBatchId) return null;
+        return query(collection(firestore, `workspaces/${workspaceId}/training_modules`), where('sourceBatchId', '==', draft.sourceBatchId));
+    }, [firestore, workspaceId, draft?.sourceBatchId]);
+    const { data: trainingModules, isLoading: isTrainingLoading } = useCollection<TrainingModule>(trainingModulesQuery);
+
 
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
@@ -109,7 +124,9 @@ export default function ReviewPage() {
         }
     };
 
-    if (isDraftLoading) {
+    const isLoading = isDraftLoading || isPlaybooksLoading || isTrainingLoading;
+
+    if (isLoading && !draft) {
         return (
             <div className="p-12 space-y-6">
                 <Skeleton className="h-10 w-1/3" />
@@ -125,7 +142,7 @@ export default function ReviewPage() {
         );
     }
     
-    if (!draft) {
+    if (!draft && !isDraftLoading) {
         return (
             <div className="p-12">
                 <Alert>
@@ -156,9 +173,9 @@ export default function ReviewPage() {
                             <CardDescription>Edite as categorias e itens gerados.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <Accordion type="multiple" defaultValue={draft.categories.map(c => c.categoria)} className="w-full">
+                            <Accordion type="multiple" defaultValue={draft?.categories.map(c => c.categoria)} className="w-full">
                                 {fields.map((categoryField, categoryIndex) => (
-                                    <AccordionItem key={categoryField.id} value={categoryField.categoria}>
+                                    <AccordionItem key={categoryField.id} value={form.getValues(`categories.${categoryIndex}.categoria`)}>
                                         <AccordionTrigger className="text-lg font-semibold hover:no-underline">
                                             <div className="flex items-center gap-4 flex-1">
                                                  <Controller
@@ -185,7 +202,63 @@ export default function ReviewPage() {
                         </CardContent>
                     </Card>
                     
-                    {/* TODO: Implement editing for Playbooks, Training, and Insights */}
+                    {/* Playbooks Section */}
+                    {(isPlaybooksLoading || (playbooks && playbooks.length > 0)) && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Playbooks Propostos</CardTitle>
+                                <CardDescription>Estes são os processos passo a passo identificados pela IA. Eles serão criados ao publicar.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
+                                {isPlaybooksLoading ? <Skeleton className="h-24 w-full" /> : (
+                                    playbooks?.map(playbook => (
+                                    <div key={playbook.id} className="border-b pb-6 last:border-b-0">
+                                        <h3 className="text-xl font-headline font-semibold">{playbook.processo}</h3>
+                                        <div className="mt-4 space-y-4">
+                                            {playbook.passos.map(step => (
+                                                <div key={step.numero} className="flex gap-4">
+                                                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold">{step.numero}</div>
+                                                    <div>
+                                                        <h5 className="font-semibold">{step.titulo}</h5>
+                                                        <p className="text-muted-foreground text-sm">{step.descricao}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* Training Modules Section */}
+                    {(isTrainingLoading || (trainingModules && trainingModules.length > 0)) && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Módulos de Treinamento Sugeridos</CardTitle>
+                                <CardDescription>Estes são os treinamentos que a IA sugere criar com base no conteúdo. Eles serão criados ao publicar.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
+                                {isTrainingLoading ? <Skeleton className="h-24 w-full" /> : (
+                                    trainingModules?.map(module => (
+                                    <div key={module.id} className="border p-4 rounded-lg">
+                                        <h3 className="text-xl font-headline font-semibold">Módulo {module.modulo}: {module.titulo}</h3>
+                                        <p className="text-muted-foreground mt-2"><span className="font-semibold">Objetivo:</span> {module.objetivo}</p>
+                                        <div className="mt-4 flex gap-4 text-sm">
+                                            <Badge variant="secondary">Duração: {module.duracao}</Badge>
+                                            <Badge variant="secondary">Formato: {module.formato}</Badge>
+                                        </div>
+                                        <h5 className="font-semibold mt-4 mb-2">Tópicos abordados:</h5>
+                                        <ul className="list-disc list-inside text-muted-foreground text-sm space-y-1">
+                                            {module.topicos.map(topic => <li key={topic}>{topic}</li>)}
+                                        </ul>
+                                    </div>
+                                ))
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
                     
                     <div className="flex justify-end gap-4">
                         <Button type="submit" variant="secondary" disabled={form.formState.isSubmitting}>
@@ -243,3 +316,5 @@ function CategoryItems({ control, categoryIndex }: { control: any, categoryIndex
     </div>
   );
 }
+
+    
