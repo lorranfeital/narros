@@ -71,22 +71,22 @@ const CustomNode = ({ data }: { data: MapNodeData }) => {
   return (
     <div className="relative group transition-all duration-300">
       <Handle
-        type="target"
+        type="both"
         position={Position.Left}
         className="!bg-primary !w-3 !h-3 opacity-0 group-hover:opacity-100 transition-opacity"
       />
        <Handle
-        type="target"
+        type="both"
         position={Position.Top}
         className="!bg-primary !w-3 !h-3 opacity-0 group-hover:opacity-100 transition-opacity"
       />
       <Handle
-        type="source"
+        type="both"
         position={Position.Right}
         className="!bg-primary !w-3 !h-3 opacity-0 group-hover:opacity-100 transition-opacity"
       />
        <Handle
-        type="source"
+        type="both"
         position={Position.Bottom}
         className="!bg-primary !w-3 !h-3 opacity-0 group-hover:opacity-100 transition-opacity"
       />
