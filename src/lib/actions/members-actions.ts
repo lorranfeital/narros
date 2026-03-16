@@ -38,8 +38,7 @@ async function verifyAdmin(
   }
 
   const workspace = workspaceSnap.data() as Workspace;
-  const adminRole = workspace.roles?.[adminId];
-  const isAdmin = adminRole === 'admin';
+  const isAdmin = workspace.ownerId === adminId || workspace.roles?.[adminId] === 'admin';
 
   if (!isAdmin) {
     throw new Error('Ação não autorizada. Apenas administradores podem gerenciar membros.');

@@ -32,6 +32,7 @@ function UserRow({
     isCurrentUser,
     onRoleChange,
     onRemove,
+    isProcessing,
 }: {
     member: User;
     role: WorkspaceRole;
@@ -39,6 +40,7 @@ function UserRow({
     isCurrentUser: boolean;
     onRoleChange: (userId: string, newRole: WorkspaceRole) => void;
     onRemove: (userId: string) => void;
+    isProcessing: boolean;
 }) {
   return (
     <div className="flex items-center justify-between space-x-4 p-2 rounded-md hover:bg-muted/50">
@@ -60,7 +62,7 @@ function UserRow({
             <Select 
                 defaultValue={role} 
                 onValueChange={(newRole) => onRoleChange(member.id, newRole as WorkspaceRole)}
-                disabled={isCurrentUser}
+                disabled={isCurrentUser || isProcessing}
             >
                 <SelectTrigger className="w-[120px]">
                     <SelectValue />
@@ -74,7 +76,7 @@ function UserRow({
             
             <AlertDialog>
                 <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="icon" disabled={isCurrentUser}>
+                    <Button variant="ghost" size="icon" disabled={isCurrentUser || isProcessing}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                 </AlertDialogTrigger>
@@ -186,7 +188,7 @@ export function MembersManager() {
     }
 
     const isLoading = isUserLoading || isWorkspaceLoading || areMembersLoading;
-    const currentRole = currentUser && workspace ? workspace.roles?.[currentUser.uid] : undefined;
+    const currentRole = currentUser && workspace ? (workspace.ownerId === currentUser.uid ? 'admin' : workspace.roles?.[currentUser.uid]) : undefined;
     const isAdmin = currentRole === 'admin';
 
     return (
@@ -244,6 +246,7 @@ export function MembersManager() {
                                 isCurrentUser={currentUser?.uid === member.id}
                                 onRoleChange={handleRoleChange}
                                 onRemove={handleRemoveUser}
+                                isProcessing={isSubmitting}
                             />
                         ))}
                          {!isLoading && (!members || members.length === 0) && (
