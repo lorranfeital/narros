@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
 import { doc, collection, query, where, getDoc, setDoc } from 'firebase/firestore';
 import { useParams } from 'next/navigation';
@@ -81,30 +81,10 @@ type MapNodeData = {
 const CustomNode = ({ data }: { data: MapNodeData }) => {
   return (
     <div className="relative group transition-all duration-300">
-      <Handle
-        type="both"
-        position={Position.Left}
-        id="left"
-        className="!bg-primary !w-3 !h-3 opacity-0 group-hover:opacity-100 transition-opacity"
-      />
-       <Handle
-        type="both"
-        position={Position.Top}
-        id="top"
-        className="!bg-primary !w-3 !h-3 opacity-0 group-hover:opacity-100 transition-opacity"
-      />
-      <Handle
-        type="both"
-        position={Position.Right}
-        id="right"
-        className="!bg-primary !w-3 !h-3 opacity-0 group-hover:opacity-100 transition-opacity"
-      />
-       <Handle
-        type="both"
-        position={Position.Bottom}
-        id="bottom"
-        className="!bg-primary !w-3 !h-3 opacity-0 group-hover:opacity-100 transition-opacity"
-      />
+      <Handle type="both" position={Position.Left} id="left" className="!bg-primary !w-3 !h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+      <Handle type="both" position={Position.Top} id="top" className="!bg-primary !w-3 !h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+      <Handle type="both" position={Position.Right} id="right" className="!bg-primary !w-3 !h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+      <Handle type="both" position={Position.Bottom} id="bottom" className="!bg-primary !w-3 !h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
       
       <Card className="w-64 border-2 shadow-lg rounded-xl group-hover:border-primary/50 transition-colors">
         <CardHeader className="flex-row items-center gap-4 p-4">
@@ -143,6 +123,9 @@ export default function OperationalMapPage() {
   const [selectedNode, setSelectedNode] = useState<Node<MapNodeData> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [edgeToDelete, setEdgeToDelete] = useState<Edge | null>(null);
+  
+  // This ref will prevent the layout from being re-calculated on every render
+  const isLayoutInitialized = useRef(false);
 
   const firestore = useFirestore();
   const params = useParams();
@@ -166,10 +149,11 @@ export default function OperationalMapPage() {
 
   // --- Layout and Node/Edge Generation ---
   useEffect(() => {
-    // Wait until all data is loaded before doing anything
-    if (!allDataLoaded || !workspace || !firestore) return;
+    // Wait until all data is loaded and only run once.
+    if (!allDataLoaded || !workspace || !firestore || isLayoutInitialized.current) {
+        return;
+    }
 
-    // This function will only run once all data is available.
     const generateAndSetLayout = async () => {
       const newNodes: Node<MapNodeData>[] = [];
       const defaultEdges: Edge[] = [];
@@ -224,7 +208,7 @@ export default function OperationalMapPage() {
           },
         });
         defaultEdges.push({
-          id: `e-ws-${categoryId}`,
+          id: `e-ws-cat-${index}`,
           source: 'workspace',
           sourceHandle: 'bottom',
           target: categoryId,
@@ -236,7 +220,7 @@ export default function OperationalMapPage() {
       const playbookRadius = 600;
       const publishedPlaybooks = playbooks || [];
       publishedPlaybooks.forEach((playbook, index) => {
-        const angle = (index / (publishedPlaybooks.length || 1)) * 2 * Math.PI;
+        const angle = (index / (publishedPlaybooks.length || 1)) * 2 * Math.PI + Math.PI / 4; // Offset angle
         const playbookNodeId = `play-${playbook.id}`;
         newNodes.push({
           id: playbookNodeId,
@@ -255,7 +239,7 @@ export default function OperationalMapPage() {
           },
         });
         defaultEdges.push({
-          id: `e-ws-${playbookNodeId}`,
+          id: `e-ws-play-${index}`,
           source: 'workspace',
           sourceHandle: 'bottom',
           target: playbookNodeId,
@@ -267,34 +251,35 @@ export default function OperationalMapPage() {
       const layoutRef = doc(firestore, `workspaces/${workspaceId}/layouts`, 'map');
       const layoutSnap = await getDoc(layoutRef);
       
+      let finalNodes = newNodes;
+      let finalEdges = defaultEdges;
+
       if (layoutSnap.exists()) {
         const layoutData = layoutSnap.data();
         
-        // Use saved edges if the 'edges' property exists as an array, otherwise use defaults.
-        // This respects a saved empty array.
-        if (layoutData.edges && Array.isArray(layoutData.edges)) {
-            setEdges(layoutData.edges);
-        } else {
-            setEdges(defaultEdges);
+        // Apply saved edges if they exist (even an empty array is a valid saved state)
+        if (Array.isArray(layoutData.edges)) {
+            finalEdges = layoutData.edges;
         }
 
-        // Load Node Positions
+        // Apply saved Node Positions
         if (Array.isArray(layoutData.nodePositions)) {
           const savedPositions = new Map(
             layoutData.nodePositions.map((p: any) => [p.id, { x: p.x, y: p.y }])
           );
-          newNodes.forEach((node) => {
+          finalNodes = newNodes.map((node) => {
             const savedPosition = savedPositions.get(node.id);
             if (savedPosition) {
-                node.position = savedPosition;
+                return { ...node, position: savedPosition };
             }
+            return node;
           });
         }
-      } else {
-        setEdges(defaultEdges);
       }
 
-      setNodes(newNodes);
+      setNodes(finalNodes);
+      setEdges(finalEdges);
+      isLayoutInitialized.current = true; // Mark as done
     };
 
     generateAndSetLayout();
@@ -306,7 +291,7 @@ export default function OperationalMapPage() {
   
   const onConnect = useCallback(
     (connection: Connection) => setEdges((eds) => addEdge(connection, eds)),
-    [setEdges]
+    [] // Empty dependency array is correct here for setEdges from useState
   );
 
   const handleNodeClick = (_event: React.MouseEvent, node: Node<MapNodeData>) => {
@@ -338,7 +323,7 @@ export default function OperationalMapPage() {
           x: node.position.x,
           y: node.position.y,
         })),
-        edges: edges,
+        edges: edges, // Save the current edges from state
       };
       const layoutRef = doc(firestore, `workspaces/${workspaceId}/layouts`, 'map');
       await setDoc(layoutRef, layoutData, { merge: true });
@@ -359,10 +344,16 @@ export default function OperationalMapPage() {
     }
   };
 
-
+  // Show a loading skeleton while data is being fetched.
   if (!allDataLoaded) {
     return (
-      <Skeleton className="h-screen w-screen" />
+      <div className="h-screen w-screen relative">
+         <Skeleton className="h-full w-full" />
+         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-2 text-muted-foreground">
+            <Loader2 className="animate-spin" />
+            Carregando mapa operacional...
+        </div>
+      </div>
     );
   }
 
