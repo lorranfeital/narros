@@ -218,13 +218,14 @@ function PlaybookEditor({ control }: { control: any }) {
 
 function PlaybookSteps({ control, playbookIndex }: { control: any; playbookIndex: number }) {
   const { fields } = useFieldArray({ control, name: `playbooks.${playbookIndex}.passos` });
+  const { getValues } = useFormContext();
 
   return (
     <>
       {fields.map((stepField, stepIndex) => (
         <div key={stepField.id} className="flex gap-4 items-start">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold flex-shrink-0 mt-1">
-            {control.getValues(`playbooks.${playbookIndex}.passos.${stepIndex}.numero`)}
+            {getValues(`playbooks.${playbookIndex}.passos.${stepIndex}.numero`)}
           </div>
           <div className="flex-1 space-y-2">
             <FormField
@@ -294,6 +295,7 @@ function TrainingModuleTopics({ control, moduleIndex }: { control: any; moduleIn
 
 function TrainingModuleEditor({ control }: { control: any }) {
   const { fields, append, remove } = useFieldArray({ control, name: "trainingModules" });
+  const { getValues } = useFormContext();
 
   return (
     <div className="space-y-6">
@@ -301,7 +303,7 @@ function TrainingModuleEditor({ control }: { control: any }) {
         <div key={moduleField.id} className="border p-4 rounded-lg bg-card/50">
           <div className="flex justify-between items-start mb-4">
             <h3 className="text-xl font-headline font-semibold">
-              Módulo {control.getValues(`trainingModules.${moduleIndex}.modulo`)}
+              Módulo {getValues(`trainingModules.${moduleIndex}.modulo`)}
             </h3>
             <Button type="button" variant="ghost" size="icon" onClick={() => remove(moduleIndex)}>
               <Trash2 className="h-4 w-4 text-destructive" />
@@ -681,4 +683,3 @@ function CategoryItems({ control, categoryIndex }: { control: any, categoryIndex
     </div>
   );
 }
-
