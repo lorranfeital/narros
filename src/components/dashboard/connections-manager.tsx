@@ -12,10 +12,12 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { searchWorkspaces, SearchableWorkspace, requestWorkspaceConnection } from '@/lib/actions/connections-actions';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { searchWorkspaces, SearchableWorkspace, requestWorkspaceConnection, updateWorkspaceLinkStatus, deleteWorkspaceLink } from '@/lib/actions/connections-actions';
 import { useParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Check, Clock } from 'lucide-react';
+import { Loader2, Check, X, Hourglass, CheckCircle, Trash2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, where, or } from 'firebase/firestore';
@@ -37,6 +39,8 @@ export function ConnectionsManager() {
     const [searchResults, setSearchResults] = useState<SearchResultWithStatus[]>([]);
     const [isSearching, startSearchTransition] = useTransition();
     const [requestingId, setRequestingId] = useState<string | null>(null);
+    const [actionId, setActionId] = useState<string | null>(null);
+    const [isActionPending, startActionTransition] = useTransition();
 
     // Fetch all existing connections related to the current workspace
     const connectionsQuery = useMemoFirebase(() => {
@@ -64,6 +68,30 @@ export function ConnectionsManager() {
             }
         });
         return map;
+    }, [connections, workspaceId]);
+    
+    const { activeConnections, incomingRequests, outgoingRequests } = useMemo(() => {
+        const active: WorkspaceLink[] = [];
+        const incoming: WorkspaceLink[] = [];
+        const outgoing: WorkspaceLink[] = [];
+
+        if (!connections) {
+            return { activeConnections: [], incomingRequests: [], outgoingRequests: [] };
+        }
+
+        connections.forEach(link => {
+            if (link.status === WorkspaceLinkStatus.ACTIVE) {
+                active.push(link);
+            } else if (link.status === WorkspaceLinkStatus.PENDING) {
+                if (link.targetWorkspaceId === workspaceId) {
+                    incoming.push(link);
+                } else {
+                    outgoing.push(link);
+                }
+            }
+        });
+
+        return { activeConnections: active, incomingRequests: incoming, outgoingRequests: outgoing };
     }, [connections, workspaceId]);
 
 
@@ -114,6 +142,38 @@ export function ConnectionsManager() {
             setRequestingId(null);
         }
     }
+    
+    const handleUpdateRequest = (linkId: string, status: WorkspaceLinkStatus.ACTIVE | WorkspaceLinkStatus.REJECTED) => {
+        if (!user) return;
+        setActionId(linkId);
+        startActionTransition(async () => {
+            try {
+                await updateWorkspaceLinkStatus(linkId, status, user.uid, workspaceId);
+                toast({ title: `Solicitação ${status === 'active' ? 'aceita' : 'recusada'}!` });
+            } catch (error) {
+                toast({ variant: 'destructive', title: "Erro ao processar solicitação", description: (error as Error).message });
+            } finally {
+                setActionId(null);
+            }
+        });
+    }
+
+    const handleDeleteRequest = (linkId: string) => {
+        if (!user) return;
+        setActionId(linkId);
+        startActionTransition(async () => {
+            try {
+                await deleteWorkspaceLink(linkId, user.uid, workspaceId);
+                toast({ title: 'Conexão removida.' });
+            } catch (error) {
+                toast({ variant: 'destructive', title: "Erro ao remover conexão", description: (error as Error).message });
+            } finally {
+                setActionId(null);
+            }
+        });
+    }
+
+    const isLoading = areConnectionsLoading || isSearching;
 
     return (
         <Card>
@@ -123,8 +183,7 @@ export function ConnectionsManager() {
                 Gerencie conexões com outros workspaces para compartilhar conhecimento.
                 </CardDescription>
             </CardHeader>
-            <CardContent>
-                <div className="space-y-8">
+            <CardContent className="space-y-8">
                 <div>
                     <h3 className="text-lg font-medium">Solicitar Nova Conexão</h3>
                     <p className="text-sm text-muted-foreground">
@@ -163,7 +222,7 @@ export function ConnectionsManager() {
                                         disabled={result.connectionStatus !== 'connect' || requestingId === result.id}
                                     >
                                         {requestingId === result.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        {result.connectionStatus === 'pending' && <><Clock className="mr-2 h-4 w-4" /> Pendente</>}
+                                        {result.connectionStatus === 'pending' && <><Hourglass className="mr-2 h-4 w-4" /> Pendente</>}
                                         {result.connectionStatus === 'connected' && <><Check className="mr-2 h-4 w-4" /> Conectado</>}
                                         {result.connectionStatus === 'connect' && 'Conectar'}
                                     </Button>
@@ -174,27 +233,101 @@ export function ConnectionsManager() {
                      {!isSearching && searchTerm && searchResults.length === 0 && (
                         <p className="mt-4 text-sm text-muted-foreground">Nenhum workspace encontrado.</p>
                      )}
-
-
                 </div>
 
                 <Separator />
 
                 <div>
-                    <h3 className="text-lg font-medium">Conexões Ativas</h3>
-                    <div className="mt-4 rounded-lg border border-dashed border-muted-foreground/30 p-8 text-center">
-                    <p className="text-sm text-muted-foreground">Nenhuma conexão ativa ainda.</p>
-                    </div>
+                    <h3 className="text-lg font-medium">Solicitações Recebidas</h3>
+                    {areConnectionsLoading ? <Skeleton className="h-20 w-full mt-4" /> : (
+                        incomingRequests.length > 0 ? (
+                            <div className="mt-4 space-y-2">
+                                {incomingRequests.map(link => (
+                                    <div key={link.id} className="flex items-center justify-between rounded-md border p-3">
+                                        <div className="flex items-center gap-3">
+                                            <Avatar className="h-8 w-8"><AvatarImage src={link.sourceWorkspaceLogoUrl} /><AvatarFallback>{link.sourceWorkspaceName.charAt(0)}</AvatarFallback></Avatar>
+                                            <p className="font-medium">{link.sourceWorkspaceName}</p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Button variant="outline" size="sm" onClick={() => handleUpdateRequest(link.id, WorkspaceLinkStatus.REJECTED)} disabled={isActionPending && actionId === link.id}>
+                                                {(isActionPending && actionId === link.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />} Recusar
+                                            </Button>
+                                            <Button size="sm" onClick={() => handleUpdateRequest(link.id, WorkspaceLinkStatus.ACTIVE)} disabled={isActionPending && actionId === link.id}>
+                                                 {(isActionPending && actionId === link.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Aceitar
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                             <div className="mt-4 rounded-lg border border-dashed border-muted-foreground/30 p-8 text-center">
+                                <p className="text-sm text-muted-foreground">Nenhuma solicitação recebida.</p>
+                            </div>
+                        )
+                    )}
                 </div>
 
-                    <Separator />
+                <Separator />
+                
+                <div>
+                    <h3 className="text-lg font-medium">Conexões Ativas</h3>
+                    {areConnectionsLoading ? <Skeleton className="h-20 w-full mt-4" /> : (
+                        activeConnections.length > 0 ? (
+                            <div className="mt-4 space-y-2">
+                                {activeConnections.map(link => {
+                                     const otherWs = link.sourceWorkspaceId === workspaceId ? { id: link.targetWorkspaceId, name: link.targetWorkspaceName, logoUrl: link.targetWorkspaceLogoUrl } : { id: link.sourceWorkspaceId, name: link.sourceWorkspaceName, logoUrl: link.sourceWorkspaceLogoUrl };
+                                    return (
+                                        <div key={link.id} className="flex items-center justify-between rounded-md border p-3">
+                                            <div className="flex items-center gap-3">
+                                                <Avatar className="h-8 w-8"><AvatarImage src={otherWs.logoUrl} /><AvatarFallback>{otherWs.name.charAt(0)}</AvatarFallback></Avatar>
+                                                <p className="font-medium">{otherWs.name}</p>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Badge variant="success" className="gap-1.5"><CheckCircle className="h-3 w-3" /> Conectado</Badge>
+                                                <Button variant="destructive" size="sm" onClick={() => handleDeleteRequest(link.id)} disabled={isActionPending && actionId === link.id}>
+                                                     {(isActionPending && actionId === link.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Desconectar
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        ) : (
+                            <div className="mt-4 rounded-lg border border-dashed border-muted-foreground/30 p-8 text-center">
+                                <p className="text-sm text-muted-foreground">Nenhuma conexão ativa.</p>
+                            </div>
+                        )
+                    )}
+                </div>
 
-                    <div>
-                        <h3 className="text-lg font-medium">Solicitações Pendentes</h3>
-                        <div className="mt-4 rounded-lg border border-dashed border-muted-foreground/30 p-8 text-center">
-                        <p className="text-sm text-muted-foreground">Nenhuma solicitação pendente.</p>
-                        </div>
-                    </div>
+                <Separator />
+
+                <div>
+                    <h3 className="text-lg font-medium">Solicitações Enviadas</h3>
+                     {areConnectionsLoading ? <Skeleton className="h-20 w-full mt-4" /> : (
+                        outgoingRequests.length > 0 ? (
+                            <div className="mt-4 space-y-2">
+                                {outgoingRequests.map(link => (
+                                     <div key={link.id} className="flex items-center justify-between rounded-md border p-3">
+                                        <div className="flex items-center gap-3">
+                                            <Avatar className="h-8 w-8"><AvatarImage src={link.targetWorkspaceLogoUrl} /><AvatarFallback>{link.targetWorkspaceName.charAt(0)}</AvatarFallback></Avatar>
+                                            <p className="font-medium">{link.targetWorkspaceName}</p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                             <Badge variant="secondary" className="gap-1.5"><Hourglass className="h-3 w-3" /> Pendente</Badge>
+                                             <Button variant="outline" size="sm" onClick={() => handleDeleteRequest(link.id)} disabled={isActionPending && actionId === link.id}>
+                                                {(isActionPending && actionId === link.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Cancelar
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="mt-4 rounded-lg border border-dashed border-muted-foreground/30 p-8 text-center">
+                                <p className="text-sm text-muted-foreground">Nenhuma solicitação enviada.</p>
+                            </div>
+                        )
+                     )}
                 </div>
             </CardContent>
         </Card>

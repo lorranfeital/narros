@@ -1,7 +1,7 @@
 
 'use server';
 
-import { collection, getDocs, query, where, limit, startAt, endAt, orderBy, serverTimestamp, addDoc, getDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, query, where, limit, startAt, endAt, orderBy, serverTimestamp, addDoc, getDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { getApps, initializeApp, getApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { firebaseConfig } from '@/firebase/config';
@@ -125,4 +125,70 @@ export async function requestWorkspaceConnection(payload: RequestConnectionPaylo
         console.error("Error creating workspace link:", error);
         throw new Error("Falha ao criar la solicitação de conexão no banco de dados.");
     }
+}
+
+
+export async function updateWorkspaceLinkStatus(
+    linkId: string,
+    status: WorkspaceLinkStatus.ACTIVE | WorkspaceLinkStatus.REJECTED,
+    userId: string,
+    currentWorkspaceId: string
+): Promise<void> {
+    const db = getAdminFirestore();
+    const linkRef = doc(db, 'workspaceLinks', linkId);
+    const linkSnap = await getDoc(linkRef);
+
+    if (!linkSnap.exists()) {
+        throw new Error("Solicitação de conexão não encontrada.");
+    }
+    const linkData = linkSnap.data() as WorkspaceLink;
+
+    // Security check: Only a member of the target workspace can approve/reject.
+    if (linkData.targetWorkspaceId !== currentWorkspaceId) {
+         throw new Error("Permissão negada. Ação permitida apenas para o workspace de destino.");
+    }
+    const workspaceRef = doc(db, 'workspaces', currentWorkspaceId);
+    const workspaceSnap = await getDoc(workspaceRef);
+    if (!workspaceSnap.exists() || !(workspaceSnap.data() as Workspace).members.includes(userId)) {
+        throw new Error("Permissão negada. Você não é membro do workspace de destino.");
+    }
+    
+    await updateDoc(linkRef, {
+        status: status,
+        updatedAt: serverTimestamp(),
+        updatedBy: userId
+    });
+}
+
+export async function deleteWorkspaceLink(
+    linkId: string,
+    userId: string,
+    currentWorkspaceId: string
+): Promise<void> {
+    const db = getAdminFirestore();
+    const linkRef = doc(db, 'workspaceLinks', linkId);
+    const linkSnap = await getDoc(linkRef);
+
+    if (!linkSnap.exists()) {
+        throw new Error("Conexão não encontrada.");
+    }
+    const linkData = linkSnap.data() as WorkspaceLink;
+
+    // Security check: only members of source or target can delete.
+    const isSourceMember = linkData.sourceWorkspaceId === currentWorkspaceId;
+    const isTargetMember = linkData.targetWorkspaceId === currentWorkspaceId;
+
+    if (!isSourceMember && !isTargetMember) {
+        throw new Error("Permissão negada. Você não pertence a nenhum dos workspaces da conexão.");
+    }
+    
+    const workspaceToCheck = isSourceMember ? linkData.sourceWorkspaceId : linkData.targetWorkspaceId;
+    const workspaceRef = doc(db, 'workspaces', workspaceToCheck);
+    const workspaceSnap = await getDoc(workspaceRef);
+
+    if (!workspaceSnap.exists() || !(workspaceSnap.data() as Workspace).members.includes(userId)) {
+        throw new Error("Permissão negada. Você não é membro do workspace.");
+    }
+
+    await deleteDoc(linkRef);
 }
