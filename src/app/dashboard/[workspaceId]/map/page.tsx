@@ -43,6 +43,17 @@ import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+
+import {
   Workspace,
   PublishedKnowledge,
   Playbook,
@@ -131,6 +142,7 @@ export default function OperationalMapPage() {
   const [edges, setEdges] = useState<Edge[]>([]);
   const [selectedNode, setSelectedNode] = useState<Node<MapNodeData> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [edgeToDelete, setEdgeToDelete] = useState<Edge | null>(null);
 
   const firestore = useFirestore();
   const params = useParams();
@@ -158,7 +170,7 @@ export default function OperationalMapPage() {
 
     const generateLayout = async () => {
       const newNodes: Node<MapNodeData>[] = [];
-      const newEdges: Edge[] = [];
+      const defaultEdges: Edge[] = [];
       const centerX = 0;
       const centerY = 0;
 
@@ -209,13 +221,12 @@ export default function OperationalMapPage() {
             raw_data: category,
           },
         });
-        newEdges.push({
+        defaultEdges.push({
           id: `e-ws-${categoryId}`,
           source: 'workspace',
           sourceHandle: 'bottom',
           target: categoryId,
           targetHandle: 'top',
-          animated: false,
         });
       });
 
@@ -241,21 +252,19 @@ export default function OperationalMapPage() {
             raw_data: playbook,
           },
         });
-        newEdges.push({
+        defaultEdges.push({
           id: `e-ws-${playbookNodeId}`,
           source: 'workspace',
           sourceHandle: 'bottom',
           target: playbookNodeId,
           targetHandle: 'top',
-          animated: false,
         });
       });
 
       // --- Load saved layout ---
       const layoutRef = doc(firestore, `workspaces/${workspaceId}/layouts`, 'map');
       const layoutSnap = await getDoc(layoutRef);
-      let finalEdges = newEdges;
-
+      
       if (layoutSnap.exists()) {
         const layoutData = layoutSnap.data();
         // Load Node Positions
@@ -269,14 +278,13 @@ export default function OperationalMapPage() {
             }
           });
         }
-        // Load Edges: if 'edges' property exists in the saved layout, use it.
-        if (Array.isArray(layoutData.edges)) {
-          finalEdges = layoutData.edges;
-        }
+        // Load Edges: if 'edges' property exists in the saved layout, use it. Otherwise, use defaults.
+        setEdges(Array.isArray(layoutData.edges) ? layoutData.edges : defaultEdges);
+      } else {
+        setEdges(defaultEdges);
       }
 
       setNodes(newNodes);
-      setEdges(finalEdges);
     };
 
     generateLayout();
@@ -295,6 +303,21 @@ export default function OperationalMapPage() {
     setSelectedNode(node);
   };
   
+  const handleEdgeClick = (_event: React.MouseEvent, edge: Edge) => {
+    setEdgeToDelete(edge);
+  };
+  
+  const confirmDeleteEdge = () => {
+    if (edgeToDelete) {
+      onEdgesChange([{ type: 'remove', id: edgeToDelete.id }]);
+      setEdgeToDelete(null);
+      toast({
+        title: "Conexão removida",
+        description: "Clique em 'Salvar Layout' para tornar a exclusão permanente."
+      });
+    }
+  };
+
   const handleSaveLayout = async () => {
     if (!firestore || !workspaceId || nodes.length === 0) return;
     setIsSaving(true);
@@ -367,6 +390,7 @@ export default function OperationalMapPage() {
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}
               onNodeClick={handleNodeClick}
+              onEdgeClick={handleEdgeClick}
               nodeTypes={nodeTypes}
               fitView
               className="bg-muted/30"
@@ -428,6 +452,22 @@ export default function OperationalMapPage() {
           )}
         </SheetContent>
       </Sheet>
+
+      <AlertDialog open={!!edgeToDelete} onOpenChange={(isOpen) => !isOpen && setEdgeToDelete(null)}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Remover conexão</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Tem certeza de que deseja remover esta conexão? A alteração será salva permanentemente quando você clicar em "Salvar Layout".
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setEdgeToDelete(null)}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={confirmDeleteEdge}>Remover</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
     </div>
   );
 }
+
