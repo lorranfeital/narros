@@ -74,8 +74,8 @@ service cloud.firestore {
       // Allow update for members or server processes.
       allow update: if isWorkspaceMember(workspaceId) || isServerProcess();
       allow delete: if isWorkspaceOwner(workspaceId);
-      // Allow queries by signed-in users. The client must filter by 'members' array.
-      allow list: if isSignedIn();
+      // Allow queries by signed-in users or server processes. Client must filter locally.
+      allow list: if isSignedIn() || isServerProcess();
 
       // --- Sources Subcollection ---
       match /sources/{sourceId} {
