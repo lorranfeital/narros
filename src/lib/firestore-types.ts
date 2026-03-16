@@ -72,6 +72,7 @@ export enum WorkspaceLinkStatus {
 export interface Workspace {
   id: string;
   name: string;
+  name_lowercase?: string;
   slug?: string;
   logoUrl?: string;
   type: 'empresa' | 'grupo' | 'franquia' | 'rede' | 'loja' | 'clínica' | 'escritório' | 'outro';

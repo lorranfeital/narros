@@ -78,6 +78,7 @@ export function CreateWorkspaceForm() {
     try {
       await addDoc(collection(firestore, 'workspaces'), {
         ...values,
+        name_lowercase: values.name.toLowerCase(),
         ownerId: user.uid,
         members: [user.uid],
         status: WorkspaceStatus.NEVER_PUBLISHED,

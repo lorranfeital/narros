@@ -150,7 +150,10 @@ export default function SettingsPage() {
   async function onWorkspaceSubmit(data: WorkspaceFormValues) {
     if (!firestore || !workspaceDocRef) return;
     try {
-      await updateDoc(workspaceDocRef, data);
+      await updateDoc(workspaceDocRef, {
+        ...data,
+        name_lowercase: data.name.toLowerCase(),
+      });
       toast({
         title: 'Workspace atualizado!',
         description: 'As informações do seu workspace foram salvas.',

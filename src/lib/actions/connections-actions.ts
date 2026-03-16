@@ -1,3 +1,4 @@
+
 'use server';
 
 import { collection, getDocs, query, where, limit, startAt, endAt, orderBy, serverTimestamp, addDoc, getDoc, doc, getFirestore } from 'firebase/firestore';
@@ -32,13 +33,14 @@ export async function searchWorkspaces(
   const db = getAdminFirestore();
   const workspacesRef = collection(db, 'workspaces');
   
-  // Firestore doesn't have a native "contains" or "like" query.
-  // This is a common workaround for prefix searching.
+  // Perform a case-insensitive prefix search.
+  const lowercasedSearchTerm = searchTerm.toLowerCase();
+  
   const q = query(
       workspacesRef,
-      orderBy('name'),
-      startAt(searchTerm),
-      endAt(searchTerm + '\uf8ff'),
+      orderBy('name_lowercase'),
+      startAt(lowercasedSearchTerm),
+      endAt(lowercasedSearchTerm + '\uf8ff'),
       limit(10)
   );
 
