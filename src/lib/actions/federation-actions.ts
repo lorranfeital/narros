@@ -1,6 +1,7 @@
+
 'use server';
 
-import { collection, getDocs, query, where, doc, getDoc, or } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, getDoc, or, and } from 'firebase/firestore';
 import { getApps, initializeApp, getApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { firebaseConfig } from '@/firebase/config';
@@ -25,10 +26,12 @@ export async function getFederatedMapData(
   // 1. Find all active connections
   const connectionsQuery = query(
     collection(db, 'workspaceLinks'),
-    where('status', '==', 'active'),
-    or(
-        where('sourceWorkspaceId', '==', currentWorkspaceId),
-        where('targetWorkspaceId', '==', currentWorkspaceId)
+    and(
+        where('status', '==', 'active'),
+        or(
+            where('sourceWorkspaceId', '==', currentWorkspaceId),
+            where('targetWorkspaceId', '==', currentWorkspaceId)
+        )
     )
   );
   const connectionsSnap = await getDocs(connectionsQuery);
