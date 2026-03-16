@@ -258,7 +258,7 @@ function QuickActions({ workspaceId, syncCount }: { workspaceId: string, syncCou
     ];
 
     return (
-        <div className="mt-8">
+        <div>
             <h3 className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Ações Rápidas</h3>
             <div className="rounded-lg border bg-card">
                 {actions.map((action, index) => (
@@ -282,47 +282,6 @@ function QuickActions({ workspaceId, syncCount }: { workspaceId: string, syncCou
         </div>
     )
 }
-
-function MostConsultedContent({ isLoading }: { isLoading: boolean }) {
-    const items = [
-        { title: 'Tabela de Tarifas', icon: FileText, href: '#' },
-        { title: 'Processo de cadastro de cliente', icon: BookOpen, href: '#' },
-        { title: 'Política de compliance', icon: FileText, href: '#' },
-    ];
-
-    return (
-        <div className="mt-8">
-            <h3 className="text-base font-semibold mb-4">Conteúdo mais usado</h3>
-            <div className="rounded-lg border bg-card">
-                 {isLoading ? (
-                    <div className="p-4 space-y-2">
-                        <Skeleton className="h-8 w-3/4" />
-                        <Skeleton className="h-8 w-1/2" />
-                        <Skeleton className="h-8 w-2/3" />
-                    </div>
-                ) : items.length > 0 ? (
-                    items.map((item, index) => (
-                        <Link key={item.title} href={item.href}>
-                            <div className={cn(
-                                "flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors",
-                                index < items.length - 1 && "border-b"
-                            )}>
-                                <item.icon className="h-5 w-5 text-muted-foreground" />
-                                <span className="font-medium">{item.title}</span>
-                                <ChevronRight className="h-5 w-5 text-muted-foreground ml-auto" />
-                            </div>
-                        </Link>
-                    ))
-                ) : (
-                    <div className="p-8 text-center">
-                        <p className="text-sm text-muted-foreground">Ainda não há dados de conteúdo mais consultado.</p>
-                    </div>
-                )}
-            </div>
-        </div>
-    )
-}
-
 
 function AIInsights({ insights, isLoading }: { insights: Insight[] | null, isLoading: boolean }) {
     const getInsightAppearance = (type: InsightType) => {
@@ -380,7 +339,7 @@ function RecentActivity({ versions, isLoading }: { versions: Version[] | null, i
     };
 
     return (
-        <div className="mt-8">
+        <div>
             <h3 className="text-xs uppercase tracking-widest text-muted-foreground mb-4">Atividade recente</h3>
              {isLoading && <Skeleton className="h-6 w-1/2" />}
              {!isLoading && versions && versions.length > 0 ? (
@@ -531,18 +490,16 @@ export default function WorkspaceDashboardPage() {
                 </Alert>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-8 items-start">
-                 <div className="md:col-span-3 space-y-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                 <div className="space-y-8">
                     <KnowledgeStats data={knowledgeStats} isLoading={isLoading} />
                     <QuickActions workspaceId={workspaceId} syncCount={syncProposals?.length ?? 0} />
-                    <MostConsultedContent isLoading={isLoading} />
                  </div>
-                 <div className="md:col-span-2">
+                 <div className="space-y-8">
                     <AIInsights insights={insights} isLoading={isLoading} />
+                    <RecentActivity versions={versions} isLoading={isVersionsLoading} />
                  </div>
             </div>
-            
-            <RecentActivity versions={versions} isLoading={isVersionsLoading} />
         </div>
     );
 }
