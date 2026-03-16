@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useFirestore, useMemoFirebase, useCollection, useUser } from '@/firebase';
@@ -206,5 +205,3 @@ export default function SyncPage() {
         </div>
     );
 }
-
-    
