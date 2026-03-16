@@ -109,6 +109,21 @@ export interface WorkspaceLink {
 // Subcollection Interfaces
 // ---------
 
+export interface NodeRelation {
+  id: string;
+  workspaceId: string;
+  fromNodeId: string;
+  toNodeId: string;
+  sourceHandle?: string | null;
+  targetHandle?: string | null;
+  relationType: 'parent_of' | 'child_of' | 'related_to' | 'depends_on' | 'part_of' | 'used_in_training' | 'recommended_after' | 'alternative_path';
+  weight?: number;
+  metadata?: any;
+  createdBy: string;
+  createdAt: Timestamp;
+  updatedAt?: Timestamp;
+}
+
 export interface Source {
   id: string;
   workspaceId: string;

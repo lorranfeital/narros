@@ -77,6 +77,11 @@ service cloud.firestore {
       // Allow queries by signed-in users or server processes. Client must filter locally.
       allow list: if isSignedIn() || isServerProcess();
 
+      // --- Node Relations Subcollection ---
+      match /nodeRelations/{relationId} {
+        allow read, list, create, update, delete: if isWorkspaceMember(workspaceId);
+      }
+      
       // --- Sources Subcollection ---
       match /sources/{sourceId} {
         // Any workspace member can create a source.

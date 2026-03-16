@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
-import { useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
-import { doc, collection, query, where, getDoc, setDoc } from 'firebase/firestore';
+import { useFirestore, useDoc, useCollection, useMemoFirebase, useUser } from '@/firebase';
+import { doc, collection, query, where, getDoc, setDoc, writeBatch, serverTimestamp, getDocs } from 'firebase/firestore';
 import { useParams } from 'next/navigation';
 import ReactFlow, {
   Controls,
@@ -69,6 +69,7 @@ import {
   Playbook,
   Insight,
   KnowledgeCategory,
+  NodeRelation,
 } from '@/lib/firestore-types';
 
 
@@ -140,6 +141,7 @@ export default function OperationalMapPage() {
   const firestore = useFirestore();
   const params = useParams();
   const { toast } = useToast();
+  const { user } = useUser();
   const workspaceId = params.workspaceId as string;
 
   // --- Data Fetching ---
@@ -155,12 +157,20 @@ export default function OperationalMapPage() {
   const insightsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, `workspaces/${workspaceId}/insights`)) : null, [firestore, workspaceId]);
   const { data: insights, isLoading: isInsightsLoading } = useCollection<Insight>(insightsQuery);
 
-  const allDataLoaded = !isWorkspaceLoading && !isKnowledgeLoading && !isPlaybooksLoading && !isInsightsLoading;
+  const nodeRelationsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, `workspaces/${workspaceId}/nodeRelations`)) : null, [firestore, workspaceId]);
+  const { data: nodeRelations, isLoading: areRelationsLoading } = useCollection<NodeRelation>(nodeRelationsQuery);
+
+  const allDataLoaded = !isWorkspaceLoading && !isKnowledgeLoading && !isPlaybooksLoading && !isInsightsLoading && !areRelationsLoading;
 
   // --- Layout and Node/Edge Generation ---
   useEffect(() => {
-    // Wait until all data is loaded and only run once.
-    if (!allDataLoaded || !workspace || !firestore || isLayoutInitialized.current) {
+    if (!allDataLoaded || !workspace || !firestore) {
+        return;
+    }
+    
+    if (isLayoutInitialized.current) {
+        // The main layout is done, but we should still react to relation changes if needed.
+        // This can be expanded later if we allow real-time collaboration.
         return;
     }
 
@@ -200,7 +210,7 @@ export default function OperationalMapPage() {
       const categories = publishedKnowledge?.categories || [];
       categories.forEach((category, index) => {
         const angle = (index / (categories.length || 1)) * 2 * Math.PI;
-        const categoryId = `cat-${category.categoria.replace(/[^a-zA-Z0-9-_]/g, '')}-${index}`;
+        const categoryId = `cat-${encodeURIComponent(category.categoria)}`;
         newNodes.push({
           id: categoryId,
           type: 'custom',
@@ -262,15 +272,10 @@ export default function OperationalMapPage() {
       const layoutSnap = await getDoc(layoutRef);
       
       let finalNodes = newNodes;
-      let finalEdges = defaultEdges;
 
       if (layoutSnap.exists()) {
         const layoutData = layoutSnap.data();
         
-        if (Array.isArray(layoutData.edges)) {
-            finalEdges = layoutData.edges;
-        }
-
         if (Array.isArray(layoutData.nodePositions)) {
           const savedPositions = new Map(
             layoutData.nodePositions.map((p: any) => [p.id, { x: p.x, y: p.y }])
@@ -304,15 +309,31 @@ export default function OperationalMapPage() {
           });
           finalNodes.push(...loadedCustomNodes);
         }
+        
+        const relationsInitialized = layoutData?.relations_initialized ?? false;
+        
+        if (relationsInitialized) {
+            const relationsAsEdges: Edge[] = nodeRelations?.map(rel => ({
+                id: rel.id,
+                source: rel.fromNodeId,
+                target: rel.toNodeId,
+                sourceHandle: rel.sourceHandle,
+                targetHandle: rel.targetHandle,
+            })) ?? [];
+            setEdges(relationsAsEdges);
+        } else {
+             setEdges(defaultEdges);
+        }
+      } else {
+        setEdges(defaultEdges);
       }
 
       setNodes(finalNodes);
-      setEdges(finalEdges);
       isLayoutInitialized.current = true; // Mark as done
     };
 
     generateAndSetLayout();
-  }, [allDataLoaded, workspace, publishedKnowledge, playbooks, insights, firestore, workspaceId]);
+  }, [allDataLoaded, workspace, publishedKnowledge, playbooks, insights, firestore, workspaceId, nodeRelations]);
 
 
   const onNodesChange = useCallback((changes: NodeChange[]) => setNodes((nds) => applyNodeChanges(changes, nds)), []);
@@ -389,9 +410,11 @@ export default function OperationalMapPage() {
 
 
   const handleSaveLayout = async () => {
-    if (!firestore || !workspaceId || nodes.length === 0) return;
+    if (!firestore || !workspaceId || nodes.length === 0 || !user) return;
     setIsSaving(true);
     try {
+      const batch = writeBatch(firestore);
+
       const customNodesToSave = nodes
         .filter(node => node.id.startsWith('custom-'))
         .map(node => {
@@ -407,18 +430,35 @@ export default function OperationalMapPage() {
           y: node.position.y,
         }));
 
-      const layoutData = {
-        nodePositions,
-        customNodes: customNodesToSave,
-        edges,
-      };
-
+      // 1. Save visual layout (positions, custom nodes, and init flag)
       const layoutRef = doc(firestore, `workspaces/${workspaceId}/layouts`, 'map');
-      await setDoc(layoutRef, layoutData, { merge: true });
+      batch.set(layoutRef, { nodePositions, customNodes: customNodesToSave, relations_initialized: true }, { merge: true });
+
+      // 2. Sync edges with nodeRelations collection
+      const relationsCollectionRef = collection(firestore, `workspaces/${workspaceId}/nodeRelations`);
+      const existingRelationsSnap = await getDocs(relationsCollectionRef);
+      existingRelationsSnap.forEach(relationDoc => {
+          batch.delete(relationDoc.ref);
+      });
+
+      edges.forEach(edge => {
+          const newRelationRef = doc(relationsCollectionRef);
+          batch.set(newRelationRef, {
+              fromNodeId: edge.source,
+              toNodeId: edge.target,
+              sourceHandle: edge.sourceHandle,
+              targetHandle: edge.targetHandle,
+              relationType: 'related_to',
+              createdBy: user.uid,
+              createdAt: serverTimestamp(),
+          });
+      });
+      
+      await batch.commit();
 
       toast({
-        title: "Layout Salvo!",
-        description: "A posição dos seus nós, conexões e nós customizados foram salvos."
+        title: "Layout e Relações Salvos!",
+        description: "A posição dos nós e suas conexões foram salvas no banco de dados."
       });
     } catch (error) {
       console.error("Error saving layout:", error);
