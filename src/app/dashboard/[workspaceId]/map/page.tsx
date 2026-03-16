@@ -456,7 +456,7 @@ export default function OperationalMapPage() {
             </Button>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="outline">
+                    <Button variant="outline" className="bg-background">
                         <Plus className="mr-2" />
                         Adicionar Nó
                     </Button>
