@@ -1,9 +1,9 @@
 
 'use server';
 
-import { collection, getDocs, query, where, limit, startAt, endAt, orderBy, serverTimestamp, addDoc, getDoc, doc, getFirestore } from 'firebase/firestore';
+import { collection, getDocs, query, where, limit, startAt, endAt, orderBy, serverTimestamp, addDoc, getDoc, doc } from 'firebase/firestore';
 import { getApps, initializeApp, getApp } from 'firebase/app';
-import { headers } from 'next/headers';
+import { getFirestore } from 'firebase/firestore';
 import { firebaseConfig } from '@/firebase/config';
 import { Workspace, WorkspaceLink, WorkspaceLinkStatus } from '@/lib/firestore-types';
 
@@ -74,27 +74,17 @@ interface RequestConnectionPayload {
     targetWorkspaceId: string;
     targetWorkspaceName: string;
     targetWorkspaceLogoUrl?: string;
+    userId: string;
 }
 
 export async function requestWorkspaceConnection(payload: RequestConnectionPayload) {
     const db = getAdminFirestore();
-    const headersList = headers();
-    const userToken = headersList.get('X-Firebase-AppCheck-Token');
-
-    if (!userToken) {
+    
+    const { sourceWorkspaceId, targetWorkspaceId, targetWorkspaceName, targetWorkspaceLogoUrl, userId } = payload;
+    
+    if (!userId) {
         throw new Error("Usuário não autenticado. Ação não permitida.");
     }
-    
-    // In a real scenario, you would verify this token with Firebase Admin SDK.
-    // For this environment, we'll extract the UID from the unverified token.
-    const decodedToken = JSON.parse(Buffer.from(userToken.split('.')[1], 'base64').toString());
-    const userId = decodedToken.user_id;
-
-    if (!userId) {
-        throw new Error("Token de usuário inválido.");
-    }
-
-    const { sourceWorkspaceId, targetWorkspaceId, targetWorkspaceName, targetWorkspaceLogoUrl } = payload;
     
     // Check for existing connection
     const existingConnectionQuery = query(

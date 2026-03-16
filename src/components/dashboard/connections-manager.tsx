@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useTransition, useMemo } from 'react';
@@ -93,7 +94,8 @@ export function ConnectionsManager() {
                 sourceWorkspaceId: workspaceId,
                 targetWorkspaceId: target.id,
                 targetWorkspaceName: target.name,
-                targetWorkspaceLogoUrl: target.logoUrl
+                targetWorkspaceLogoUrl: target.logoUrl,
+                userId: user.uid,
             });
             toast({
                 title: "Solicitação enviada!",
