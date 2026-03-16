@@ -58,9 +58,8 @@ service cloud.firestore {
       // Allow update for members or server processes.
       allow update: if isWorkspaceMember(workspaceId) || isServerProcess();
       allow delete: if isWorkspaceOwner(workspaceId);
-      // Disallow listing all workspaces directly for security.
-      // The client must query for workspaces where the user is a member.
-      allow list: if false;
+      // Allow queries by signed-in users. The client must filter by 'members' array.
+      allow list: if isSignedIn();
 
       // --- Sources Subcollection ---
       match /sources/{sourceId} {
