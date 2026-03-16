@@ -159,8 +159,8 @@ export default function OperationalMapPage() {
     const categoryRadius = 350;
     const categories = publishedKnowledge?.categories || [];
     categories.forEach((category, index) => {
-      const angle = (index / categories.length) * 2 * Math.PI;
-      const categoryId = `cat-${category.categoria.replace(/[^a-zA-Z0-9]/g, '-')}`;
+      const angle = (index / (categories.length || 1)) * 2 * Math.PI;
+      const categoryId = `cat-${index}`;
       newNodes.push({
         id: categoryId,
         type: 'custom',
@@ -184,7 +184,7 @@ export default function OperationalMapPage() {
     const playbookRadius = 600;
     const publishedPlaybooks = playbooks || [];
     publishedPlaybooks.forEach((playbook, index) => {
-      const angle = (index / publishedPlaybooks.length) * 2 * Math.PI;
+      const angle = (index / (publishedPlaybooks.length || 1)) * 2 * Math.PI;
       newNodes.push({
         id: `play-${playbook.id}`,
         type: 'custom',
