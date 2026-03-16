@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { refineText } from '@/lib/actions/ai-actions';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Label } from '@/components/ui/label';
 
 // Schemas for form validation
 const knowledgeItemSchema = z.object({
@@ -189,7 +190,30 @@ function OrgChartEditor({ control }: { control: any }) {
 function PlaybookEditor({ control }: { control: any }) {
   const { fields } = useFieldArray({ control, name: "playbooks" });
 
-  return ( <div className="space-y-6"> {fields.map((playbookField, playbookIndex) => ( <div key={playbookField.id} className="border-b pb-6 last:border-b-0"> <FormField control={control} name={`playbooks.${playbookIndex}.processo`} render={({ field }) => ( <FormItem> <FormLabel className="text-xl font-headline font-semibold">Nome do Processo</FormLabel> <FormControl> <Input {...field} className="text-xl font-headline font-semibold" /> </FormControl> <FormMessage /> </FormItem> )} /> <div className="mt-4 space-y-4"> <PlaybookSteps control={control} playbookIndex={playbookIndex} /> </div> </div> ))} </div> );
+  return (
+    <div className="space-y-6">
+      {fields.map((playbookField, playbookIndex) => (
+        <div key={playbookField.id} className="border-b pb-6 last:border-b-0">
+          <FormField
+            control={control}
+            name={`playbooks.${playbookIndex}.processo`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-xl font-headline font-semibold">Nome do Processo</FormLabel>
+                <FormControl>
+                  <Input {...field} className="text-xl font-headline font-semibold" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <div className="mt-4 space-y-4">
+            <PlaybookSteps control={control} playbookIndex={playbookIndex} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function PlaybookSteps({ control, playbookIndex }: { control: any; playbookIndex: number }) {
@@ -239,13 +263,143 @@ function PlaybookSteps({ control, playbookIndex }: { control: any; playbookIndex
 function TrainingModuleTopics({ control, moduleIndex }: { control: any; moduleIndex: number }) {
   const { fields, append, remove } = useFieldArray({ control, name: `trainingModules.${moduleIndex}.topicos` });
 
-  return ( <div className="space-y-2 mt-2"> {fields.map((topicField, topicIndex) => ( <div key={topicField.id} className="flex items-center gap-2"> <FormField control={control} name={`trainingModules.${moduleIndex}.topicos.${topicIndex}`} render={({ field }) => ( <FormItem className="flex-1"> <FormLabel className="sr-only">Tópico {topicIndex + 1}</FormLabel> <FormControl> <Input {...field} placeholder="Descreva o tópico" /> </FormControl> <FormMessage /> </FormItem> )} /> <Button type="button" variant="ghost" size="icon" onClick={() => remove(topicIndex)}> <Trash2 className="h-4 w-4 text-muted-foreground" /> </Button> </div> ))} <Button type="button" variant="outline" size="sm" onClick={() => append('')}> <Plus className="mr-2 h-4 w-4" /> Adicionar Tópico </Button> </div> );
+  return (
+    <div className="space-y-2 mt-2">
+      {fields.map((topicField, topicIndex) => (
+        <div key={topicField.id} className="flex items-center gap-2">
+          <FormField
+            control={control}
+            name={`trainingModules.${moduleIndex}.topicos.${topicIndex}`}
+            render={({ field }) => (
+              <FormItem className="flex-1">
+                <FormLabel className="sr-only">Tópico {topicIndex + 1}</FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="Descreva o tópico" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <Button type="button" variant="ghost" size="icon" onClick={() => remove(topicIndex)}>
+            <Trash2 className="h-4 w-4 text-muted-foreground" />
+          </Button>
+        </div>
+      ))}
+      <Button type="button" variant="outline" size="sm" onClick={() => append('')}>
+        <Plus className="mr-2 h-4 w-4" /> Adicionar Tópico
+      </Button>
+    </div>
+  );
 }
 
 function TrainingModuleEditor({ control }: { control: any }) {
   const { fields, append, remove } = useFieldArray({ control, name: "trainingModules" });
 
-  return ( <div className="space-y-6"> {fields.map((moduleField, moduleIndex) => ( <div key={moduleField.id} className="border p-4 rounded-lg bg-card/50"> <div className="flex justify-between items-start mb-4"> <h3 className="text-xl font-headline font-semibold"> Módulo {control.getValues(`trainingModules.${moduleIndex}.modulo`)} </h3> <Button type="button" variant="ghost" size="icon" onClick={() => remove(moduleIndex)}> <Trash2 className="h-4 w-4 text-destructive" /> </Button> </div> <div className="space-y-4"> <FormField control={control} name={`trainingModules.${moduleIndex}.titulo`} render={({ field }) => ( <FormItem> <FormLabel>Título do Módulo</FormLabel> <FormControl><Input {...field} placeholder="Ex: Onboarding de Vendas" /></FormControl> <FormMessage /> </FormItem> )} /> <FormField control={control} name={`trainingModules.${moduleIndex}.objetivo`} render={({ field }) => ( <FormItem> <FormLabel>Objetivo</FormLabel> <FormControl><Textarea {...field} placeholder="O que o colaborador poderá fazer após este módulo?" /></FormControl> <FormMessage /> </FormItem> )} /> <div className="grid grid-cols-2 gap-4"> <FormField control={control} name={`trainingModules.${moduleIndex}.duracao`} render={({ field }) => ( <FormItem> <FormLabel>Duração</FormLabel> <FormControl><Input {...field} placeholder="Ex: 45 min" /></FormControl> <FormMessage /> </FormItem> )} /> <FormField control={control} name={`trainingModules.${moduleIndex}.formato`} render={({ field }) => ( <FormItem> <FormLabel>Formato</FormLabel> <Select onValueChange={field.onChange} value={field.value}> <FormControl><SelectTrigger><SelectValue placeholder="Selecione um formato" /></SelectTrigger></FormControl> <SelectContent> <SelectItem value="presencial">Presencial</SelectItem> <SelectItem value="vídeo">Vídeo</SelectItem> <SelectItem value="slides">Slides</SelectItem> <SelectItem value="prático">Prático</SelectItem> </SelectContent> </Select> <FormMessage /> </FormItem> )} /> </div> <div> <FormLabel>Tópicos Abordados</FormLabel> <TrainingModuleTopics control={control} moduleIndex={moduleIndex} /> </div> </div> </div> ))} <Button type="button" variant="outline" size="sm" className="mt-6" onClick={() => append({ id: crypto.randomUUID(), modulo: fields.length + 1, titulo: 'Novo Módulo', objetivo: '', duracao: '30 min', formato: 'slides', topicos: [] })}> <Plus className="mr-2 h-4 w-4" /> Adicionar Módulo </Button> </div> );
+  return (
+    <div className="space-y-6">
+      {fields.map((moduleField, moduleIndex) => (
+        <div key={moduleField.id} className="border p-4 rounded-lg bg-card/50">
+          <div className="flex justify-between items-start mb-4">
+            <h3 className="text-xl font-headline font-semibold">
+              Módulo {control.getValues(`trainingModules.${moduleIndex}.modulo`)}
+            </h3>
+            <Button type="button" variant="ghost" size="icon" onClick={() => remove(moduleIndex)}>
+              <Trash2 className="h-4 w-4 text-destructive" />
+            </Button>
+          </div>
+          <div className="space-y-4">
+            <FormField
+              control={control}
+              name={`trainingModules.${moduleIndex}.titulo`}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Título do Módulo</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="Ex: Onboarding de Vendas" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={control}
+              name={`trainingModules.${moduleIndex}.objetivo`}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Objetivo</FormLabel>
+                  <FormControl>
+                    <Textarea {...field} placeholder="O que o colaborador poderá fazer após este módulo?" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={control}
+                name={`trainingModules.${moduleIndex}.duracao`}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Duração</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Ex: 45 min" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={control}
+                name={`trainingModules.${moduleIndex}.formato`}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Formato</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um formato" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="presencial">Presencial</SelectItem>
+                        <SelectItem value="vídeo">Vídeo</SelectItem>
+                        <SelectItem value="slides">Slides</SelectItem>
+                        <SelectItem value="prático">Prático</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div>
+              <Label>Tópicos Abordados</Label>
+              <TrainingModuleTopics control={control} moduleIndex={moduleIndex} />
+            </div>
+          </div>
+        </div>
+      ))}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="mt-6"
+        onClick={() =>
+          append({
+            id: crypto.randomUUID(),
+            modulo: fields.length + 1,
+            titulo: 'Novo Módulo',
+            objetivo: '',
+            duracao: '30 min',
+            formato: 'slides',
+            topicos: [],
+          })
+        }
+      >
+        <Plus className="mr-2 h-4 w-4" /> Adicionar Módulo
+      </Button>
+    </div>
+  );
 }
 
 export default function ReviewPage() {
@@ -527,3 +681,4 @@ function CategoryItems({ control, categoryIndex }: { control: any, categoryIndex
     </div>
   );
 }
+
