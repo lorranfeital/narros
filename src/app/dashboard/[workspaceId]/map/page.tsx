@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
@@ -31,6 +30,9 @@ import {
   X,
   Save,
   Loader2,
+  Plus,
+  FileText,
+  Users,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -41,6 +43,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 import {
   AlertDialog,
@@ -65,7 +75,7 @@ import {
 // Type definitions for our nodes
 type MapNodeData = {
   label: string;
-  type: 'workspace' | 'category' | 'playbook';
+  type: 'workspace' | 'category' | 'playbook' | 'content' | 'orgchart';
   icon: React.ReactNode;
   subtext?: string;
   insights?: {
@@ -257,12 +267,10 @@ export default function OperationalMapPage() {
       if (layoutSnap.exists()) {
         const layoutData = layoutSnap.data();
         
-        // Apply saved edges if they exist (even an empty array is a valid saved state)
         if (Array.isArray(layoutData.edges)) {
             finalEdges = layoutData.edges;
         }
 
-        // Apply saved Node Positions
         if (Array.isArray(layoutData.nodePositions)) {
           const savedPositions = new Map(
             layoutData.nodePositions.map((p: any) => [p.id, { x: p.x, y: p.y }])
@@ -274,6 +282,27 @@ export default function OperationalMapPage() {
             }
             return node;
           });
+        }
+        
+        if (Array.isArray(layoutData.customNodes)) {
+          const loadedCustomNodes: Node<MapNodeData>[] = layoutData.customNodes.map((node: Node<Omit<MapNodeData, 'icon'>>) => {
+            let icon: React.ReactNode;
+            switch (node.data.type) {
+                case 'category': icon = <Folder className="h-5 w-5" />; break;
+                case 'playbook': icon = <BookOpen className="h-5 w-5" />; break;
+                case 'content': icon = <FileText className="h-5 w-5" />; break;
+                case 'orgchart': icon = <Users className="h-5 w-5" />; break;
+                default: icon = <BookOpen className="h-5 w-5" />;
+            }
+            return {
+                ...node,
+                data: {
+                    ...node.data,
+                    icon: icon,
+                }
+            };
+          });
+          finalNodes.push(...loadedCustomNodes);
         }
       }
 
@@ -313,24 +342,83 @@ export default function OperationalMapPage() {
     }
   };
 
+  const handleAddNode = (type: 'category' | 'playbook' | 'content' | 'orgchart') => {
+    const newNodeId = `custom-${type}-${Date.now()}`;
+    let nodeData: MapNodeData;
+    
+    // Position in the center of the current view (or a fallback)
+    const position = { x: 200, y: 200 };
+
+    switch (type) {
+      case 'category':
+        nodeData = { label: 'Nova Categoria', type: 'category', icon: <Folder className="h-5 w-5" />, raw_data: {} };
+        break;
+      case 'playbook':
+        nodeData = { label: 'Novo Playbook', type: 'playbook', icon: <BookOpen className="h-5 w-5" />, raw_data: {} };
+        break;
+      case 'content':
+        nodeData = { label: 'Novo Conteúdo', type: 'content', icon: <FileText className="h-5 w-5" />, raw_data: {} };
+        break;
+      case 'orgchart':
+        nodeData = { label: 'Organograma', type: 'orgchart', icon: <Users className="h-5 w-5" />, raw_data: {} };
+        break;
+    }
+
+    const newNode: Node<MapNodeData> = {
+      id: newNodeId,
+      type: 'custom',
+      position: position,
+      data: nodeData,
+    };
+
+    setNodes((nds) => [...nds, newNode]);
+    toast({ title: 'Nó adicionado ao mapa!', description: "Arraste para posicionar e clique para editar. Não se esqueça de salvar o layout." });
+  };
+  
+  const handleLabelChange = (newLabel: string) => {
+    if (!selectedNode) return;
+    const newNode = { ...selectedNode, data: { ...selectedNode.data, label: newLabel } };
+    
+    // Update main nodes state
+    setNodes((nds) =>
+        nds.map((node) => (node.id === selectedNode.id ? newNode : node))
+    );
+    // Update sheet state to reflect the change in the input immediately
+    setSelectedNode(newNode);
+  };
+
+
   const handleSaveLayout = async () => {
     if (!firestore || !workspaceId || nodes.length === 0) return;
     setIsSaving(true);
     try {
-      const layoutData = {
-        nodePositions: nodes.map(node => ({
+      const customNodesToSave = nodes
+        .filter(node => node.id.startsWith('custom-'))
+        .map(node => {
+          const { icon, ...restOfData } = node.data; // Don't save React component
+          return { ...node, data: restOfData };
+        });
+      
+      const nodePositions = nodes
+        .filter(node => !node.id.startsWith('custom-'))
+        .map(node => ({
           id: node.id,
           x: node.position.x,
           y: node.position.y,
-        })),
-        edges: edges, // Save the current edges from state
+        }));
+
+      const layoutData = {
+        nodePositions,
+        customNodes: customNodesToSave,
+        edges,
       };
+
       const layoutRef = doc(firestore, `workspaces/${workspaceId}/layouts`, 'map');
       await setDoc(layoutRef, layoutData, { merge: true });
 
       toast({
         title: "Layout Salvo!",
-        description: "A posição dos seus nós e as conexões foram salvas."
+        description: "A posição dos seus nós, conexões e nós customizados foram salvos."
       });
     } catch (error) {
       console.error("Error saving layout:", error);
@@ -366,6 +454,28 @@ export default function OperationalMapPage() {
                 {isSaving ? <Loader2 className="mr-2" /> : <Save className="mr-2" />}
                 Salvar Layout
             </Button>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="outline">
+                        <Plus className="mr-2" />
+                        Adicionar Nó
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                    <DropdownMenuItem onSelect={() => handleAddNode('category')}>
+                        <Folder className="mr-2" /> Categoria
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => handleAddNode('playbook')}>
+                        <BookOpen className="mr-2" /> Playbook
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => handleAddNode('content')}>
+                        <FileText className="mr-2" /> Conteúdo
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => handleAddNode('orgchart')}>
+                        <Users className="mr-2" /> Organograma
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
        </div>
        <Button asChild variant="outline" className="absolute top-6 right-6 z-10 h-12 w-12 rounded-full p-0 bg-background/80 hover:bg-background">
             <Link href={`/dashboard/${workspaceId}`}>
@@ -410,44 +520,62 @@ export default function OperationalMapPage() {
                   {selectedNode.data.icon} {selectedNode.data.label}
                 </SheetTitle>
                 <SheetDescription>
-                  Detalhes sobre o nó '{selectedNode.data.label}' do tipo '{selectedNode.data.type}'.
+                  {selectedNode.id.startsWith('custom-')
+                    ? `Nó customizado do tipo '${selectedNode.data.type}'. Edite o nome abaixo.`
+                    : `Detalhes sobre o nó '${selectedNode.data.label}' do tipo '${selectedNode.data.type}'.`}
                 </SheetDescription>
               </SheetHeader>
               <div className="py-6 space-y-6">
-                 {selectedNode.data.type === 'category' && (
-                    <div className="space-y-4">
+                {selectedNode.id.startsWith('custom-') ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="node-label">Nome do Nó</Label>
+                    <Input
+                      id="node-label"
+                      value={selectedNode.data.label}
+                      onChange={(e) => handleLabelChange(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Não se esqueça de "Salvar Layout" para manter suas alterações.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {selectedNode.data.type === 'category' && (
+                      <div className="space-y-4">
                         <h4 className="font-semibold">Itens de Conhecimento</h4>
                         <div className="space-y-3">
-                        {(selectedNode.data.raw_data as KnowledgeCategory).itens.map(item => (
+                          {(selectedNode.data.raw_data as KnowledgeCategory).itens.map(item => (
                             <div key={item.titulo} className="text-sm">
-                                <p className="font-medium text-foreground">{item.titulo}</p>
-                                <p className="text-muted-foreground">{item.descricao}</p>
+                              <p className="font-medium text-foreground">{item.titulo}</p>
+                              <p className="text-muted-foreground">{item.descricao}</p>
                             </div>
-                        ))}
+                          ))}
                         </div>
-                    </div>
-                 )}
-                 {selectedNode.data.type === 'playbook' && (
-                     <div className="space-y-4">
+                      </div>
+                    )}
+                    {selectedNode.data.type === 'playbook' && (
+                      <div className="space-y-4">
                         <h4 className="font-semibold">Passos do Processo</h4>
                         <div className="space-y-4">
-                        {(selectedNode.data.raw_data as Playbook).passos.map(step => (
-                           <div key={step.numero} className="flex gap-4">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold">{step.numero}</div>
-                                <div>
-                                    <h5 className="font-semibold">{step.titulo}</h5>
-                                    <p className="text-muted-foreground text-sm">{step.descricao}</p>
-                                </div>
+                          {(selectedNode.data.raw_data as Playbook).passos.map(step => (
+                            <div key={step.numero} className="flex gap-4">
+                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold">{step.numero}</div>
+                              <div>
+                                <h5 className="font-semibold">{step.titulo}</h5>
+                                <p className="text-muted-foreground text-sm">{step.descricao}</p>
+                              </div>
                             </div>
-                        ))}
+                          ))}
                         </div>
-                    </div>
-                 )}
-                 <Button asChild>
-                     <Link href={`/dashboard/${workspaceId}/knowledge`}>
+                      </div>
+                    )}
+                    <Button asChild>
+                      <Link href={`/dashboard/${workspaceId}/knowledge`}>
                         Explorar na Base de Conhecimento <ChevronRight className="h-4 w-4 ml-2"/>
-                    </Link>
-                 </Button>
+                      </Link>
+                    </Button>
+                  </>
+                )}
               </div>
             </>
           )}
