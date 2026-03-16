@@ -1,8 +1,7 @@
 'use server';
 
-import { collection, getDocs, query, where, limit, startAt, endAt, orderBy, serverTimestamp, addDoc, getDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, query, where, limit, startAt, endAt, orderBy, serverTimestamp, addDoc, getDoc, doc, getFirestore } from 'firebase/firestore';
 import { getApps, initializeApp, getApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
 import { headers } from 'next/headers';
 import { firebaseConfig } from '@/firebase/config';
 import { Workspace, WorkspaceLink, WorkspaceLinkStatus } from '@/lib/firestore-types';
@@ -132,6 +131,6 @@ export async function requestWorkspaceConnection(payload: RequestConnectionPaylo
         await addDoc(collection(db, 'workspaceLinks'), newLink);
     } catch (error) {
         console.error("Error creating workspace link:", error);
-        throw new Error("Falha ao criar a solicitação de conexão no banco de dados.");
+        throw new Error("Falha ao criar la solicitação de conexão no banco de dados.");
     }
 }
