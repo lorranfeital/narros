@@ -1,6 +1,7 @@
+
 'use client';
 
-import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, doc, getDoc, writeBatch, serverTimestamp, getDocs } from 'firebase/firestore';
 import { useParams } from 'next/navigation';
@@ -148,8 +149,6 @@ export default function OperationalMapPage() {
   const [selectedNode, setSelectedNode] = useState<Node<MapNodeData> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [edgeToDelete, setEdgeToDelete] = useState<Edge | null>(null);
-  
-  const isLayoutInitialized = useRef(false);
 
   const firestore = useFirestore();
   const params = useParams();
@@ -191,10 +190,8 @@ export default function OperationalMapPage() {
     if (!allDataLoaded || !federatedData || !Object.keys(federatedData).length || !firestore) {
         return;
     }
-    
-    if (isLayoutInitialized.current) { return; }
 
-    const generateAndSetLayout = async () => {
+    const generateLayout = async () => {
       const newNodes: Node<MapNodeData>[] = [];
       const federatedEdges: Edge[] = [];
       const defaultIntraWorkspaceEdges: Edge[] = [];
@@ -291,6 +288,25 @@ export default function OperationalMapPage() {
       let finalNodes = newNodes;
       let finalEdges: Edge[] = [];
 
+      const relationsInitialized = layoutSnap.exists() && layoutSnap.data()?.relations_initialized;
+
+      if (relationsInitialized && nodeRelations) {
+        // User has saved a layout, so we use their saved relations
+        const savedEdges = nodeRelations.map(rel => ({
+          id: rel.id,
+          source: rel.fromNodeId,
+          target: rel.toNodeId,
+          sourceHandle: rel.sourceHandle,
+          targetHandle: rel.targetHandle,
+          type: 'smoothstep',
+        }));
+        finalEdges = [...savedEdges, ...federatedEdges];
+      } else {
+        // First load, use default generated edges
+        finalEdges = [...defaultIntraWorkspaceEdges, ...federatedEdges];
+      }
+
+      // Apply saved node positions if they exist
       if (layoutSnap.exists()) {
         const layoutData = layoutSnap.data();
         if (Array.isArray(layoutData.nodePositions)) {
@@ -300,32 +316,19 @@ export default function OperationalMapPage() {
             return savedPosition ? { ...node, position: savedPosition } : node;
           });
         }
-        
         if (Array.isArray(layoutData.customNodes)) {
-          const loadedCustomNodes: Node<MapNodeData>[] = layoutData.customNodes.map((node: Node<Omit<MapNodeData, 'icon'>>) => ({
-              ...node,
-              data: { ...node.data, icon: <BookOpen className="h-5 w-5" /> }, // Provide a default icon
-          }));
-          finalNodes.push(...loadedCustomNodes);
+            const loadedCustomNodes: Node<MapNodeData>[] = layoutData.customNodes.map((node: Node<Omit<MapNodeData, 'icon'>>) => ({
+                ...node,
+                data: { ...node.data, icon: <BookOpen className="h-5 w-5" /> }, 
+            }));
+            finalNodes.push(...loadedCustomNodes);
         }
-        
-        const relationsInitialized = layoutData?.relations_initialized ?? false;
-        
-        if (relationsInitialized && nodeRelations) {
-          const savedEdges = nodeRelations.map(rel => ({ id: rel.id, source: rel.fromNodeId, target: rel.toNodeId, sourceHandle: rel.sourceHandle, targetHandle: rel.targetHandle, type: 'smoothstep' }));
-          finalEdges = [...savedEdges, ...federatedEdges];
-        } else {
-          finalEdges = [...defaultIntraWorkspaceEdges, ...federatedEdges];
-        }
-      } else {
-        finalEdges = [...defaultIntraWorkspaceEdges, ...federatedEdges];
       }
 
       setEdges(finalEdges);
       setNodes(finalNodes);
-      isLayoutInitialized.current = true;
     };
-    generateAndSetLayout();
+    generateLayout();
   }, [allDataLoaded, federatedData, insights, firestore, workspaceId, nodeRelations]);
 
 
@@ -370,7 +373,7 @@ export default function OperationalMapPage() {
     try {
       const batch = writeBatch(firestore);
       const customNodesToSave = nodes.filter(node => node.id.startsWith('custom-')).map(node => { const { icon, ...restOfData } = node.data; return { ...node, data: restOfData }; });
-      const nodePositions = nodes.filter(node => !node.id.startsWith('custom-')).map(node => ({ id: node.id, x: node.position.x, y: node.position.y }));
+      const nodePositions = nodes.map(node => ({ id: node.id, x: node.position.x, y: node.position.y }));
 
       const layoutRef = doc(firestore, `workspaces/${workspaceId}/layouts`, 'map');
       batch.set(layoutRef, { nodePositions, customNodes: customNodesToSave, relations_initialized: true }, { merge: true });
