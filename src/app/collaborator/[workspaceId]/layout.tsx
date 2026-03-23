@@ -2,7 +2,7 @@
 
 import { useUser, useFirestore, useDoc, useMemoFirebase } from "@/firebase";
 import { useRouter, useParams } from "next/navigation";
-import { useEffect, ReactNode, useMemo } from "react";
+import { useEffect, ReactNode } from "react";
 import { doc } from 'firebase/firestore';
 import { Workspace } from "@/lib/firestore-types";
 import { CollaboratorSidebar } from "@/components/collaborator/sidebar";
@@ -23,7 +23,8 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
   
   useEffect(() => {
     if (isUserLoading || isWorkspaceLoading) {
-      return; // Wait for both user and workspace data to be loaded.
+      // Still waiting for data, do nothing.
+      return;
     }
 
     if (!user) {
@@ -31,13 +32,14 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
       return;
     }
 
-    // After loading, if workspace is still null, it means no access or doesn't exist.
+    // After loading is complete, check for the workspace.
+    // If it's null, it means useDoc failed, likely due to security rules.
     if (!workspace) {
       router.push('/unauthorized');
       return;
     }
 
-    // Final check: verify membership from the loaded workspace data.
+    // If we have the workspace, perform the final membership check.
     const isOwner = workspace.ownerId === user.uid;
     const hasRole = workspace.roles && Object.prototype.hasOwnProperty.call(workspace.roles, user.uid);
 
@@ -47,7 +49,7 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
   }, [user, isUserLoading, workspace, isWorkspaceLoading, router, workspaceId]);
 
 
-  // Show loading screen until both hooks are done and we have a definitive workspace object (or not)
+  // Show a loading screen while auth and workspace data are being fetched.
   if (isUserLoading || isWorkspaceLoading) {
      return (
       <div className="flex min-h-screen items-center justify-center">
@@ -56,8 +58,8 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
     );
   }
 
-  // If loading is done, but there's no workspace, it means access was denied.
-  // The useEffect will handle the redirect, but we show a placeholder to prevent rendering children.
+  // If loading is done, but there's still no workspace, it means access was denied.
+  // The useEffect will handle the redirect, but we show this to prevent children from rendering.
   if (!workspace) {
       return (
         <div className="flex min-h-screen items-center justify-center">
@@ -66,6 +68,7 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
       );
   }
 
+  // If all checks pass, render the layout.
   return (
     <div className="flex h-screen bg-background">
       <CollaboratorSidebar />

@@ -17,10 +17,11 @@ service cloud.firestore {
 
     function isWorkspaceMember(workspaceId) {
       // A user is a member if they are the owner or have an explicit role.
+      // This is the definitive way to check for membership in a rule.
       let workspaceData = get(/databases/$(database)/documents/workspaces/$(workspaceId)).data;
       return isSignedIn() && (
         request.auth.uid == workspaceData.ownerId ||
-        (workspaceData.roles != null && request.auth.uid in workspaceData.roles)
+        (workspaceData.roles != null && workspaceData.roles[request.auth.uid] != null)
       );
     }
 
