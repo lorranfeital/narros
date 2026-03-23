@@ -38,6 +38,10 @@ service cloud.firestore {
       return isAdmin(workspaceId) || getRole(workspaceId) == 'curator';
     }
     
+    function isCollaborator(workspaceId) {
+        return getRole(workspaceId) == 'collaborator';
+    }
+    
     function isServerProcess() {
         return request.auth == null;
     }
@@ -53,7 +57,7 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isSignedIn();
       allow write: if isOwner(userId);
-      allow list: if isPlatformAdmin();
+      allow list: if isPlatformAdmin() || isServerProcess();
     }
     
     // ------------------------------------------------------------------------
@@ -122,15 +126,14 @@ service cloud.firestore {
       // --- Org Charts Subcollection ---
       match /org_charts/{orgChartId} {
         allow read, list: if isWorkspaceMember(workspaceId) || isServerProcess();
-        allow create, update: if isServerProcess() || isAdmin(workspaceId);
-        allow delete: if isAdmin(workspaceId) || isServerProcess();
+        allow create, update, delete: if isServerProcess() || isAdmin(workspaceId);
       }
 
       // --- Playbooks Subcollection ---
       match /playbooks/{playbookId} {
         allow read, list: if isWorkspaceMember(workspaceId) || isServerProcess();
         allow create, update: if isServerProcess() || isAdmin(workspaceId);
-        allow delete: if isAdmin(workspaceId) || isServerProcess();
+        allow delete: if isServerProcess() || isAdmin(workspaceId);
       }
 
       // --- Training Modules Subcollection ---
@@ -138,7 +141,7 @@ service cloud.firestore {
         // Collaborators can only read published modules
         allow read, list: if isWorkspaceMember(workspaceId) || isServerProcess();
         allow create, update: if isServerProcess() || isAdmin(workspaceId);
-        allow delete: if isAdmin(workspaceId) || isServerProcess();
+        allow delete: if isServerProcess() || isAdmin(workspaceId);
       }
       
       // --- Training Progress Subcollection ---
