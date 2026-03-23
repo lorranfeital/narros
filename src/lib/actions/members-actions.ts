@@ -12,9 +12,12 @@ import {
   arrayUnion,
   arrayRemove,
   deleteField,
+  setDoc,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { getApps, initializeApp, getApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { firebaseConfig } from '@/firebase/config';
 import { Workspace, WorkspaceRole } from '@/lib/firestore-types';
 
@@ -24,6 +27,14 @@ function getAdminFirestore() {
   }
   return getFirestore(getApp());
 }
+
+function getAdminAuth() {
+    if (getApps().length === 0) {
+        initializeApp(firebaseConfig);
+    }
+    return getAuth(getApp());
+}
+
 
 async function verifyAdmin(
   db: any,
@@ -55,6 +66,7 @@ export async function inviteUserToWorkspace(
   inviterId: string
 ) {
     const db = getAdminFirestore();
+    const auth = getAdminAuth();
     const workspace = await verifyAdmin(db, workspaceId, inviterId);
 
     if (!email) {
@@ -64,27 +76,63 @@ export async function inviteUserToWorkspace(
     const userQuery = query(collection(db, 'users'), where('email', '==', email), limit(1));
     const userSnap = await getDocs(userQuery);
 
+    let userId: string;
+    let isNewUser = false;
+
     if (userSnap.empty) {
-        return { success: false, message: `Nenhum usuário encontrado com o e-mail: ${email}. Peça para que ele crie uma conta na plataforma primeiro.` };
+        // User does not exist, create them.
+        isNewUser = true;
+        try {
+            // Generate a random temporary password. User will need to reset it.
+            const tempPassword = Math.random().toString(36).slice(-8) + 'A1b2c3!';
+            const userCredential = await createUserWithEmailAndPassword(auth, email, tempPassword);
+            userId = userCredential.user.uid;
+
+            // Create a user document in Firestore
+            const newUserRef = doc(db, 'users', userId);
+            await setDoc(newUserRef, {
+                id: userId,
+                name: email.split('@')[0],
+                email: email,
+                plan: "free",
+                createdAt: serverTimestamp(),
+            });
+
+        } catch (error: any) {
+             if (error.code === 'auth/email-already-in-use') {
+                return { success: false, message: 'Este e-mail já está em uso pelo sistema de autenticação, mas não foi encontrado em nosso banco de dados. Contate o suporte.' };
+            }
+             if (error.code === 'auth/invalid-email') {
+                return { success: false, message: 'O formato do e-mail fornecido é inválido.' };
+            }
+            console.error("Error creating user:", error);
+            return { success: false, message: `Ocorreu um erro ao criar o novo usuário: ${error.message}` };
+        }
+    } else {
+        // User exists, get their ID.
+        const userDoc = userSnap.docs[0];
+        userId = userDoc.id;
+        if (workspace.members.includes(userId)) {
+            return { success: false, message: 'Este usuário já é membro do workspace.' };
+        }
     }
 
-    const userDoc = userSnap.docs[0];
-    const userId = userDoc.id;
-
-    if (workspace.members.includes(userId)) {
-        return { success: false, message: 'Este usuário já é membro do workspace.' };
-    }
-
+    // Add user to the workspace
     try {
         const workspaceRef = doc(db, 'workspaces', workspaceId);
         await updateDoc(workspaceRef, {
             members: arrayUnion(userId),
             [`roles.${userId}`]: role,
         });
-        return { success: true, message: `Usuário ${email} convidado como ${role}.` };
+
+        if (isNewUser) {
+            return { success: true, message: `Usuário ${email} criado e convidado como ${role}. Ele precisará usar a função 'Esqueci minha senha' para definir uma senha e acessar.` };
+        } else {
+            return { success: true, message: `Usuário ${email} convidado como ${role}.` };
+        }
     } catch (error) {
         console.error("Error inviting user:", error);
-        return { success: false, message: "Ocorreu um erro ao convidar o usuário." };
+        return { success: false, message: "Ocorreu um erro ao adicionar o usuário ao workspace." };
     }
 }
 
