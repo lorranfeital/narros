@@ -23,7 +23,8 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
   
   const isMember = useMemo(() => {
     if (!user || !workspace) return false;
-    return workspace.members.includes(user.uid);
+    // Check against ownerId and the keys of the roles map for membership.
+    return workspace.ownerId === user.uid || (workspace.roles && Object.prototype.hasOwnProperty.call(workspace.roles, user.uid));
   }, [user, workspace]);
 
 
