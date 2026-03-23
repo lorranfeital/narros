@@ -19,7 +19,7 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
       if (!firestore || !workspaceId) return null;
       return doc(firestore, 'workspaces', workspaceId);
   }, [firestore, workspaceId]);
-  const { data: workspace, isLoading: isWorkspaceLoading } = useDoc<Workspace>(workspaceDocRef);
+  const { data: workspace, isLoading: isWorkspaceLoading, error: workspaceError } = useDoc<Workspace>(workspaceDocRef);
   
   const isMember = useMemo(() => {
     if (!user || !workspace) return false;
@@ -28,13 +28,33 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
   }, [user, workspace]);
 
 
+  // --- START DEBUG LOGS ---
+  console.log('[CollaboratorLayout] Debug Info:', {
+      timestamp: new Date().toLocaleTimeString(),
+      isUserLoading,
+      isWorkspaceLoading,
+      userId: user?.uid,
+      workspaceId: workspaceId,
+      workspaceExists: !!workspace,
+      workspaceData: workspace,
+      workspaceError: workspaceError,
+      isMemberResult: isMember,
+  });
+  // --- END DEBUG LOGS ---
+
+
   useEffect(() => {
     if (!isUserLoading && !user) {
       router.push('/login');
       return;
     }
-    if (!isWorkspaceLoading && !isMember) {
+    // Wait until both user and workspace are done loading
+    if (!isUserLoading && !isWorkspaceLoading) {
+      // If loading is finished and the user is NOT a member, redirect.
+      if (!isMember) {
+        console.log('[CollaboratorLayout] REDIRECTING to /unauthorized because isMember is false.');
         router.push('/unauthorized');
+      }
     }
   }, [user, isUserLoading, isWorkspaceLoading, isMember, router]);
 
@@ -44,7 +64,7 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
   if (showLoading || !isMember) {
      return (
       <div className="flex min-h-screen items-center justify-center">
-        <p>Carregando...</p>
+        <p>Carregando área do colaborador...</p>
       </div>
     );
   }
