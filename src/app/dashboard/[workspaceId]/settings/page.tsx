@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useUser, useFirestore, useMemoFirebase, useStorage } from '@/firebase';
@@ -22,9 +21,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Label } from '@/components/ui/label';
-import { BrandKit } from '@/lib/firestore-types';
+import { BrandKit, Workspace } from '@/lib/firestore-types';
 import { ConnectionsManager } from '@/components/dashboard/connections-manager';
 import { MembersManager } from '@/components/dashboard/members-manager';
+import { cn } from '@/lib/utils';
 
 const sectorEnum = z.enum([
   'Agricultura',
@@ -76,7 +76,7 @@ export default function SettingsPage() {
     if (!firestore || !workspaceId) return null;
     return doc(firestore, 'workspaces', workspaceId);
   }, [firestore, workspaceId]);
-  const { data: currentWorkspace, isLoading: isWorkspacesLoading } = useDoc<any>(workspaceDocRef);
+  const { data: currentWorkspace, isLoading: isWorkspacesLoading } = useDoc<Workspace>(workspaceDocRef);
 
   const brandKitDocRef = useMemoFirebase(() => {
     if (!firestore || !workspaceId) return null;
@@ -88,6 +88,9 @@ export default function SettingsPage() {
     resolver: zodResolver(workspaceFormSchema),
     defaultValues: { name: '', type: 'empresa', sector: 'Alimentação' },
   });
+  
+  const userRole = currentWorkspace?.ownerId === user?.uid ? 'admin' : currentWorkspace?.roles?.[user?.uid ?? ''];
+  const isAdmin = userRole === 'admin';
 
   React.useEffect(() => {
     if (currentWorkspace) {
@@ -100,7 +103,7 @@ export default function SettingsPage() {
   }, [currentWorkspace, workspaceForm]);
 
   async function onWorkspaceSubmit(data: WorkspaceFormValues) {
-    if (!firestore || !workspaceDocRef) return;
+    if (!firestore || !workspaceDocRef || !isAdmin) return;
     try {
       await updateDoc(workspaceDocRef, {
         ...data,
@@ -121,7 +124,7 @@ export default function SettingsPage() {
   }
 
   async function handleLogoUpload() {
-    if (!logoFile || !currentWorkspace || !storage || !user || !workspaceDocRef) return;
+    if (!logoFile || !currentWorkspace || !storage || !user || !workspaceDocRef || !isAdmin) return;
 
     setIsUploading(true);
     const logoStoragePath = `workspaces/${currentWorkspace.id}/logo`;
@@ -156,7 +159,7 @@ export default function SettingsPage() {
   }
 
   async function handleLogoPrincipalUpload() {
-    if (!logoPrincipalFile || !storage || !user || !brandKitDocRef) return;
+    if (!logoPrincipalFile || !storage || !user || !brandKitDocRef || !isAdmin) return;
 
     setIsUploadingPrincipal(true);
     const logoStoragePath = `workspaces/${workspaceId}/brandkit/logo-principal.png`;
@@ -178,7 +181,7 @@ export default function SettingsPage() {
   }
 
   async function handleLogoNegativoUpload() {
-    if (!logoNegativoFile || !storage || !user || !brandKitDocRef) return;
+    if (!logoNegativoFile || !storage || !user || !brandKitDocRef || !isAdmin) return;
 
     setIsUploadingNegativo(true);
     const logoStoragePath = `workspaces/${workspaceId}/brandkit/logo-negativo.png`;
@@ -206,10 +209,10 @@ export default function SettingsPage() {
       <p className="text-muted-foreground mt-2">Gerencie as configurações deste workspace, membros e suas conexões.</p>
 
       <Tabs defaultValue="workspace" className="mt-10 max-w-2xl">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className={cn("grid w-full", isAdmin ? "grid-cols-3" : "grid-cols-1")}>
             <TabsTrigger value="workspace">Workspace</TabsTrigger>
-            <TabsTrigger value="connections">Conexões</TabsTrigger>
-            <TabsTrigger value="members">Membros</TabsTrigger>
+            {isAdmin && <TabsTrigger value="connections">Conexões</TabsTrigger>}
+            {isAdmin && <TabsTrigger value="members">Membros</TabsTrigger>}
         </TabsList>
         <TabsContent value="workspace">
           <Card>
@@ -238,7 +241,7 @@ export default function SettingsPage() {
                         <FormItem>
                           <FormLabel>Nome do Workspace</FormLabel>
                           <FormControl>
-                            <Input placeholder="Nome do seu workspace" {...field} />
+                            <Input placeholder="Nome do seu workspace" {...field} disabled={!isAdmin} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -250,7 +253,7 @@ export default function SettingsPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Tipo</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
+                          <Select onValueChange={field.onChange} value={field.value} disabled={!isAdmin}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Selecione o tipo de negócio" />
@@ -277,7 +280,7 @@ export default function SettingsPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Setor</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
+                          <Select onValueChange={field.onChange} value={field.value} disabled={!isAdmin}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Selecione o setor de atuação" />
@@ -293,9 +296,11 @@ export default function SettingsPage() {
                         </FormItem>
                       )}
                     />
-                    <Button type="submit" disabled={workspaceForm.formState.isSubmitting}>
-                      {workspaceForm.formState.isSubmitting ? 'Salvando...' : 'Salvar alterações'}
-                    </Button>
+                    {isAdmin && (
+                        <Button type="submit" disabled={workspaceForm.formState.isSubmitting}>
+                            {workspaceForm.formState.isSubmitting ? 'Salvando...' : 'Salvar alterações'}
+                        </Button>
+                    )}
                   </form>
                 </Form>
                 <Separator className="my-8" />
@@ -308,56 +313,60 @@ export default function SettingsPage() {
                         </Avatar>
                         <div className="grid flex-1 gap-2">
                             <Label htmlFor="logo-upload">Arquivo do ícone</Label>
-                            <Input id="logo-upload" type="file" accept="image/png, image/jpeg, image/gif, image/svg+xml" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} />
+                            <Input id="logo-upload" type="file" accept="image/png, image/jpeg, image/gif, image/svg+xml" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} disabled={!isAdmin}/>
                             <p className="text-sm text-muted-foreground">Preferencialmente um arquivo quadrado (ex: .ico, .svg, ou .png 1:1).</p>
                         </div>
                     </div>
-                     {logoFile && (
+                     {logoFile && isAdmin && (
                         <Button onClick={handleLogoUpload} disabled={isUploading} className="mt-2">
                             {isUploading ? 'Enviando...' : 'Salvar ícone'}
                         </Button>
                     )}
                 </div>
-                <Separator className="my-8" />
-                 <div className="space-y-4">
-                    <h3 className="font-medium leading-none tracking-tight">Logo Principal</h3>
-                    <div className="flex items-start gap-6 pt-2">
-                        <Avatar className="h-16 w-32 rounded-sm bg-muted/50 p-1">
-                            <AvatarImage src={currentBrandKit?.logoPrincipalUrl} className="object-contain" />
-                            <AvatarFallback>Logo</AvatarFallback>
-                        </Avatar>
-                        <div className="grid flex-1 gap-2">
-                            <Label htmlFor="logo-principal-upload">Arquivo do logo</Label>
-                            <Input id="logo-principal-upload" type="file" accept="image/png, image/jpeg, image/svg+xml" onChange={(e) => setLogoPrincipalFile(e.target.files?.[0] || null)} />
-                            <p className="text-sm text-muted-foreground">Versão primária/colorida do logo (ex: horizontal).</p>
+                {isAdmin && (
+                    <>
+                        <Separator className="my-8" />
+                        <div className="space-y-4">
+                            <h3 className="font-medium leading-none tracking-tight">Logo Principal</h3>
+                            <div className="flex items-start gap-6 pt-2">
+                                <Avatar className="h-16 w-32 rounded-sm bg-muted/50 p-1">
+                                    <AvatarImage src={currentBrandKit?.logoPrincipalUrl} className="object-contain" />
+                                    <AvatarFallback>Logo</AvatarFallback>
+                                </Avatar>
+                                <div className="grid flex-1 gap-2">
+                                    <Label htmlFor="logo-principal-upload">Arquivo do logo</Label>
+                                    <Input id="logo-principal-upload" type="file" accept="image/png, image/jpeg, image/svg+xml" onChange={(e) => setLogoPrincipalFile(e.target.files?.[0] || null)} />
+                                    <p className="text-sm text-muted-foreground">Versão primária/colorida do logo (ex: horizontal).</p>
+                                </div>
+                            </div>
+                            {logoPrincipalFile && (
+                                <Button onClick={handleLogoPrincipalUpload} disabled={isUploadingPrincipal} className="mt-2">
+                                    {isUploadingPrincipal ? 'Enviando...' : 'Salvar logo principal'}
+                                </Button>
+                            )}
                         </div>
-                    </div>
-                     {logoPrincipalFile && (
-                        <Button onClick={handleLogoPrincipalUpload} disabled={isUploadingPrincipal} className="mt-2">
-                            {isUploadingPrincipal ? 'Enviando...' : 'Salvar logo principal'}
-                        </Button>
-                    )}
-                </div>
-                <Separator className="my-8" />
-                 <div className="space-y-4">
-                    <h3 className="font-medium leading-none tracking-tight">Logo Negativo</h3>
-                    <div className="flex items-start gap-6 pt-2">
-                        <Avatar className="h-16 w-32 rounded-sm bg-foreground p-1">
-                            <AvatarImage src={currentBrandKit?.logoNegativoUrl} className="object-contain" />
-                            <AvatarFallback className="bg-transparent text-background">Logo</AvatarFallback>
-                        </Avatar>
-                        <div className="grid flex-1 gap-2">
-                            <Label htmlFor="logo-negativo-upload">Arquivo do logo</Label>
-                            <Input id="logo-negativo-upload" type="file" accept="image/png, image/svg+xml" onChange={(e) => setLogoNegativoFile(e.target.files?.[0] || null)} />
-                            <p className="text-sm text-muted-foreground">Versão branca/negativa do logo para fundos escuros.</p>
+                        <Separator className="my-8" />
+                        <div className="space-y-4">
+                            <h3 className="font-medium leading-none tracking-tight">Logo Negativo</h3>
+                            <div className="flex items-start gap-6 pt-2">
+                                <Avatar className="h-16 w-32 rounded-sm bg-foreground p-1">
+                                    <AvatarImage src={currentBrandKit?.logoNegativoUrl} className="object-contain" />
+                                    <AvatarFallback className="bg-transparent text-background">Logo</AvatarFallback>
+                                </Avatar>
+                                <div className="grid flex-1 gap-2">
+                                    <Label htmlFor="logo-negativo-upload">Arquivo do logo</Label>
+                                    <Input id="logo-negativo-upload" type="file" accept="image/png, image/svg+xml" onChange={(e) => setLogoNegativoFile(e.target.files?.[0] || null)} />
+                                    <p className="text-sm text-muted-foreground">Versão branca/negativa do logo para fundos escuros.</p>
+                                </div>
+                            </div>
+                            {logoNegativoFile && (
+                                <Button onClick={handleLogoNegativoUpload} disabled={isUploadingNegativo} className="mt-2">
+                                    {isUploadingNegativo ? 'Enviando...' : 'Salvar logo negativo'}
+                                </Button>
+                            )}
                         </div>
-                    </div>
-                     {logoNegativoFile && (
-                        <Button onClick={handleLogoNegativoUpload} disabled={isUploadingNegativo} className="mt-2">
-                            {isUploadingNegativo ? 'Enviando...' : 'Salvar logo negativo'}
-                        </Button>
-                    )}
-                </div>
+                    </>
+                )}
                 </>
               ) : (
                 <p className="text-sm text-muted-foreground">
@@ -367,12 +376,16 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="connections">
-            <ConnectionsManager />
-        </TabsContent>
-         <TabsContent value="members">
-            <MembersManager />
-        </TabsContent>
+        {isAdmin && (
+            <TabsContent value="connections">
+                <ConnectionsManager />
+            </TabsContent>
+        )}
+        {isAdmin && (
+            <TabsContent value="members">
+                <MembersManager />
+            </TabsContent>
+        )}
       </Tabs>
     </div>
   );

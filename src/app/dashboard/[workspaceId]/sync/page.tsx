@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { updateSyncProposalStatus, publishSync } from '@/lib/actions/workspace-actions';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 function getProposalTypeInfo(type: SyncProposalType): { text: string; icon: React.ReactNode, variant: "success" | "default" | "destructive" } {
     switch (type) {
@@ -117,8 +118,10 @@ export default function SyncPage() {
     const { data: pendingProposals, isLoading: isPendingLoading } = useCollection<SyncProposal>(pendingQuery);
     const { data: approvedProposals, isLoading: isApprovedLoading } = useCollection<SyncProposal>(approvedQuery);
 
+    const approvedCount = approvedProposals?.length ?? 0;
+
     const handlePublish = async () => {
-        if (!user || (approvedProposals?.length ?? 0) === 0) {
+        if (!user || approvedCount === 0) {
             toast({ variant: 'destructive', title: 'Nenhuma alteração aprovada para publicar.' });
             return;
         }
@@ -178,10 +181,23 @@ export default function SyncPage() {
                         Revise, aprove ou rejeite as alterações propostas pela IA para manter sua base de conhecimento atualizada.
                     </p>
                 </div>
-                 <Button size="lg" onClick={handlePublish} disabled={isPublishing || (approvedProposals?.length ?? 0) === 0}>
-                    {isPublishing ? <Loader2 className="mr-2 animate-spin" /> : <Sparkles className="mr-2" />}
-                    Publicar {approvedProposals?.length ?? 0} Alterações
-                </Button>
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <div className="inline-block"> {/* Wrapper div for tooltip on disabled button */}
+                                <Button size="lg" onClick={handlePublish} disabled={isPublishing || approvedCount === 0}>
+                                    {isPublishing ? <Loader2 className="mr-2 animate-spin" /> : <Sparkles className="mr-2" />}
+                                    Publicar {approvedCount} Alteração{approvedCount !== 1 ? 's' : ''}
+                                </Button>
+                            </div>
+                        </TooltipTrigger>
+                        {approvedCount === 0 && (
+                            <TooltipContent>
+                                <p>Aprove pelo menos uma alteração para publicar</p>
+                            </TooltipContent>
+                        )}
+                    </Tooltip>
+                </TooltipProvider>
             </div>
             
             {pendingProposals && pendingProposals.length > 0 && (

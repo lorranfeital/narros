@@ -45,7 +45,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         const userRole = firstWorkspace.ownerId === user.uid ? 'admin' : firstWorkspace.roles?.[user.uid];
 
         let targetPath: string;
-        if (userRole && ['member', 'collaborator'].includes(userRole)) {
+        if (userRole && ['collaborator'].includes(userRole)) {
             targetPath = `/collaborator/${firstWorkspace.id}/home`;
         } else {
             targetPath = `/dashboard/${firstWorkspace.id}`;
