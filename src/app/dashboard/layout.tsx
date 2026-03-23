@@ -20,57 +20,64 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { data: workspaces, isLoading: isWorkspacesLoading } = useCollection<Workspace>(workspacesQuery);
 
   useEffect(() => {
-    // Wait until both user and their workspaces have been loaded
+    // 1. Wait until all data is loaded before making any decisions.
     if (isUserLoading || isWorkspacesLoading) {
-      return;
+      return; // Do nothing until loading is complete.
     }
 
-    // If user is not logged in, send to login page
+    // 2. If user is not logged in, send to login page.
     if (!user) {
-      router.push('/login');
+      router.replace('/login');
       return;
     }
 
-    // If user has no workspaces, send them to create one (unless they are already there)
+    // 3. If user has no workspaces, send them to create one (unless they are already there).
     const isOnNewWorkspacePage = pathname === '/dashboard/new-workspace';
-    if ((!workspaces || workspaces.length === 0) && !isOnNewWorkspacePage) {
-      router.push('/dashboard/new-workspace');
-      return;
+    if ((!workspaces || workspaces.length === 0)) {
+        if (!isOnNewWorkspacePage) {
+            router.replace('/dashboard/new-workspace');
+        }
+        return;
     }
     
-    // If user is on the root dashboard page, decide where they should go.
+    // 4. If we are on the root dashboard page, decide where the user's "home" is.
     const isOnDashboardRoot = pathname === '/dashboard';
     if (workspaces && workspaces.length > 0 && isOnDashboardRoot) {
         const firstWorkspace = workspaces[0];
-        const userRole = firstWorkspace.ownerId === user.uid ? 'admin' : firstWorkspace.roles?.[user!.uid];
+        // Determine the user's role in their first workspace.
+        const userRole = firstWorkspace.ownerId === user.uid ? 'admin' : firstWorkspace.roles?.[user.uid];
 
-        // If the user's role is a collaborator type, redirect to the collaborator view
+        // If the user's role is a collaborator type, their home is the collaborator view.
         if (userRole && ['member', 'collaborator'].includes(userRole)) {
             router.replace(`/collaborator/${firstWorkspace.id}/home`);
         } else {
-            // Otherwise, redirect to their first workspace's admin dashboard
+            // Otherwise, their home is the admin dashboard for that workspace.
             router.replace(`/dashboard/${firstWorkspace.id}`);
         }
-        return;
+        return; // Important: stop execution after redirecting.
     }
 
   }, [user, isUserLoading, workspaces, isWorkspacesLoading, pathname, router]);
 
-  // Render a loading state while we wait for auth and data
-  if (isUserLoading || (user && isWorkspacesLoading && pathname === '/dashboard')) {
-     return <div className="flex min-h-screen items-center justify-center"><p>Carregando Dashboard...</p></div>;
-  }
-  
-  // If user is not logged in, show nothing while redirecting
-  if (!user) {
-    return null;
-  }
-  
-  // If user has no workspaces and is not on the creation page, show nothing while redirecting
-  if ((!workspaces || workspaces.length === 0) && pathname !== '/dashboard/new-workspace') {
-      return null;
-  }
+  // --- Render Logic ---
+  const isLoading = isUserLoading || isWorkspacesLoading;
 
+  // While loading, or if a redirect is in progress from the useEffect, show a full-screen loader.
+  // This prevents any "flash" of content.
+  if (isLoading || pathname === '/dashboard') {
+     return (
+        <div className="flex h-screen w-screen items-center justify-center">
+            <p>Carregando...</p>
+        </div>
+     );
+  }
+  
+  // If user has no workspaces but is on the creation page, allow it.
+  if ((!workspaces || workspaces.length === 0) && pathname === '/dashboard/new-workspace') {
+      return <>{children}</>;
+  }
+  
+  // After all checks, if we are not loading and not on a page that should redirect, render the layout.
   const isMapPage = pathname?.includes('/map');
   if (isMapPage) {
     return <div className="h-screen w-screen">{children}</div>;
