@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useRouter, useParams } from "next/navigation";
@@ -25,26 +24,25 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
   const { data: workspace, isLoading: isWorkspaceLoading, error: workspaceError } = useDoc<Workspace>(workspaceDocRef);
 
   useEffect(() => {
-    const isLoading = isUserLoading || isWorkspaceLoading;
-    if (isLoading) {
-      return; // Wait for all data to settle.
+    // 1. NUNCA tomar decisões de redirecionamento se os dados essenciais ainda estiverem carregando.
+    if (isUserLoading || isWorkspaceLoading) {
+      return; 
     }
-    
-    // --- At this point, all hooks have finished their loading cycle ---
-    
-    // 1. User not logged in
+
+    // 2. Se o carregamento terminou e não há usuário, o lugar dele é na tela de login.
     if (!user) {
       router.replace('/login');
       return;
     }
-
-    // 2. Workspace doesn't exist (permission error or not found)
-    if (!workspace) {
-      router.push('/unauthorized');
-      return;
-    }
     
-    // 3. User is not a member of this workspace
+    // 3. Se o carregamento terminou e o workspace não foi encontrado (seja por permissão ou inexistência),
+    // o acesso é não autorizado. Esta é a guarda crucial para evitar a "race condition".
+    if (!workspace) {
+        router.push('/unauthorized');
+        return;
+    }
+
+    // 4. Só agora, com usuário e workspace confirmados, verificamos as permissões de acesso.
     const isOwner = workspace.ownerId === user.uid;
     const userRole = workspace.roles?.[user.uid];
     const isMember = isOwner || !!userRole;
@@ -54,50 +52,50 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
       return;
     }
     
-    // 4. User is an admin/curator and should be on the main dashboard
+    // 5. Se o usuário for um administrador ou curador, seu lugar é no dashboard principal, não aqui.
     if (isOwner || userRole === 'admin' || userRole === 'curator') {
       router.replace(`/dashboard/${workspaceId}`);
       return;
     }
-    
-    // 5. If all checks pass, user is an authorized collaborator.
 
-  }, [isUserLoading, isWorkspaceLoading, user, workspace, router, workspaceId, workspaceError]);
+    // Se passar por todas as verificações, o acesso está correto e o useEffect não faz nada.
 
-  // === RENDER LOGIC ===
+  }, [isUserLoading, isWorkspaceLoading, user, workspace, router, workspaceId]);
 
-  const isLoading = isUserLoading || isWorkspaceLoading;
+
+  // --- Lógica de Renderização ---
   
-  if (isLoading) {
+  // Exibe a tela de carregamento enquanto o usuário ou o workspace estão sendo carregados,
+  // E crucialmente, TAMBÉM se o workspace ainda for nulo após o carregamento inicial.
+  // Isso impede a renderização de conteúdo parcial antes que o useEffect possa redirecionar com segurança.
+  if (isUserLoading || isWorkspaceLoading || !workspace) {
      return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex h-screen items-center justify-center">
         <p>Verificando permissões...</p>
       </div>
     );
   }
-
-  // Only render children if user and workspace are loaded and authorized.
-  // The useEffect handles all unauthorized/redirect cases.
-  if (user && workspace) {
-     const userRole = workspace.roles?.[user.uid];
-     const isAuthorizedCollaborator = userRole === 'member' || userRole === 'collaborator';
+  
+  // Neste ponto, temos certeza que temos um usuário e um workspace.
+  // O useEffect acima já está cuidando de redirecionar quem não deveria estar aqui (e.g., admins).
+  const userRole = workspace.roles?.[user.uid];
+  const isAuthorizedCollaborator = userRole === 'member' || userRole === 'collaborator';
      
-     if (isAuthorizedCollaborator) {
-        return (
-          <div className="flex h-screen bg-background">
-            <CollaboratorSidebar />
-            <main className={cn(
-              "flex-1 overflow-y-auto transition-all duration-300 ease-in-out"
-              )}>
-              {children}
-            </main>
-          </div>
-        );
-     }
+  if (isAuthorizedCollaborator) {
+    return (
+      <div className="flex h-screen bg-background">
+        <CollaboratorSidebar />
+        <main className={cn(
+          "flex-1 overflow-y-auto transition-all duration-300 ease-in-out"
+          )}>
+          {children}
+        </main>
+      </div>
+    );
   }
 
-  // Fallback case: Loading is done, but conditions aren't met for rendering.
-  // The useEffect is already handling the redirection. We show a loader to prevent content flash.
+  // Caso de borda: O usuário é um membro válido (e.g. admin) mas o useEffect ainda não o redirecionou.
+  // Mostramos uma tela de "Redirecionando..." para evitar qualquer flash de conteúdo indevido.
   return (
     <div className="flex min-h-screen items-center justify-center">
       <p>Redirecionando...</p>
