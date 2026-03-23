@@ -7,6 +7,10 @@ import { useEffect, ReactNode } from "react";
 import { collection, query, where, doc } from 'firebase/firestore';
 import { Workspace } from "@/lib/firestore-types";
 
+function getTimestamp() {
+    return new Date().toLocaleTimeString('en-US', { hour12: false });
+}
+
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
@@ -15,15 +19,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const params = useParams();
   const workspaceId = params.workspaceId as string;
 
-  // This query gets ALL workspaces the user is a member of.
-  // It's used to decide where to go if the user just lands on /dashboard.
   const workspacesQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return query(collection(firestore, 'workspaces'), where('members', 'array-contains', user.uid));
   }, [user, firestore]);
   const { data: workspaces, isLoading: isWorkspacesLoading } = useCollection<Workspace>(workspacesQuery);
   
-  // This hook gets the specific workspace from the URL, if one exists.
   const currentWorkspaceDocRef = useMemoFirebase(() => {
       if (!firestore || !workspaceId) return null;
       return doc(firestore, 'workspaces', workspaceId);
@@ -31,52 +32,60 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { data: currentWorkspace, isLoading: isCurrentWorkspaceLoading } = useDoc<Workspace>(currentWorkspaceDocRef);
 
   useEffect(() => {
-    // Primary loading gate: wait for user and initial workspace list.
+    const timestamp = getTimestamp();
+    console.log(`[${timestamp}] [DashboardLayout] useEffect triggered.`, { pathname, workspaceId, isUserLoading, isWorkspacesLoading, isCurrentWorkspaceLoading, user: !!user, workspaces: workspaces?.map(w => w.id) });
+
     if (isUserLoading || isWorkspacesLoading) {
+      console.log(`[${timestamp}] [DashboardLayout] Waiting for user or workspaces to load...`);
       return; 
     }
 
-    // 1. If user is not logged in, go to login page.
     if (!user) {
+      console.log(`[${timestamp}] [DashboardLayout] No user found. Redirecting to /login.`);
       router.push('/login');
       return;
     }
 
-    // After this point, we know we have a user and their list of workspaces.
     const hasWorkspaces = workspaces && workspaces.length > 0;
     const isOnNewWorkspacePage = pathname === '/dashboard/new-workspace';
     const isOnDashboardRoot = pathname === '/dashboard';
 
-    // 2. If user has no workspaces, force them to create one.
     if (!hasWorkspaces && !isOnNewWorkspacePage) {
+        console.log(`[${timestamp}] [DashboardLayout] No workspaces found for user. Redirecting to /dashboard/new-workspace.`);
         router.push('/dashboard/new-workspace');
         return;
     }
 
-    // 3. If user has workspaces and is on the root, decide where to send them.
     if (hasWorkspaces && isOnDashboardRoot) {
         const firstWorkspace = workspaces[0];
         const userRole = firstWorkspace.ownerId === user.uid ? 'admin' : firstWorkspace.roles?.[user.uid];
-
-        if (userRole && ['member', 'collaborator'].includes(userRole)) {
-            router.replace(`/collaborator/${firstWorkspace.id}/home`);
-        } else {
-            router.replace(`/dashboard/${firstWorkspace.id}`);
-        }
+        const targetPath = (userRole && ['member', 'collaborator'].includes(userRole))
+            ? `/collaborator/${firstWorkspace.id}/home`
+            : `/dashboard/${firstWorkspace.id}`;
+        
+        console.log(`[${timestamp}] [DashboardLayout] User is on root. Deciding where to go.`, { userRole, targetPath });
+        router.replace(targetPath);
         return;
     }
     
-    // 4. If user is on a specific dashboard URL, verify their role for THAT workspace.
-    // This handles cases where they might have a direct link or are already navigating.
-    if (workspaceId && !isCurrentWorkspaceLoading && currentWorkspace) {
-        const userRole = currentWorkspace.ownerId === user.uid ? 'admin' : currentWorkspace.roles?.[user.uid];
-        
-        // This is a key fix: If a collaborator lands on a dashboard URL, redirect them.
-        if (userRole && ['member', 'collaborator'].includes(userRole) && !pathname.startsWith('/collaborator')) {
-            router.replace(`/collaborator/${workspaceId}/home`);
-            return;
+    if (workspaceId && !isCurrentWorkspaceLoading) {
+        if (currentWorkspace) {
+            const userRole = currentWorkspace.ownerId === user.uid ? 'admin' : currentWorkspace.roles?.[user.uid];
+            const isCollaboratorPath = pathname.startsWith('/collaborator');
+
+            console.log(`[${timestamp}] [DashboardLayout] Verifying role for loaded workspace.`, { workspaceId, userRole, isCollaboratorPath });
+
+            if (userRole && ['member', 'collaborator'].includes(userRole) && !isCollaboratorPath) {
+                const targetPath = `/collaborator/${workspaceId}/home`;
+                console.log(`[${timestamp}] [DashboardLayout] User has collaborator role. REDIRECTING to ${targetPath}`);
+                router.replace(targetPath);
+                return;
+            }
+        } else {
+             console.log(`[${timestamp}] [DashboardLayout] Workspace with ID ${workspaceId} not found after loading. This might be a permission issue or invalid ID.`);
         }
     }
+     console.log(`[${timestamp}] [DashboardLayout] useEffect completed without redirection.`);
 
   }, [
     user, isUserLoading, 
@@ -85,21 +94,19 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     workspaceId, pathname, router
   ]);
 
-  // --- RENDER LOGIC ---
-
   const isLoading = isUserLoading || isWorkspacesLoading;
 
   if (isLoading) {
-     return <div className="flex min-h-screen items-center justify-center"><p>Carregando...</p></div>;
+     return <div className="flex min-h-screen items-center justify-center"><p>Carregando Dashboard...</p></div>;
   }
   
   if (!user) {
-    return null; // Redirecting
+    return null;
   }
   
   const isCreatingWorkspace = pathname === '/dashboard/new-workspace';
   if ((!workspaces || workspaces.length === 0) && !isCreatingWorkspace) {
-    return <div className="flex min-h-screen items-center justify-center"><p>Redirecionando...</p></div>;
+    return <div className="flex min-h-screen items-center justify-center"><p>Redirecionando para criação de workspace...</p></div>;
   }
   
   const isMapPage = pathname?.includes('/map');
@@ -107,7 +114,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     return <div className="h-screen w-screen">{children}</div>;
   }
 
-  // For users with no workspaces, only render the creation page.
   if ((!workspaces || workspaces.length === 0) && isCreatingWorkspace) {
       return <>{children}</>;
   }

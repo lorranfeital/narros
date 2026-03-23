@@ -8,6 +8,11 @@ import { Workspace } from "@/lib/firestore-types";
 import { CollaboratorSidebar } from "@/components/collaborator/sidebar";
 import { cn } from "@/lib/utils";
 
+
+function getTimestamp() {
+    return new Date().toLocaleTimeString('en-US', { hour12: false });
+}
+
 export default function CollaboratorLayout({ children }: { children: ReactNode }) {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
@@ -15,7 +20,6 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
   const params = useParams();
   const workspaceId = params.workspaceId as string;
 
-  // Just get the current workspace. This layout's only job is to protect itself.
   const workspaceDocRef = useMemoFirebase(() => {
       if (!firestore || !workspaceId) return null;
       return doc(firestore, 'workspaces', workspaceId);
@@ -23,45 +27,45 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
   const { data: workspace, isLoading: isWorkspaceLoading, error: workspaceError } = useDoc<Workspace>(workspaceDocRef);
   
   useEffect(() => {
-    // --- AUTHORIZATION GATE ---
-    // Wait until ALL data is loaded before making any decisions.
+    const timestamp = getTimestamp();
+    console.log(`[${timestamp}] [CollaboratorLayout] useEffect triggered.`, { isUserLoading, isWorkspaceLoading, user: !!user, workspace: !!workspace, workspaceId });
+    
     if (isUserLoading || isWorkspaceLoading) {
-      return; // Do nothing until loading is complete.
+      console.log(`[${timestamp}] [CollaboratorLayout] Still loading...`, { isUserLoading, isWorkspaceLoading });
+      return; 
     }
 
-    // --- DECISION POINT ---
-    // At this point, all data is settled. We can now make a single, definitive check.
-
-    // 1. Check for authenticated user.
     if (!user) {
+      console.log(`[${timestamp}] [CollaboratorLayout] No user found. Redirecting to /login.`);
       router.push('/login');
       return;
     }
     
-    // 2. Check if the workspace document was found. If not, access is unauthorized.
-    // This covers both non-existent workspaces and permission errors from useDoc.
     if (!workspace) {
+        console.error(`[${timestamp}] [CollaboratorLayout] REDIRECTING to /unauthorized because workspace document not found after loading. Error from useDoc: ${workspaceError?.message || 'No error object'}`);
         router.push('/unauthorized');
         return;
     }
     
-    // 3. Final check: Is the user actually a member of this workspace?
-    const isMember = workspace.members?.includes(user.uid);
+    const isOwner = workspace.ownerId === user.uid;
+    const hasRole = workspace.roles && Object.prototype.hasOwnProperty.call(workspace.roles, user.uid);
+    const isMember = isOwner || hasRole;
+    
+    console.log(`[${timestamp}] [CollaboratorLayout] Final check:`, { isOwner, hasRole, roles: workspace.roles });
 
     if (!isMember) {
+        console.error(`[${timestamp}] [CollaboratorLayout] REDIRECTING to /unauthorized because final 'isMember' check is false.`);
         router.push('/unauthorized');
         return;
     }
     
-    // All checks passed, user is authorized. The effect is done.
+    console.log(`[${timestamp}] [CollaboratorLayout] Access GRANTED.`);
 
-  }, [user, isUserLoading, workspace, isWorkspaceLoading, router, workspaceId]);
+  }, [user, isUserLoading, workspace, isWorkspaceLoading, router, workspaceId, workspaceError]);
 
 
-  // --- RENDER LOGIC ---
   const isLoading = isUserLoading || isWorkspaceLoading;
 
-  // Show a loading screen while the useEffect is waiting for data.
   if (isLoading) {
      return (
       <div className="flex min-h-screen items-center justify-center">
@@ -69,13 +73,10 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
       </div>
     );
   }
-
-  // The useEffect will handle redirection if needed. We can render the children only 
-  // if we are confident the user is authorized, preventing flashes of content.
-  const isAuthorized = user && workspace && workspace.members?.includes(user.uid);
-
-  if (!isAuthorized) {
-      // While the useEffect handles the redirect, this prevents rendering children if auth fails.
+  
+  // This check is a safeguard, the useEffect handles the logic.
+  // It prevents rendering children if the data is not yet available or auth fails.
+  if (!user || !workspace) {
       return (
         <div className="flex min-h-screen items-center justify-center">
             <p>Verificando permissões...</p>
@@ -83,7 +84,16 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
       );
   }
 
-  // If all checks pass, render the layout.
+  const isMember = (workspace.ownerId === user.uid) || (workspace.roles && Object.prototype.hasOwnProperty.call(workspace.roles, user.uid));
+  if (!isMember) {
+     return (
+        <div className="flex min-h-screen items-center justify-center">
+            <p>Redirecionando...</p>
+        </div>
+      );
+  }
+
+
   return (
     <div className="flex h-screen bg-background">
       <CollaboratorSidebar />
