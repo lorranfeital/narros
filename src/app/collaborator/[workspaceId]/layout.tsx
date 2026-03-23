@@ -22,30 +22,59 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
   const { data: workspace, isLoading: isWorkspaceLoading, error: workspaceError } = useDoc<Workspace>(workspaceDocRef);
   
   const isMember = useMemo(() => {
-    if (!user || !workspace) return false;
-    // This logic MUST mirror the `isWorkspaceMember` security rule.
-    // Check if the user is the owner OR if their UID exists as a key in the roles map.
-    return workspace.ownerId === user.uid || (workspace.roles && Object.prototype.hasOwnProperty.call(workspace.roles, user.uid));
+    const timestamp = new Date().toLocaleTimeString();
+    console.log(`[${timestamp}] useMemo for isMember is calculating...`);
+
+    if (!user || !workspace) {
+      console.log(`[${timestamp}] isMember -> false (user or workspace is missing)`);
+      return false;
+    }
+
+    console.log(`[${timestamp}] isMember check: User ID: ${user.uid}`);
+    console.log(`[${timestamp}] isMember check: Workspace Owner ID: ${workspace.ownerId}`);
+    console.log(`[${timestamp}] isMember check: Workspace roles:`, workspace.roles ? JSON.parse(JSON.stringify(workspace.roles)) : 'undefined');
+
+    const isOwner = workspace.ownerId === user.uid;
+    const hasRole = workspace.roles && Object.prototype.hasOwnProperty.call(workspace.roles, user.uid);
+    const result = isOwner || hasRole;
+    
+    console.log(`[${timestamp}] isMember result: ${result} (isOwner: ${isOwner}, hasRole: ${hasRole})`);
+    return result;
   }, [user, workspace]);
 
   useEffect(() => {
-    if (!isUserLoading && !user) {
+    const timestamp = new Date().toLocaleTimeString();
+    console.log(`[${timestamp}] CollaboratorLayout useEffect triggered.`);
+
+    if (isUserLoading || isWorkspaceLoading) {
+        console.log(`[${timestamp}] Still loading... (isUserLoading: ${isUserLoading}, isWorkspaceLoading: ${isWorkspaceLoading})`);
+        return;
+    }
+
+    if (!user) {
+      console.error(`[${timestamp}] Auth loaded, but no user found. Redirecting to /login.`);
       router.push('/login');
       return;
     }
-    
-    // Wait until both user and workspace are done loading
-    if (!isUserLoading && !isWorkspaceLoading) {
-      // If loading is finished and the user is NOT a member, redirect.
-      if (!isMember) {
-        router.push('/unauthorized');
-      }
+
+    if (!workspace) {
+        console.error(`[${timestamp}] Data loaded, but workspace document not found. Error: ${workspaceError?.message || 'No error message'}`);
+        // Don't redirect immediately, the next check will handle it.
     }
-  }, [user, isUserLoading, isWorkspaceLoading, isMember, router]);
+    
+    if (!isMember) {
+        console.error(`[${timestamp}] REDIRECTING to /unauthorized because final 'isMember' check is false.`);
+        router.push('/unauthorized');
+    } else {
+        console.log(`[${timestamp}] Access GRANTED. Final 'isMember' check is true.`);
+    }
+  }, [user, isUserLoading, workspace, isWorkspaceLoading, workspaceError, isMember, router]);
 
 
   const showLoading = isUserLoading || isWorkspaceLoading;
   
+  // Important: We still need to block render if isMember is false even while loading, 
+  // to prevent flicker of content before redirect.
   if (showLoading || !isMember) {
      return (
       <div className="flex min-h-screen items-center justify-center">
