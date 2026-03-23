@@ -75,7 +75,6 @@ import {
 } from '@/lib/firestore-types';
 
 import { getFederatedMapData, FederatedMapData } from '@/lib/actions/federation-actions';
-import { useCollection } from '@/firebase';
 import { cn } from '@/lib/utils';
 
 // Type definitions for our nodes
@@ -154,238 +153,187 @@ export default function OperationalMapPage() {
   const [selectedNode, setSelectedNode] = useState<Node<MapNodeData> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [edgeToDelete, setEdgeToDelete] = useState<Edge | null>(null);
-  
+  const [isLoading, setIsLoading] = useState(true);
+
   const firestore = useFirestore();
   const params = useParams();
   const { toast } = useToast();
   const { user } = useUser();
   const workspaceId = params.workspaceId as string;
 
-  // --- Data Fetching ---
-  const [federatedData, setFederatedData] = useState<{ [key: string]: FederatedMapData } | null>(null);
-  const [isFederatedLoading, setIsFederatedLoading] = useState(true);
-
-  const insightsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, `workspaces/${workspaceId}/insights`)) : null, [firestore, workspaceId]);
-  const { data: insights, isLoading: isInsightsLoading } = useCollection<Insight>(insightsQuery);
-
-  const nodeRelationsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, `workspaces/${workspaceId}/nodeRelations`)) : null, [firestore, workspaceId]);
-  const { data: nodeRelations, isLoading: areRelationsLoading, error: relationsError } = useCollection<NodeRelation>(nodeRelationsQuery);
-  
   useEffect(() => {
-    const fetchData = async () => {
-        if (!workspaceId) return;
-        setIsFederatedLoading(true);
-        try {
-            const data = await getFederatedMapData(workspaceId);
-            setFederatedData(data);
-        } catch (error) {
-            console.error("Failed to fetch federated map data:", error);
-            toast({ variant: 'destructive', title: "Erro ao carregar dados do mapa.", description: (error as Error).message });
-        } finally {
-            setIsFederatedLoading(false);
+    const generateFullLayout = async () => {
+      if (!firestore || !workspaceId) return;
+      setIsLoading(true);
+
+      try {
+        // Step 1: Fetch all required data in one go.
+        const federatedData = await getFederatedMapData(workspaceId);
+        
+        const relationsQuery = query(collection(firestore, `workspaces/${workspaceId}/nodeRelations`));
+        const relationsSnap = await getDocs(relationsQuery);
+        const nodeRelations = relationsSnap.docs.map(doc => ({ ...doc.data(), id: doc.id } as NodeRelation & {id: string}));
+
+        const layoutRef = doc(firestore, `workspaces/${workspaceId}/layouts`, 'map');
+        const layoutSnap = await getDoc(layoutRef);
+
+        const insightsQuery = query(collection(firestore, `workspaces/${workspaceId}/insights`));
+        const insightsSnap = await getDocs(insightsQuery);
+        const insights = insightsSnap.docs.map(doc => doc.data() as Insight);
+
+        // Step 2: Process data and build nodes & edges.
+        const newNodes: Node<MapNodeData>[] = [];
+        const newEdges: Edge[] = [];
+
+        if (!federatedData || Object.keys(federatedData).length === 0) {
+            setNodes([]);
+            setEdges([]);
+            setIsLoading(false);
+            return;
         }
-    };
-    fetchData();
-  }, [workspaceId, toast]);
 
-  const allDataLoaded = !isFederatedLoading && !isInsightsLoading && !areRelationsLoading;
-
-  // --- Layout and Node/Edge Generation ---
-  useEffect(() => {
-    if (!allDataLoaded || !federatedData || !Object.keys(federatedData).length || !firestore) {
-        return;
-    }
-
-    const generateLayout = async () => {
-      const newNodes: Node<MapNodeData>[] = [];
-      const federatedEdges: Edge[] = [];
-      const defaultIntraWorkspaceEdges: Edge[] = [];
-      
-      const getInsightsFor = (entityTitle: string) => {
-        if (!insights) return { risco: 0, gap: 0, oportunidade: 0 };
-        const counts = { risco: 0, gap: 0, oportunidade: 0 };
-        insights.forEach((insight) => {
-          if (insight.texto.toLowerCase().includes(entityTitle.toLowerCase())) {
-            counts[insight.tipo]++;
-          }
-        });
-        return counts;
-      };
-
-      const federatedKeys = Object.keys(federatedData);
-      const connectedWorkspaces = federatedKeys.filter(id => id !== workspaceId);
-      const connectedWsSpacing = 1200;
-
-      for (const wsId in federatedData) {
-        const isCurrentWs = wsId === workspaceId;
-        const data = federatedData[wsId];
-        const wsName = data.workspace.name;
-        
-        let workspaceCenterX = 0;
-        let workspaceCenterY = 0;
-        
-        if (isCurrentWs) {
-            workspaceCenterX = -800;
-        } else {
-            const connectedIndex = connectedWorkspaces.indexOf(wsId);
-            workspaceCenterX = 800;
-            workspaceCenterY = connectedIndex * connectedWsSpacing - ((connectedWorkspaces.length - 1) * connectedWsSpacing / 2);
-        }
-        
-        const workspaceNodeId = `ws-${wsId}`;
-        newNodes.push({
-            id: workspaceNodeId,
-            type: 'custom',
-            position: { x: workspaceCenterX, y: workspaceCenterY },
-            data: {
-                label: wsName,
-                type: 'workspace',
-                icon: <Network className="h-6 w-6" />,
-                raw_data: data.workspace,
-                isFederated: !isCurrentWs,
-            },
-        });
-        
-        if (!isCurrentWs) {
-             federatedEdges.push({
-                id: `e-fed-${wsId}`,
-                source: `ws-${workspaceId}`,
-                target: workspaceNodeId,
-                type: 'smoothstep',
-                label: `Conexão: ${wsName}`,
-                style: { stroke: '#aaa', strokeDasharray: '5 5' },
-                markerEnd: { type: MarkerType.ArrowClosed, color: '#aaa' },
-            });
-        }
-        
-        const categoryRadius = 500;
-        const itemRadius = 250;
-        const categories = data.knowledge?.categories || [];
-        categories.forEach((category, catIndex) => {
-            const catAngle = (catIndex / (categories.length || 1)) * 2 * Math.PI;
-            const categoryCenterX = workspaceCenterX + categoryRadius * Math.cos(catAngle);
-            const categoryCenterY = workspaceCenterY + categoryRadius * Math.sin(catAngle);
-            const categoryId = `${wsId}-cat-${encodeURIComponent(category.categoria)}`;
-
-            newNodes.push({
-                id: categoryId,
-                type: 'custom',
-                position: { x: categoryCenterX - 128, y: categoryCenterY - 70 },
-                data: { label: category.categoria, type: 'category', icon: <Folder className="h-5 w-5" />, subtext: `${category.itens.length} iten(s)`, insights: getInsightsFor(category.categoria), raw_data: category, isFederated: !isCurrentWs, workspaceName: wsName },
-            });
-            defaultIntraWorkspaceEdges.push({ id: `e-ws-cat-${wsId}-${catIndex}`, source: workspaceNodeId, target: categoryId, type: 'smoothstep' });
-
-            category.itens.forEach((item, itemIndex) => {
-                const itemAngle = (itemIndex / (category.itens.length || 1)) * 2 * Math.PI + (catAngle / 4);
-                const itemId = `${categoryId}-item-${encodeURIComponent(item.titulo)}`;
-                newNodes.push({
-                    id: itemId,
-                    type: 'custom',
-                    position: { x: categoryCenterX + itemRadius * Math.cos(itemAngle) - 128, y: categoryCenterY + itemRadius * Math.sin(itemAngle) - 40 },
-                    data: {
-                        label: item.titulo,
-                        type: 'content',
-                        icon: <FileText className="h-5 w-5" />,
-                        subtext: item.descricao,
-                        raw_data: item,
-                        isFederated: !isCurrentWs,
-                        workspaceName: wsName,
-                    },
-                });
-                defaultIntraWorkspaceEdges.push({ id: `e-cat-item-${wsId}-${catIndex}-${itemIndex}`, source: categoryId, target: itemId, type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed, color: '#aaa'} });
-            });
-        });
-        
-        const playbookRadius = 800;
-        const playbooks = data.playbooks || [];
-        playbooks.forEach((playbook, index) => {
-            const angle = (index / (playbooks.length || 1)) * 2 * Math.PI + Math.PI / 4;
-            const playbookId = `${wsId}-play-${playbook.id}`;
-            newNodes.push({
-                id: playbookId,
-                type: 'custom',
-                position: { x: workspaceCenterX + playbookRadius * Math.cos(angle) - 128, y: workspaceCenterY + playbookRadius * Math.sin(angle) - 70 },
-                data: { label: playbook.processo, type: 'playbook', icon: <BookOpen className="h-5 w-5" />, subtext: `${playbook.passos.length} passo(s)`, insights: getInsightsFor(playbook.processo), raw_data: playbook, isFederated: !isCurrentWs, workspaceName: wsName },
-            });
-            defaultIntraWorkspaceEdges.push({ id: `e-${wsId}-play-${index}`, source: workspaceNodeId, target: playbookId, type: 'smoothstep' });
-        });
-
-        const orgChartRadius = 1100;
-        const orgChart = data.orgChart;
-        if (orgChart && orgChart.nodes) {
-            orgChart.nodes.forEach((node, index) => {
-                const angle = (index / (orgChart.nodes.length || 1)) * 2 * Math.PI - Math.PI / 3;
-                const nodeId = `${wsId}-org-${node.id}`;
-                newNodes.push({
-                    id: nodeId,
-                    type: 'custom',
-                    position: { x: workspaceCenterX + orgChartRadius * Math.cos(angle) - 128, y: workspaceCenterY + orgChartRadius * Math.sin(angle) - 70 },
-                    data: {
-                        label: node.name,
-                        type: 'orgchart',
-                        icon: <Users className="h-5 w-5" />,
-                        subtext: node.title,
-                        raw_data: node,
-                        isFederated: !isCurrentWs,
-                        workspaceName: wsName,
-                    },
-                });
-                if (node.parentId) {
-                    defaultIntraWorkspaceEdges.push({ id: `e-org-${wsId}-${node.id}`, source: `${wsId}-org-${node.parentId}`, target: nodeId, type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } });
-                } else {
-                    defaultIntraWorkspaceEdges.push({ id: `e-ws-org-${wsId}-${node.id}`, source: workspaceNodeId, target: nodeId, type: 'smoothstep' });
-                }
-            });
-        }
-      }
-
-      const layoutRef = doc(firestore, `workspaces/${workspaceId}/layouts`, 'map');
-      const layoutSnap = await getDoc(layoutRef);
-      
-      let finalNodes = newNodes;
-      
-      const finalEdges: Edge[] = [...defaultIntraWorkspaceEdges, ...federatedEdges];
-      
-      const relationsInitialized = layoutSnap.exists() && layoutSnap.data()?.relations_initialized;
-
-      if (relationsInitialized && nodeRelations) {
-        const savedEdges = nodeRelations.map(rel => ({
-          id: rel.id,
-          source: rel.fromNodeId,
-          target: rel.toNodeId,
-          sourceHandle: rel.sourceHandle,
-          targetHandle: rel.targetHandle,
-          type: 'smoothstep',
-        }));
-        finalEdges.push(...savedEdges);
-      }
-      
-      if (layoutSnap.exists()) {
-        const layoutData = layoutSnap.data();
-        if (Array.isArray(layoutData.nodePositions)) {
-          const savedPositions = new Map(layoutData.nodePositions.map((p: any) => [p.id, { x: p.x, y: p.y }]));
-          finalNodes = newNodes.map((node) => {
-            const savedPosition = savedPositions.get(node.id);
-            return savedPosition ? { ...node, position: savedPosition } : node;
+        const getInsightsFor = (entityTitle: string) => {
+          if (!insights) return { risco: 0, gap: 0, oportunidade: 0 };
+          const counts = { risco: 0, gap: 0, oportunidade: 0 };
+          insights.forEach((insight) => {
+            if (insight.texto.toLowerCase().includes(entityTitle.toLowerCase())) {
+              counts[insight.tipo]++;
+            }
           });
+          return counts;
+        };
+        
+        const federatedKeys = Object.keys(federatedData);
+        const connectedWorkspaces = federatedKeys.filter(id => id !== workspaceId);
+        const connectedWsSpacing = 1200;
+
+        for (const wsId in federatedData) {
+          const isCurrentWs = wsId === workspaceId;
+          const data = federatedData[wsId];
+          const wsName = data.workspace.name;
+          
+          let workspaceCenterX = isCurrentWs ? -800 : 800;
+          let workspaceCenterY = 0;
+          
+          if (!isCurrentWs) {
+              const connectedIndex = connectedWorkspaces.indexOf(wsId);
+              workspaceCenterY = connectedIndex * connectedWsSpacing - ((connectedWorkspaces.length - 1) * connectedWsSpacing / 2);
+          }
+          
+          const workspaceNodeId = `ws-${wsId}`;
+          newNodes.push({
+              id: workspaceNodeId,
+              type: 'custom',
+              position: { x: workspaceCenterX, y: workspaceCenterY },
+              data: { label: wsName, type: 'workspace', icon: <Network className="h-6 w-6" />, raw_data: data.workspace, isFederated: !isCurrentWs },
+          });
+          
+          if (!isCurrentWs) {
+               newEdges.push({
+                  id: `e-fed-${wsId}`, source: `ws-${workspaceId}`, target: workspaceNodeId, type: 'smoothstep',
+                  label: `Conexão: ${wsName}`, style: { stroke: '#aaa', strokeDasharray: '5 5' }, markerEnd: { type: MarkerType.ArrowClosed, color: '#aaa' },
+              });
+          }
+          
+          const categoryRadius = 500;
+          const itemRadius = 250;
+          const categories = data.knowledge?.categories || [];
+
+          categories.forEach((category, catIndex) => {
+              const catAngle = (catIndex / (categories.length || 1)) * 2 * Math.PI;
+              const categoryCenterX = workspaceCenterX + categoryRadius * Math.cos(catAngle);
+              const categoryCenterY = workspaceCenterY + categoryRadius * Math.sin(catAngle);
+              const categoryId = `${wsId}-cat-${encodeURIComponent(category.categoria)}`;
+
+              newNodes.push({
+                  id: categoryId, type: 'custom', position: { x: categoryCenterX - 128, y: categoryCenterY - 70 },
+                  data: { label: category.categoria, type: 'category', icon: <Folder className="h-5 w-5" />, subtext: `${category.itens.length} iten(s)`, insights: getInsightsFor(category.categoria), raw_data: category, isFederated: !isCurrentWs, workspaceName: wsName },
+              });
+              newEdges.push({ id: `e-ws-cat-${wsId}-${catIndex}`, source: workspaceNodeId, target: categoryId, type: 'smoothstep' });
+
+              category.itens.forEach((item, itemIndex) => {
+                  const itemAngle = (itemIndex / (category.itens.length || 1)) * 2 * Math.PI + (catAngle / 4);
+                  const itemId = `${categoryId}-item-${encodeURIComponent(item.titulo)}`;
+                  newNodes.push({
+                      id: itemId, type: 'custom', position: { x: categoryCenterX + itemRadius * Math.cos(itemAngle) - 128, y: categoryCenterY + itemRadius * Math.sin(itemAngle) - 40 },
+                      data: { label: item.titulo, type: 'content', icon: <FileText className="h-5 w-5" />, subtext: item.descricao, raw_data: item, isFederated: !isCurrentWs, workspaceName: wsName },
+                  });
+                  newEdges.push({ id: `e-cat-item-${wsId}-${catIndex}-${itemIndex}`, source: categoryId, target: itemId, type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed, color: '#aaa'} });
+              });
+          });
+          
+          const playbookRadius = 800;
+          const playbooks = data.playbooks || [];
+          playbooks.forEach((playbook, index) => {
+              const angle = (index / (playbooks.length || 1)) * 2 * Math.PI + Math.PI / 4;
+              const playbookId = `${wsId}-play-${playbook.id}`;
+              newNodes.push({
+                  id: playbookId, type: 'custom', position: { x: workspaceCenterX + playbookRadius * Math.cos(angle) - 128, y: workspaceCenterY + playbookRadius * Math.sin(angle) - 70 },
+                  data: { label: playbook.processo, type: 'playbook', icon: <BookOpen className="h-5 w-5" />, subtext: `${playbook.passos.length} passo(s)`, insights: getInsightsFor(playbook.processo), raw_data: playbook, isFederated: !isCurrentWs, workspaceName: wsName },
+              });
+              newEdges.push({ id: `e-${wsId}-play-${index}`, source: workspaceNodeId, target: playbookId, type: 'smoothstep' });
+          });
+
+          const orgChartRadius = 1100;
+          const orgChart = data.orgChart;
+          if (orgChart && orgChart.nodes) {
+              orgChart.nodes.forEach((node, index) => {
+                  const angle = (index / (orgChart.nodes.length || 1)) * 2 * Math.PI - Math.PI / 3;
+                  const nodeId = `${wsId}-org-${node.id}`;
+                  newNodes.push({
+                      id: nodeId, type: 'custom', position: { x: workspaceCenterX + orgChartRadius * Math.cos(angle) - 128, y: workspaceCenterY + orgChartRadius * Math.sin(angle) - 70 },
+                      data: { label: node.name, type: 'orgchart', icon: <Users className="h-5 w-5" />, subtext: node.title, raw_data: node, isFederated: !isCurrentWs, workspaceName: wsName },
+                  });
+                  if (node.parentId) {
+                      newEdges.push({ id: `e-org-${wsId}-${node.id}`, source: `${wsId}-org-${node.parentId}`, target: nodeId, type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } });
+                  } else {
+                      newEdges.push({ id: `e-ws-org-${wsId}-${node.id}`, source: workspaceNodeId, target: nodeId, type: 'smoothstep' });
+                  }
+              });
+          }
         }
-        if (Array.isArray(layoutData.customNodes)) {
-            const loadedCustomNodes: Node<MapNodeData>[] = layoutData.customNodes.map((node: Node<Omit<MapNodeData, 'icon'>>) => ({
-                ...node,
-                data: { ...node.data, icon: <BookOpen className="h-5 w-5" /> }, 
+
+        if (nodeRelations) {
+            const savedEdges = nodeRelations.map(rel => ({
+                id: rel.id, source: rel.fromNodeId, target: rel.toNodeId,
+                sourceHandle: rel.sourceHandle, targetHandle: rel.targetHandle,
+                type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed, color: '#aaa' }
             }));
-            finalNodes.push(...loadedCustomNodes);
+            newEdges.push(...savedEdges);
         }
+
+        let finalNodes = newNodes;
+        if (layoutSnap.exists()) {
+            const layoutData = layoutSnap.data();
+            if (Array.isArray(layoutData.nodePositions)) {
+                const savedPositions = new Map(layoutData.nodePositions.map((p: any) => [p.id, { x: p.x, y: p.y }]));
+                finalNodes = newNodes.map((node) => {
+                    const savedPosition = savedPositions.get(node.id);
+                    return savedPosition ? { ...node, position: savedPosition } : node;
+                });
+            }
+             if (Array.isArray(layoutData.customNodes)) {
+                const loadedCustomNodes: Node<MapNodeData>[] = layoutData.customNodes.map((node: Node<Omit<MapNodeData, 'icon'>>) => ({
+                    ...node,
+                    data: { ...node.data, icon: <BookOpen className="h-5 w-5" /> }, 
+                }));
+                finalNodes.push(...loadedCustomNodes);
+            }
+        }
+        
+        setNodes(finalNodes);
+        setEdges(newEdges);
+
+      } catch (error) {
+        console.error("Error generating map layout:", error);
+        toast({ variant: "destructive", title: "Erro ao gerar o mapa.", description: (error as Error).message });
+      } finally {
+        setIsLoading(false);
       }
-
-      setEdges(finalEdges);
-      setNodes(finalNodes);
     };
-    
-    generateLayout();
-    
-  }, [allDataLoaded, federatedData, insights, firestore, workspaceId, nodeRelations]);
 
+    generateFullLayout();
+  }, [firestore, workspaceId, toast]);
 
   const onNodesChange = useCallback((changes: NodeChange[]) => setNodes((nds) => applyNodeChanges(changes, nds)), []);
   const onEdgesChange = useCallback((changes: EdgeChange[]) => setEdges((eds) => applyEdgeChanges(changes, eds)), []);
@@ -395,7 +343,7 @@ export default function OperationalMapPage() {
     }, []);
   const handleNodeClick = (_event: React.MouseEvent, node: Node<MapNodeData>) => setSelectedNode(node);
   const handleEdgeClick = (_event: React.MouseEvent, edge: Edge) => {
-      if(edge.id.startsWith('e-fed-')) return;
+      if(edge.id.startsWith('e-')) return;
       setEdgeToDelete(edge);
   }
   
@@ -462,7 +410,7 @@ export default function OperationalMapPage() {
     }
   };
 
-  if (!allDataLoaded && isFederatedLoading) {
+  if (isLoading) {
     return (
       <div className="h-screen w-screen relative">
          <Skeleton className="h-full w-full" />
@@ -474,7 +422,7 @@ export default function OperationalMapPage() {
     );
   }
   
-  const noContent = !federatedData || Object.keys(federatedData).every(wsId => !federatedData[wsId].knowledge && (!federatedData[wsId].playbooks || federatedData[wsId].playbooks.length === 0) && !federatedData[wsId].orgChart);
+  const noNodes = nodes.length === 0;
 
   return (
     <div className="w-full h-full relative">
@@ -495,7 +443,7 @@ export default function OperationalMapPage() {
        </div>
        <Button asChild variant="outline" className="absolute top-6 right-6 z-10 h-12 w-12 rounded-full p-0 bg-background/80 hover:bg-background"><Link href={`/dashboard/${workspaceId}`}><X className="h-6 w-6" /></Link></Button>
       
-        {noContent ? (
+        {noNodes ? (
              <div className="flex h-full items-center justify-center"><Alert className="max-w-md"><Network className="h-4 w-4" /><AlertTitle>Mapa Vazio</AlertTitle><AlertDescription>Nenhum conhecimento publicado para gerar o mapa.</AlertDescription></Alert></div>
         ) : (
             <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect} onNodeClick={handleNodeClick} onEdgeClick={handleEdgeClick} nodeTypes={nodeTypes} fitView className="bg-muted/30"><Controls /><Background /></ReactFlow>
