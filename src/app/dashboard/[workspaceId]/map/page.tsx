@@ -196,14 +196,14 @@ export default function OperationalMapPage() {
 
     const generateAndSetLayout = async () => {
       const newNodes: Node<MapNodeData>[] = [];
-      const defaultEdges: Edge[] = [];
+      const federatedEdges: Edge[] = [];
+      const defaultIntraWorkspaceEdges: Edge[] = [];
       
       const getInsightsFor = (entityTitle: string) => {
         if (!insights) return { risco: 0, gap: 0, oportunidade: 0 };
         const counts = { risco: 0, gap: 0, oportunidade: 0 };
-        const lowerEntityTitle = entityTitle.toLowerCase();
         insights.forEach((insight) => {
-          if (insight.texto.toLowerCase().includes(lowerEntityTitle)) {
+          if (insight.texto.toLowerCase().includes(entityTitle.toLowerCase())) {
             counts[insight.tipo]++;
           }
         });
@@ -211,10 +211,8 @@ export default function OperationalMapPage() {
       };
 
       const federatedKeys = Object.keys(federatedData);
-      const isMultiWorkspace = federatedKeys.length > 1;
-      const workspaceAngleStep = isMultiWorkspace ? (2 * Math.PI) / (federatedKeys.length -1) : 0;
-      const workspaceRadius = isMultiWorkspace ? 1000 : 0;
-      let connectedWsIndex = 0;
+      const connectedWorkspaces = federatedKeys.filter(id => id !== workspaceId);
+      const connectedWsSpacing = 800; // Vertical space between connected workspaces
 
       for (const wsId in federatedData) {
         const isCurrentWs = wsId === workspaceId;
@@ -224,11 +222,12 @@ export default function OperationalMapPage() {
         let workspaceCenterX = 0;
         let workspaceCenterY = 0;
         
-        if (!isCurrentWs && isMultiWorkspace) {
-             const angle = connectedWsIndex * workspaceAngleStep;
-             workspaceCenterX = workspaceRadius * Math.cos(angle);
-             workspaceCenterY = workspaceRadius * Math.sin(angle);
-             connectedWsIndex++;
+        if (isCurrentWs) {
+            workspaceCenterX = -700; // Position current workspace on the left
+        } else {
+            const connectedIndex = connectedWorkspaces.indexOf(wsId);
+            workspaceCenterX = 700; // Position connected workspaces on the right
+            workspaceCenterY = connectedIndex * connectedWsSpacing - ((connectedWorkspaces.length - 1) * connectedWsSpacing / 2);
         }
         
         const workspaceNodeId = `ws-${wsId}`;
@@ -246,11 +245,12 @@ export default function OperationalMapPage() {
         });
         
         if (!isCurrentWs) {
-             defaultEdges.push({
+             federatedEdges.push({
                 id: `e-fed-${wsId}`,
                 source: `ws-${workspaceId}`,
                 target: workspaceNodeId,
-                type: 'straight',
+                type: 'smoothstep',
+                label: wsName,
                 style: { stroke: '#aaa', strokeDasharray: '5 5' },
                 markerEnd: { type: MarkerType.ArrowClosed, color: '#aaa' },
             });
@@ -267,7 +267,7 @@ export default function OperationalMapPage() {
                 position: { x: workspaceCenterX + categoryRadius * Math.cos(angle) - 128, y: workspaceCenterY + categoryRadius * Math.sin(angle) - 70 },
                 data: { label: category.categoria, type: 'category', icon: <Folder className="h-5 w-5" />, subtext: `${category.itens.length} iten(s)`, insights: getInsightsFor(category.categoria), raw_data: category, isFederated: !isCurrentWs, workspaceName: wsName },
             });
-            defaultEdges.push({ id: `e-${wsId}-cat-${index}`, source: workspaceNodeId, target: categoryId });
+            defaultIntraWorkspaceEdges.push({ id: `e-${wsId}-cat-${index}`, source: workspaceNodeId, target: categoryId, type: 'smoothstep' });
         });
         
         const playbookRadius = 600;
@@ -281,7 +281,7 @@ export default function OperationalMapPage() {
                 position: { x: workspaceCenterX + playbookRadius * Math.cos(angle) - 128, y: workspaceCenterY + playbookRadius * Math.sin(angle) - 70 },
                 data: { label: playbook.processo, type: 'playbook', icon: <BookOpen className="h-5 w-5" />, subtext: `${playbook.passos.length} passo(s)`, insights: getInsightsFor(playbook.processo), raw_data: playbook, isFederated: !isCurrentWs, workspaceName: wsName },
             });
-             defaultEdges.push({ id: `e-${wsId}-play-${index}`, source: workspaceNodeId, target: playbookId });
+            defaultIntraWorkspaceEdges.push({ id: `e-${wsId}-play-${index}`, source: workspaceNodeId, target: playbookId, type: 'smoothstep' });
         });
       }
 
@@ -289,6 +289,7 @@ export default function OperationalMapPage() {
       const layoutSnap = await getDoc(layoutRef);
       
       let finalNodes = newNodes;
+      let finalEdges: Edge[] = [];
 
       if (layoutSnap.exists()) {
         const layoutData = layoutSnap.data();
@@ -309,10 +310,18 @@ export default function OperationalMapPage() {
         }
         
         const relationsInitialized = layoutData?.relations_initialized ?? false;
-        setEdges(relationsInitialized ? (nodeRelations?.map(rel => ({ id: rel.id, source: rel.fromNodeId, target: rel.toNodeId, sourceHandle: rel.sourceHandle, targetHandle: rel.targetHandle })) ?? []) : defaultEdges);
+        
+        if (relationsInitialized && nodeRelations) {
+          const savedEdges = nodeRelations.map(rel => ({ id: rel.id, source: rel.fromNodeId, target: rel.toNodeId, sourceHandle: rel.sourceHandle, targetHandle: rel.targetHandle, type: 'smoothstep' }));
+          finalEdges = [...savedEdges, ...federatedEdges];
+        } else {
+          finalEdges = [...defaultIntraWorkspaceEdges, ...federatedEdges];
+        }
       } else {
-        setEdges(defaultEdges);
+        finalEdges = [...defaultIntraWorkspaceEdges, ...federatedEdges];
       }
+
+      setEdges(finalEdges);
       setNodes(finalNodes);
       isLayoutInitialized.current = true;
     };
@@ -369,7 +378,9 @@ export default function OperationalMapPage() {
       const relationsCollectionRef = collection(firestore, `workspaces/${workspaceId}/nodeRelations`);
       const existingRelationsSnap = await getDocs(relationsCollectionRef);
       existingRelationsSnap.forEach(relationDoc => batch.delete(relationDoc.ref));
-      edges.forEach(edge => {
+      
+      const edgesToSave = edges.filter(edge => !edge.id.startsWith('e-fed-'));
+      edgesToSave.forEach(edge => {
           const newRelationRef = doc(relationsCollectionRef);
           batch.set(newRelationRef, { fromNodeId: edge.source, toNodeId: edge.target, sourceHandle: edge.sourceHandle || null, targetHandle: edge.targetHandle || null, relationType: 'related_to', createdBy: user.uid, createdAt: serverTimestamp() });
       });
