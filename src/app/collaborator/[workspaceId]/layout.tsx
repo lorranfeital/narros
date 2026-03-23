@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useUser, useFirestore, useDoc, useMemoFirebase } from "@/firebase";
@@ -8,10 +9,6 @@ import { Workspace } from "@/lib/firestore-types";
 import { CollaboratorSidebar } from "@/components/collaborator/sidebar";
 import { cn } from "@/lib/utils";
 
-
-function getTimestamp() {
-    return new Date().toLocaleTimeString('en-US', { hour12: false });
-}
 
 export default function CollaboratorLayout({ children }: { children: ReactNode }) {
   const { user, isUserLoading } = useUser();
@@ -27,22 +24,16 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
   const { data: workspace, isLoading: isWorkspaceLoading, error: workspaceError } = useDoc<Workspace>(workspaceDocRef);
   
   useEffect(() => {
-    const timestamp = getTimestamp();
-    console.log(`[${timestamp}] [CollaboratorLayout] useEffect triggered.`, { isUserLoading, isWorkspaceLoading, user: !!user, workspace: !!workspace, workspaceId });
-    
     if (isUserLoading || isWorkspaceLoading) {
-      console.log(`[${timestamp}] [CollaboratorLayout] Still loading...`, { isUserLoading, isWorkspaceLoading });
       return; 
     }
 
     if (!user) {
-      console.log(`[${timestamp}] [CollaboratorLayout] No user found. Redirecting to /login.`);
       router.push('/login');
       return;
     }
     
     if (!workspace) {
-        console.error(`[${timestamp}] [CollaboratorLayout] REDIRECTING to /unauthorized because workspace document not found after loading. Error from useDoc: ${workspaceError?.message || 'No error object'}`);
         router.push('/unauthorized');
         return;
     }
@@ -51,15 +42,10 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
     const hasRole = workspace.roles && Object.prototype.hasOwnProperty.call(workspace.roles, user.uid);
     const isMember = isOwner || hasRole;
     
-    console.log(`[${timestamp}] [CollaboratorLayout] Final check:`, { isOwner, hasRole, roles: workspace.roles });
-
     if (!isMember) {
-        console.error(`[${timestamp}] [CollaboratorLayout] REDIRECTING to /unauthorized because final 'isMember' check is false.`);
         router.push('/unauthorized');
         return;
     }
-    
-    console.log(`[${timestamp}] [CollaboratorLayout] Access GRANTED.`);
 
   }, [user, isUserLoading, workspace, isWorkspaceLoading, router, workspaceId, workspaceError]);
 

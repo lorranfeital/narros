@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Sidebar } from "@/components/dashboard/sidebar";
@@ -6,10 +7,6 @@ import { useRouter, usePathname, useParams } from "next/navigation";
 import { useEffect, ReactNode } from "react";
 import { collection, query, where, doc } from 'firebase/firestore';
 import { Workspace } from "@/lib/firestore-types";
-
-function getTimestamp() {
-    return new Date().toLocaleTimeString('en-US', { hour12: false });
-}
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, isUserLoading } = useUser();
@@ -32,16 +29,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { data: currentWorkspace, isLoading: isCurrentWorkspaceLoading } = useDoc<Workspace>(currentWorkspaceDocRef);
 
   useEffect(() => {
-    const timestamp = getTimestamp();
-    console.log(`[${timestamp}] [DashboardLayout] useEffect triggered.`, { pathname, workspaceId, isUserLoading, isWorkspacesLoading, isCurrentWorkspaceLoading, user: !!user, workspaces: workspaces?.map(w => w.id) });
-
     if (isUserLoading || isWorkspacesLoading) {
-      console.log(`[${timestamp}] [DashboardLayout] Waiting for user or workspaces to load...`);
       return; 
     }
 
     if (!user) {
-      console.log(`[${timestamp}] [DashboardLayout] No user found. Redirecting to /login.`);
       router.push('/login');
       return;
     }
@@ -51,7 +43,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     const isOnDashboardRoot = pathname === '/dashboard';
 
     if (!hasWorkspaces && !isOnNewWorkspacePage) {
-        console.log(`[${timestamp}] [DashboardLayout] No workspaces found for user. Redirecting to /dashboard/new-workspace.`);
         router.push('/dashboard/new-workspace');
         return;
     }
@@ -63,29 +54,20 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             ? `/collaborator/${firstWorkspace.id}/home`
             : `/dashboard/${firstWorkspace.id}`;
         
-        console.log(`[${timestamp}] [DashboardLayout] User is on root. Deciding where to go.`, { userRole, targetPath });
         router.replace(targetPath);
         return;
     }
     
-    if (workspaceId && !isCurrentWorkspaceLoading) {
-        if (currentWorkspace) {
-            const userRole = currentWorkspace.ownerId === user.uid ? 'admin' : currentWorkspace.roles?.[user.uid];
-            const isCollaboratorPath = pathname.startsWith('/collaborator');
+    if (workspaceId && !isCurrentWorkspaceLoading && currentWorkspace) {
+        const userRole = currentWorkspace.ownerId === user.uid ? 'admin' : currentWorkspace.roles?.[user.uid];
+        const isCollaboratorPath = pathname.startsWith('/collaborator');
 
-            console.log(`[${timestamp}] [DashboardLayout] Verifying role for loaded workspace.`, { workspaceId, userRole, isCollaboratorPath });
-
-            if (userRole && ['member', 'collaborator'].includes(userRole) && !isCollaboratorPath) {
-                const targetPath = `/collaborator/${workspaceId}/home`;
-                console.log(`[${timestamp}] [DashboardLayout] User has collaborator role. REDIRECTING to ${targetPath}`);
-                router.replace(targetPath);
-                return;
-            }
-        } else {
-             console.log(`[${timestamp}] [DashboardLayout] Workspace with ID ${workspaceId} not found after loading. This might be a permission issue or invalid ID.`);
+        if (userRole && ['member', 'collaborator'].includes(userRole) && !isCollaboratorPath) {
+            const targetPath = `/collaborator/${workspaceId}/home`;
+            router.replace(targetPath);
+            return;
         }
     }
-     console.log(`[${timestamp}] [DashboardLayout] useEffect completed without redirection.`);
 
   }, [
     user, isUserLoading, 

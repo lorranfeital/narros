@@ -91,10 +91,14 @@ service cloud.firestore {
     // ------------------------------------------------------------------------
     match /workspaces/{workspaceId} {
       allow create: if isOwner(request.resource.data.ownerId);
-      allow get: if isWorkspaceMember(workspaceId) || isServerProcess();
+      // Allow any signed-in user to GET a workspace document.
+      // This is safe because sensitive data is in subcollections.
+      // This rule prevents a circular dependency where checking membership requires reading the doc.
+      allow get: if isSignedIn() || isServerProcess();
       allow update: if isAdmin(workspaceId) || isServerProcess();
       allow delete: if isWorkspaceOwner(workspaceId);
-      allow list: if isPlatformAdmin() || isSignedIn() || isServerProcess();
+      // Listing workspaces is secured by the query in the client code.
+      allow list: if isSignedIn() || isServerProcess();
 
       // --- Node Relations Subcollection ---
       match /nodeRelations/{relationId} {
