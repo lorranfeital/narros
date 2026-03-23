@@ -33,12 +33,15 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
+  CardFooter,
 } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, Circle, ArrowRight, BookOpen } from 'lucide-react';
 import { useMemo } from 'react';
 import Link from 'next/link';
+import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 
 // Helper to determine the status of a module
 const getModuleStatus = (
@@ -98,38 +101,33 @@ function OnboardingSection({
   }
 
   return (
-    <Card>
+    <Card className="h-full flex flex-col">
       <CardHeader>
         <CardTitle>Sua jornada de integração</CardTitle>
         <CardDescription>
           Complete os módulos abaixo para finalizar seu onboarding.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex-grow">
         <div className="flex items-center gap-4 mb-4">
           <Progress value={progressPercentage} className="h-2" />
-          <span className="text-sm font-medium text-muted-foreground">
+          <span className="text-sm font-medium text-muted-foreground shrink-0">
             {Math.round(progressPercentage)}%
           </span>
         </div>
         <div className="space-y-3">
           {modules?.map((module) => {
             const status = getModuleStatus(module.id, progress);
+            const isCompleted = status === TrainingProgressStatus.COMPLETED;
             return (
               <div key={module.id} className="flex items-center gap-3">
-                {status === TrainingProgressStatus.COMPLETED ? (
+                {isCompleted ? (
                   <CheckCircle className="h-5 w-5 text-green-500" />
-                ) : status === TrainingProgressStatus.IN_PROGRESS ? (
-                  <ArrowRight className="h-5 w-5 text-primary" />
                 ) : (
                   <Circle className="h-5 w-5 text-muted-foreground" />
                 )}
                 <span
-                  className={
-                    status === TrainingProgressStatus.COMPLETED
-                      ? 'text-muted-foreground line-through'
-                      : ''
-                  }
+                  className={cn(isCompleted && 'text-muted-foreground line-through')}
                 >
                   {module.titulo}
                 </span>
@@ -137,14 +135,16 @@ function OnboardingSection({
             );
           })}
         </div>
-        {nextModule && (
-          <Button asChild className="mt-6">
+      </CardContent>
+       {nextModule && (
+        <CardFooter>
+          <Button asChild className="w-full md:w-auto" variant="default">
             <Link href={`/collaborator/${workspaceId}/trainings/${nextModule.id}`}>
               Continuar onboarding
             </Link>
           </Button>
-        )}
-      </CardContent>
+        </CardFooter>
+      )}
     </Card>
   );
 }
@@ -159,35 +159,39 @@ function KnowledgePreview({
 }) {
   if (isLoading) {
     return (
-      <div>
-        <h3 className="text-lg font-semibold mb-4">Base de Conhecimento</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
-        </div>
-      </div>
+        <Card>
+            <CardHeader>
+                <Skeleton className="h-6 w-3/4" />
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 gap-4">
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
+            </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div>
-      <h3 className="text-lg font-semibold mb-4">Base de Conhecimento</h3>
-      <div className="grid grid-cols-2 gap-4">
-        {knowledge?.categories.slice(0, 4).map((cat) => (
-          <Card key={cat.categoria} className="hover:bg-muted/50">
-            <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-              <span className="text-3xl">{cat.icone}</span>
-              <p className="font-semibold mt-2 text-sm">{cat.categoria}</p>
-              <p className="text-xs text-muted-foreground">
-                {cat.itens.length} itens
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
+    <Card>
+        <CardHeader>
+            <CardTitle className="text-lg">Base de Conhecimento</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 gap-4">
+            {knowledge?.categories.slice(0, 4).map((cat) => (
+            <Card key={cat.categoria} className="hover:bg-muted/50">
+                <CardContent className="p-4 flex flex-col items-center justify-center text-center h-full">
+                <span className="text-3xl">{cat.icone}</span>
+                <p className="font-semibold mt-2 text-sm">{cat.categoria}</p>
+                <p className="text-xs text-muted-foreground">
+                    {cat.itens.length} itens
+                </p>
+                </CardContent>
+            </Card>
+            ))}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -281,7 +285,7 @@ export default function CollaboratorHomePage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         <OnboardingSection modules={modules} progress={progress} isLoading={isLoading} workspaceId={workspaceId} />
         <div className="space-y-8">
           <KnowledgePreview knowledge={publishedKnowledge} isLoading={isLoading} />
@@ -290,14 +294,19 @@ export default function CollaboratorHomePage() {
                   <CardTitle className="text-lg">Meus Treinamentos</CardTitle>
               </CardHeader>
               <CardContent>
-                  {isLoading && <Skeleton className="h-20 w-full" />}
-                  {!isLoading && modules && modules.slice(0,3).map(module => (
-                      <div key={module.id} className="flex items-center justify-between text-sm py-2 border-b last:border-0">
-                          <p>{module.titulo}</p>
-                          <p className="text-muted-foreground">{getModuleStatus(module.id, progress) === 'completed' ? 'Concluído' : 'Pendente'}</p>
-                      </div>
-                  ))}
-                  <Button variant="link" asChild className="p-0 mt-4">
+                  {isLoading ? <Skeleton className="h-20 w-full" /> : (
+                  <Table>
+                    <TableBody>
+                        {modules?.slice(0,3).map(module => (
+                            <TableRow key={module.id}>
+                                <TableCell className="font-medium p-2">{module.titulo}</TableCell>
+                                <TableCell className="text-right text-muted-foreground p-2">{getModuleStatus(module.id, progress) === 'completed' ? 'Concluído' : 'Pendente'}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                  )}
+                  <Button variant="link" asChild className="p-0 mt-4 text-primary">
                       <Link href={`/collaborator/${workspaceId}/trainings`}>Ver todos</Link>
                   </Button>
               </CardContent>
