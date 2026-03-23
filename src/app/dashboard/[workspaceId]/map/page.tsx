@@ -68,6 +68,7 @@ import {
 import {
   Insight,
   KnowledgeCategory,
+  KnowledgeItem,
   NodeRelation,
   Playbook,
 } from '@/lib/firestore-types';
@@ -95,6 +96,7 @@ type MapNodeData = {
 
 // Custom Node Component
 const CustomNode = ({ data }: { data: MapNodeData }) => {
+  const isOrgChart = data.type === 'orgchart';
   return (
     <div className="relative group transition-all duration-300">
       <Handle type="both" position={Position.Left} id="left" className="!bg-primary !w-3 !h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -104,12 +106,14 @@ const CustomNode = ({ data }: { data: MapNodeData }) => {
       
       <Card className={cn(
         "w-64 border-2 shadow-lg rounded-xl group-hover:border-primary/50 transition-colors",
-        data.isFederated && "border-dashed border-muted-foreground/50"
+        data.isFederated && "border-dashed border-muted-foreground/50",
+        isOrgChart && "border-blue-500/50 bg-blue-950/20 group-hover:border-blue-500"
         )}>
         <CardHeader className="flex-row items-center gap-4 p-4">
           <div className={cn(
               "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary",
-              data.isFederated && "bg-muted text-muted-foreground"
+              data.isFederated && "bg-muted text-muted-foreground",
+              isOrgChart && "bg-blue-500/10 text-blue-600"
           )}>
             {data.icon}
           </div>
@@ -124,7 +128,7 @@ const CustomNode = ({ data }: { data: MapNodeData }) => {
         </CardHeader>
         {(data.subtext || (data.insights && (data.insights.risco > 0 || data.insights.gap > 0 || data.insights.oportunidade > 0))) && (
           <CardContent className="border-t p-4 text-xs text-muted-foreground">
-            {data.subtext && <p className="mb-2">{data.subtext}</p>}
+            {data.subtext && <p className="mb-2 line-clamp-2">{data.subtext}</p>}
             {data.insights && (
               <div className="flex flex-wrap gap-1">
                 {data.insights.risco > 0 && <Badge variant="destructive" className="text-xs"><AlertTriangle className="mr-1 h-3 w-3" /> {data.insights.risco} Risco(s)</Badge>}
@@ -149,6 +153,7 @@ export default function OperationalMapPage() {
   const [selectedNode, setSelectedNode] = useState<Node<MapNodeData> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [edgeToDelete, setEdgeToDelete] = useState<Edge | null>(null);
+  const isLayoutInitialized = useRef(false);
 
   const firestore = useFirestore();
   const params = useParams();
@@ -209,7 +214,7 @@ export default function OperationalMapPage() {
 
       const federatedKeys = Object.keys(federatedData);
       const connectedWorkspaces = federatedKeys.filter(id => id !== workspaceId);
-      const connectedWsSpacing = 800; // Vertical space between connected workspaces
+      const connectedWsSpacing = 1200;
 
       for (const wsId in federatedData) {
         const isCurrentWs = wsId === workspaceId;
@@ -220,10 +225,10 @@ export default function OperationalMapPage() {
         let workspaceCenterY = 0;
         
         if (isCurrentWs) {
-            workspaceCenterX = -700; // Position current workspace on the left
+            workspaceCenterX = -800;
         } else {
             const connectedIndex = connectedWorkspaces.indexOf(wsId);
-            workspaceCenterX = 700; // Position connected workspaces on the right
+            workspaceCenterX = 800;
             workspaceCenterY = connectedIndex * connectedWsSpacing - ((connectedWorkspaces.length - 1) * connectedWsSpacing / 2);
         }
         
@@ -247,27 +252,51 @@ export default function OperationalMapPage() {
                 source: `ws-${workspaceId}`,
                 target: workspaceNodeId,
                 type: 'smoothstep',
-                label: wsName,
+                label: `Conexão: ${wsName}`,
                 style: { stroke: '#aaa', strokeDasharray: '5 5' },
                 markerEnd: { type: MarkerType.ArrowClosed, color: '#aaa' },
             });
         }
         
-        const categoryRadius = 350;
+        const categoryRadius = 500;
+        const itemRadius = 250;
         const categories = data.knowledge?.categories || [];
-        categories.forEach((category, index) => {
-            const angle = (index / (categories.length || 1)) * 2 * Math.PI;
+        categories.forEach((category, catIndex) => {
+            const catAngle = (catIndex / (categories.length || 1)) * 2 * Math.PI;
+            const categoryCenterX = workspaceCenterX + categoryRadius * Math.cos(catAngle);
+            const categoryCenterY = workspaceCenterY + categoryRadius * Math.sin(catAngle);
             const categoryId = `${wsId}-cat-${encodeURIComponent(category.categoria)}`;
+
             newNodes.push({
                 id: categoryId,
                 type: 'custom',
-                position: { x: workspaceCenterX + categoryRadius * Math.cos(angle) - 128, y: workspaceCenterY + categoryRadius * Math.sin(angle) - 70 },
+                position: { x: categoryCenterX - 128, y: categoryCenterY - 70 },
                 data: { label: category.categoria, type: 'category', icon: <Folder className="h-5 w-5" />, subtext: `${category.itens.length} iten(s)`, insights: getInsightsFor(category.categoria), raw_data: category, isFederated: !isCurrentWs, workspaceName: wsName },
             });
-            defaultIntraWorkspaceEdges.push({ id: `e-${wsId}-cat-${index}`, source: workspaceNodeId, target: categoryId, type: 'smoothstep' });
+            defaultIntraWorkspaceEdges.push({ id: `e-ws-cat-${wsId}-${catIndex}`, source: workspaceNodeId, target: categoryId, type: 'smoothstep' });
+
+            category.itens.forEach((item, itemIndex) => {
+                const itemAngle = (itemIndex / (category.itens.length || 1)) * 2 * Math.PI + (catAngle / 4);
+                const itemId = `${categoryId}-item-${encodeURIComponent(item.titulo)}`;
+                newNodes.push({
+                    id: itemId,
+                    type: 'custom',
+                    position: { x: categoryCenterX + itemRadius * Math.cos(itemAngle) - 128, y: categoryCenterY + itemRadius * Math.sin(itemAngle) - 40 },
+                    data: {
+                        label: item.titulo,
+                        type: 'content',
+                        icon: <FileText className="h-5 w-5" />,
+                        subtext: item.descricao,
+                        raw_data: item,
+                        isFederated: !isCurrentWs,
+                        workspaceName: wsName,
+                    },
+                });
+                defaultIntraWorkspaceEdges.push({ id: `e-cat-item-${wsId}-${catIndex}-${itemIndex}`, source: categoryId, target: itemId, type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed, color: '#aaa'} });
+            });
         });
         
-        const playbookRadius = 600;
+        const playbookRadius = 800;
         const playbooks = data.playbooks || [];
         playbooks.forEach((playbook, index) => {
             const angle = (index / (playbooks.length || 1)) * 2 * Math.PI + Math.PI / 4;
@@ -281,7 +310,7 @@ export default function OperationalMapPage() {
             defaultIntraWorkspaceEdges.push({ id: `e-${wsId}-play-${index}`, source: workspaceNodeId, target: playbookId, type: 'smoothstep' });
         });
 
-        const orgChartRadius = 850;
+        const orgChartRadius = 1100;
         const orgChart = data.orgChart;
         if (orgChart && orgChart.nodes) {
             orgChart.nodes.forEach((node, index) => {
@@ -301,23 +330,10 @@ export default function OperationalMapPage() {
                         workspaceName: wsName,
                     },
                 });
-
-                // Add edge from parent or from workspace
                 if (node.parentId) {
-                    defaultIntraWorkspaceEdges.push({
-                        id: `e-org-${wsId}-${node.id}`,
-                        source: `${wsId}-org-${node.parentId}`,
-                        target: nodeId,
-                        type: 'smoothstep',
-                        markerEnd: { type: MarkerType.ArrowClosed }
-                    });
+                    defaultIntraWorkspaceEdges.push({ id: `e-org-${wsId}-${node.id}`, source: `${wsId}-org-${node.parentId}`, target: nodeId, type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } });
                 } else {
-                    defaultIntraWorkspaceEdges.push({
-                        id: `e-ws-org-${wsId}-${node.id}`,
-                        source: workspaceNodeId,
-                        target: nodeId,
-                        type: 'smoothstep',
-                    });
+                    defaultIntraWorkspaceEdges.push({ id: `e-ws-org-${wsId}-${node.id}`, source: workspaceNodeId, target: nodeId, type: 'smoothstep' });
                 }
             });
         }
@@ -345,7 +361,8 @@ export default function OperationalMapPage() {
         finalEdges = [...defaultIntraWorkspaceEdges, ...federatedEdges];
       }
       
-      if (layoutSnap.exists()) {
+      if (layoutSnap.exists() && !isLayoutInitialized.current) {
+        isLayoutInitialized.current = true;
         const layoutData = layoutSnap.data();
         if (Array.isArray(layoutData.nodePositions)) {
           const savedPositions = new Map(layoutData.nodePositions.map((p: any) => [p.id, { x: p.x, y: p.y }]));
@@ -366,16 +383,21 @@ export default function OperationalMapPage() {
       setEdges(finalEdges);
       setNodes(finalNodes);
     };
+    
     generateLayout();
+    
   }, [allDataLoaded, federatedData, insights, firestore, workspaceId, nodeRelations]);
 
 
   const onNodesChange = useCallback((changes: NodeChange[]) => setNodes((nds) => applyNodeChanges(changes, nds)), []);
   const onEdgesChange = useCallback((changes: EdgeChange[]) => setEdges((eds) => applyEdgeChanges(changes, eds)), []);
-  const onConnect = useCallback((connection: Connection) => setEdges((eds) => addEdge(connection, eds)), []);
+  const onConnect = useCallback((connection: Connection) => {
+     const newEdge = { ...connection, type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed, color: '#aaa'} };
+     setEdges((eds) => addEdge(newEdge, eds))
+    }, []);
   const handleNodeClick = (_event: React.MouseEvent, node: Node<MapNodeData>) => setSelectedNode(node);
   const handleEdgeClick = (_event: React.MouseEvent, edge: Edge) => {
-      if(edge.id.startsWith('e-fed-')) return; // Don't allow deleting federated edges
+      if(edge.id.startsWith('e-fed-')) return;
       setEdgeToDelete(edge);
   }
   
@@ -389,14 +411,16 @@ export default function OperationalMapPage() {
 
   const handleAddNode = (type: 'category' | 'playbook' | 'content' | 'orgchart') => {
     const newNodeId = `custom-${type}-${Date.now()}`;
-    const nodeData: Omit<MapNodeData, 'icon'> = { label: 'Novo Nó', type: type, raw_data: {}, isFederated: false };
+    
+    let icon = <FileText className="h-5 w-5" />;
+    let label = 'Novo Conteúdo';
     switch (type) {
-      case 'category': nodeData.label = 'Nova Categoria'; break;
-      case 'playbook': nodeData.label = 'Novo Playbook'; break;
-      case 'content': nodeData.label = 'Novo Conteúdo'; break;
-      case 'orgchart': nodeData.label = 'Organograma'; break;
+      case 'category': icon = <Folder className="h-5 w-5" />; label = 'Nova Categoria'; break;
+      case 'playbook': icon = <BookOpen className="h-5 w-5" />; label = 'Novo Playbook'; break;
+      case 'orgchart': icon = <Users className="h-5 w-5" />; label = 'Nova Posição'; break;
     }
-    const newNode: Node<MapNodeData> = { id: newNodeId, type: 'custom', position: { x: 200, y: 200 }, data: { ...nodeData, icon: <FileText className="h-5 w-5" /> } };
+
+    const newNode: Node<MapNodeData> = { id: newNodeId, type: 'custom', position: { x: 200, y: 200 }, data: { label, type, icon, raw_data: {}, isFederated: false } };
     setNodes((nds) => [...nds, newNode]);
     toast({ title: 'Nó adicionado!', description: "Arraste para posicionar e clique para editar. Não se esqueça de salvar." });
   };
@@ -423,7 +447,7 @@ export default function OperationalMapPage() {
       const existingRelationsSnap = await getDocs(relationsCollectionRef);
       existingRelationsSnap.forEach(relationDoc => batch.delete(relationDoc.ref));
       
-      const edgesToSave = edges.filter(edge => !edge.id.startsWith('e-fed-'));
+      const edgesToSave = edges.filter(edge => !edge.id.startsWith('e-fed-') && !edge.id.startsWith('e-ws-cat-') && !edge.id.startsWith('e-cat-item-') && !edge.id.startsWith('e-ws-org-') && !edge.id.startsWith('e-org-') && !edge.id.startsWith('e-play-'));
       edgesToSave.forEach(edge => {
           const newRelationRef = doc(relationsCollectionRef);
           batch.set(newRelationRef, { fromNodeId: edge.source, toNodeId: edge.target, sourceHandle: edge.sourceHandle || null, targetHandle: edge.targetHandle || null, relationType: 'related_to', createdBy: user.uid, createdAt: serverTimestamp() });
@@ -482,13 +506,17 @@ export default function OperationalMapPage() {
         <SheetContent className="w-[400px] sm:w-[540px]">
           {selectedNode && (
             <>
-              <SheetHeader><SheetTitle className="flex items-center gap-3 text-2xl">{selectedNode.data.icon} {selectedNode.data.label}</SheetTitle><SheetDescription>{selectedNode.id.startsWith('custom-') ? `Nó customizado do tipo '${selectedNode.data.type}'. Edite o nome abaixo.` : `Detalhes sobre o nó '${selectedNode.data.label}'.`}</SheetDescription></SheetHeader>
+              <SheetHeader>
+                <SheetTitle className="flex items-center gap-3 text-2xl">{selectedNode.data.icon} {selectedNode.data.label}</SheetTitle>
+                <SheetDescription>{selectedNode.id.startsWith('custom-') ? `Nó customizado do tipo '${selectedNode.data.type}'. Edite o nome abaixo.` : `Detalhes sobre o nó '${selectedNode.data.label}'.`}</SheetDescription>
+              </SheetHeader>
               <div className="py-6 space-y-6">
                 {selectedNode.id.startsWith('custom-') ? (
                   <div className="space-y-2"><Label htmlFor="node-label">Nome do Nó</Label><Input id="node-label" value={selectedNode.data.label} onChange={(e) => handleLabelChange(e.target.value)} /><p className="text-xs text-muted-foreground">Não se esqueça de "Salvar Layout" para manter suas alterações.</p></div>
                 ) : (
                   <>
                     {selectedNode.data.type === 'category' && (<div className="space-y-4"><h4 className="font-semibold">Itens de Conhecimento</h4><div className="space-y-3">{(selectedNode.data.raw_data as KnowledgeCategory).itens.map(item => (<div key={item.titulo} className="text-sm"><p className="font-medium text-foreground">{item.titulo}</p><p className="text-muted-foreground">{item.descricao}</p></div>))}</div></div>)}
+                    {selectedNode.data.type === 'content' && (<div className="space-y-4"><h4 className="font-semibold">Descrição</h4><div className="space-y-3"><p className="text-muted-foreground">{(selectedNode.data.raw_data as KnowledgeItem).descricao}</p></div></div>)}
                     {selectedNode.data.type === 'playbook' && (<div className="space-y-4"><h4 className="font-semibold">Passos do Processo</h4><div className="space-y-4">{(selectedNode.data.raw_data as Playbook).passos.map(step => (<div key={step.numero} className="flex gap-4"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold">{step.numero}</div><div><h5 className="font-semibold">{step.titulo}</h5><p className="text-muted-foreground text-sm">{step.descricao}</p></div></div>))}</div></div>)}
                     <Button asChild><Link href={`/dashboard/${workspaceId}/knowledge`}>Explorar na Base de Conhecimento <ChevronRight className="h-4 w-4 ml-2"/></Link></Button>
                   </>
@@ -505,3 +533,4 @@ export default function OperationalMapPage() {
     </div>
   );
 }
+
