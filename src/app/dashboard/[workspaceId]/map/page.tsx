@@ -153,8 +153,7 @@ export default function OperationalMapPage() {
   const [selectedNode, setSelectedNode] = useState<Node<MapNodeData> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [edgeToDelete, setEdgeToDelete] = useState<Edge | null>(null);
-  const isLayoutInitialized = useRef(false);
-
+  
   const firestore = useFirestore();
   const params = useParams();
   const { toast } = useToast();
@@ -343,10 +342,13 @@ export default function OperationalMapPage() {
       const layoutSnap = await getDoc(layoutRef);
       
       let finalNodes = newNodes;
-      let finalEdges: Edge[] = [];
-
+      
+      // Corrected Logic: Always start with default structural edges.
+      const finalEdges: Edge[] = [...defaultIntraWorkspaceEdges, ...federatedEdges];
+      
       const relationsInitialized = layoutSnap.exists() && layoutSnap.data()?.relations_initialized;
 
+      // If a layout has been saved, load the custom user-created relations and add them.
       if (relationsInitialized && nodeRelations) {
         const savedEdges = nodeRelations.map(rel => ({
           id: rel.id,
@@ -356,13 +358,10 @@ export default function OperationalMapPage() {
           targetHandle: rel.targetHandle,
           type: 'smoothstep',
         }));
-        finalEdges = [...savedEdges, ...federatedEdges];
-      } else {
-        finalEdges = [...defaultIntraWorkspaceEdges, ...federatedEdges];
+        finalEdges.push(...savedEdges);
       }
       
-      if (layoutSnap.exists() && !isLayoutInitialized.current) {
-        isLayoutInitialized.current = true;
+      if (layoutSnap.exists()) {
         const layoutData = layoutSnap.data();
         if (Array.isArray(layoutData.nodePositions)) {
           const savedPositions = new Map(layoutData.nodePositions.map((p: any) => [p.id, { x: p.x, y: p.y }]));
@@ -533,4 +532,3 @@ export default function OperationalMapPage() {
     </div>
   );
 }
-
