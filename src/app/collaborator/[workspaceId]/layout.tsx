@@ -23,8 +23,9 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
   
   const isMember = useMemo(() => {
     if (!user || !workspace) return false;
-    // Check if user's UID is in the members array.
-    return workspace.members && workspace.members.includes(user.uid);
+    // This logic MUST mirror the `isWorkspaceMember` security rule.
+    // Check if the user is the owner OR if their UID exists as a key in the roles map.
+    return workspace.ownerId === user.uid || (workspace.roles && Object.prototype.hasOwnProperty.call(workspace.roles, user.uid));
   }, [user, workspace]);
 
   useEffect(() => {
@@ -32,11 +33,11 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
       router.push('/login');
       return;
     }
+    
     // Wait until both user and workspace are done loading
     if (!isUserLoading && !isWorkspaceLoading) {
       // If loading is finished and the user is NOT a member, redirect.
       if (!isMember) {
-        console.log('[CollaboratorLayout] REDIRECTING to /unauthorized because isMember is false.');
         router.push('/unauthorized');
       }
     }
