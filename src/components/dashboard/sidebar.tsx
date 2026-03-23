@@ -117,7 +117,7 @@ export function Sidebar({ className }: { className?: string }) {
         <div className="flex-1 p-2 space-y-4">
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="w-full justify-start gap-2 px-2 h-11 overflow-hidden">
+                    <Button variant="ghost" className="group w-full justify-start gap-2 px-2 h-11 overflow-hidden">
                         <Avatar className="h-6 w-6">
                             <AvatarImage src={currentWorkspace?.logoUrl} />
                             <AvatarFallback>{currentWorkspace?.name?.charAt(0) ?? 'N'}</AvatarFallback>
@@ -128,7 +128,9 @@ export function Sidebar({ className }: { className?: string }) {
                             <TooltipProvider>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <span className="flex-1 font-semibold text-sm truncate text-left">{currentWorkspace?.name || 'Sem workspace'}</span>
+                                        <span className="flex-1 font-semibold text-sm truncate text-left text-muted-foreground group-hover:text-foreground transition-colors">
+                                            {currentWorkspace?.name || 'Sem workspace'}
+                                        </span>
                                     </TooltipTrigger>
                                     <TooltipContent side="right" align="start">
                                         <p>{currentWorkspace?.name}</p>
@@ -310,7 +312,7 @@ export function Sidebar({ className }: { className?: string }) {
             ) : (
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="w-full justify-start gap-2 px-2 h-auto py-2">
+                        <Button variant="ghost" className="group w-full justify-start gap-2 px-2 h-auto py-2">
                             <Avatar className="h-8 w-8">
                                 <AvatarImage src={user?.photoURL ?? undefined} />
                                 <AvatarFallback>{userProfile?.name?.charAt(0) ?? user?.email?.charAt(0) ?? 'U'}</AvatarFallback>
@@ -319,7 +321,9 @@ export function Sidebar({ className }: { className?: string }) {
                                 <TooltipProvider>
                                     <Tooltip>
                                         <TooltipTrigger asChild>
-                                            <span className="text-sm font-semibold truncate block w-full text-left">{userProfile?.name ?? user?.displayName ?? 'Usuário'}</span>
+                                            <span className="text-sm font-semibold truncate block w-full text-left text-muted-foreground group-hover:text-foreground transition-colors">
+                                                {userProfile?.name ?? user?.displayName ?? 'Usuário'}
+                                            </span>
                                         </TooltipTrigger>
                                         <TooltipContent side="top" align="start">
                                             <p>{userProfile?.name ?? user?.displayName ?? 'Usuário'}</p>
@@ -329,7 +333,9 @@ export function Sidebar({ className }: { className?: string }) {
                                 <TooltipProvider>
                                     <Tooltip>
                                         <TooltipTrigger asChild>
-                                            <span className="text-xs text-muted-foreground truncate block w-full text-left">{user?.email}</span>
+                                            <span className="text-xs text-muted-foreground truncate block w-full text-left group-hover:text-foreground transition-colors">
+                                                {user?.email}
+                                            </span>
                                         </TooltipTrigger>
                                         <TooltipContent side="top" align="start">
                                             <p>{user?.email}</p>
