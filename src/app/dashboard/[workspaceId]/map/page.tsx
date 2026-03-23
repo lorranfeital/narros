@@ -71,6 +71,7 @@ import {
   KnowledgeItem,
   NodeRelation,
   Playbook,
+  OrgChart,
 } from '@/lib/firestore-types';
 
 import { getFederatedMapData, FederatedMapData } from '@/lib/actions/federation-actions';
@@ -343,12 +344,10 @@ export default function OperationalMapPage() {
       
       let finalNodes = newNodes;
       
-      // Corrected Logic: Always start with default structural edges.
       const finalEdges: Edge[] = [...defaultIntraWorkspaceEdges, ...federatedEdges];
       
       const relationsInitialized = layoutSnap.exists() && layoutSnap.data()?.relations_initialized;
 
-      // If a layout has been saved, load the custom user-created relations and add them.
       if (relationsInitialized && nodeRelations) {
         const savedEdges = nodeRelations.map(rel => ({
           id: rel.id,
@@ -446,7 +445,8 @@ export default function OperationalMapPage() {
       const existingRelationsSnap = await getDocs(relationsCollectionRef);
       existingRelationsSnap.forEach(relationDoc => batch.delete(relationDoc.ref));
       
-      const edgesToSave = edges.filter(edge => !edge.id.startsWith('e-fed-') && !edge.id.startsWith('e-ws-cat-') && !edge.id.startsWith('e-cat-item-') && !edge.id.startsWith('e-ws-org-') && !edge.id.startsWith('e-org-') && !edge.id.startsWith('e-play-'));
+      const edgesToSave = edges.filter(edge => !edge.id.startsWith('e-'));
+      
       edgesToSave.forEach(edge => {
           const newRelationRef = doc(relationsCollectionRef);
           batch.set(newRelationRef, { fromNodeId: edge.source, toNodeId: edge.target, sourceHandle: edge.sourceHandle || null, targetHandle: edge.targetHandle || null, relationType: 'related_to', createdBy: user.uid, createdAt: serverTimestamp() });
@@ -474,7 +474,7 @@ export default function OperationalMapPage() {
     );
   }
   
-  const noContent = !federatedData || Object.keys(federatedData).every(wsId => !federatedData[wsId].knowledge && federatedData[wsId].playbooks.length === 0 && !federatedData[wsId].orgChart);
+  const noContent = !federatedData || Object.keys(federatedData).every(wsId => !federatedData[wsId].knowledge && (!federatedData[wsId].playbooks || federatedData[wsId].playbooks.length === 0) && !federatedData[wsId].orgChart);
 
   return (
     <div className="w-full h-full relative">
@@ -517,6 +517,7 @@ export default function OperationalMapPage() {
                     {selectedNode.data.type === 'category' && (<div className="space-y-4"><h4 className="font-semibold">Itens de Conhecimento</h4><div className="space-y-3">{(selectedNode.data.raw_data as KnowledgeCategory).itens.map(item => (<div key={item.titulo} className="text-sm"><p className="font-medium text-foreground">{item.titulo}</p><p className="text-muted-foreground">{item.descricao}</p></div>))}</div></div>)}
                     {selectedNode.data.type === 'content' && (<div className="space-y-4"><h4 className="font-semibold">Descrição</h4><div className="space-y-3"><p className="text-muted-foreground">{(selectedNode.data.raw_data as KnowledgeItem).descricao}</p></div></div>)}
                     {selectedNode.data.type === 'playbook' && (<div className="space-y-4"><h4 className="font-semibold">Passos do Processo</h4><div className="space-y-4">{(selectedNode.data.raw_data as Playbook).passos.map(step => (<div key={step.numero} className="flex gap-4"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold">{step.numero}</div><div><h5 className="font-semibold">{step.titulo}</h5><p className="text-muted-foreground text-sm">{step.descricao}</p></div></div>))}</div></div>)}
+                    {selectedNode.data.type === 'orgchart' && (<div className="space-y-4"><h4 className="font-semibold">Detalhes</h4><div className="space-y-3"><p className="text-muted-foreground">Posição: {selectedNode.data.label} ({(selectedNode.data.raw_data as any).title})</p></div></div>)}
                     <Button asChild><Link href={`/dashboard/${workspaceId}/knowledge`}>Explorar na Base de Conhecimento <ChevronRight className="h-4 w-4 ml-2"/></Link></Button>
                   </>
                 )}
