@@ -118,19 +118,18 @@ export default function CollaboratorTrainingsPage() {
 
   const [filter, setFilter] = useState('all');
 
-  // Fetch published training modules
+  // Fetch all training modules and filter client-side
   const modulesQuery = useMemoFirebase(
     () =>
       firestore && workspaceId
         ? query(
             collection(firestore, `workspaces/${workspaceId}/training_modules`),
-            where('status', '==', 'published'),
             orderBy('modulo', 'asc')
           )
         : null,
     [firestore, workspaceId]
   );
-  const { data: modules, isLoading: areModulesLoading } = useCollection<TrainingModule>(modulesQuery);
+  const { data: allModules, isLoading: areModulesLoading } = useCollection<TrainingModule>(modulesQuery);
 
   // Fetch user's training progress
   const progressQuery = useMemoFirebase(
@@ -146,16 +145,20 @@ export default function CollaboratorTrainingsPage() {
   const { data: progress, isLoading: isProgressLoading } = useCollection<TrainingProgress>(progressQuery);
 
   const filteredModules = useMemo(() => {
-    if (!modules) return [];
-    if (filter === 'all') return modules;
-    return modules.filter(module => {
+    if (!allModules) return [];
+    
+    const publishedModules = allModules.filter(m => m.status === 'published');
+    
+    if (filter === 'all') return publishedModules;
+
+    return publishedModules.filter(module => {
         const status = getModuleStatus(module.id, progress);
         if (filter === 'not_started' && status === TrainingProgressStatus.NOT_STARTED) return true;
         if (filter === 'in_progress' && status === TrainingProgressStatus.IN_PROGRESS) return true;
         if (filter === 'completed' && status === TrainingProgressStatus.COMPLETED) return true;
         return false;
     });
-  }, [modules, progress, filter]);
+  }, [allModules, progress, filter]);
 
   const isLoading = areModulesLoading || isProgressLoading || isUserLoading;
 

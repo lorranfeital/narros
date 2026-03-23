@@ -211,19 +211,22 @@ export default function CollaboratorHomePage() {
   );
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<User>(userDocRef);
 
-  // Fetch published training modules
+  // Fetch training modules
   const modulesQuery = useMemoFirebase(
     () =>
       firestore && workspaceId
         ? query(
             collection(firestore, `workspaces/${workspaceId}/training_modules`),
-            where('status', '==', 'published'),
             orderBy('modulo', 'asc')
           )
         : null,
     [firestore, workspaceId]
   );
-  const { data: modules, isLoading: areModulesLoading } = useCollection<TrainingModule>(modulesQuery);
+  const { data: allModules, isLoading: areModulesLoading } = useCollection<TrainingModule>(modulesQuery);
+
+  const modules = useMemo(() => {
+    return allModules?.filter(m => m.status === 'published') || null;
+  }, [allModules]);
 
   // Fetch user's training progress
   const progressQuery = useMemoFirebase(
