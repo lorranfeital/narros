@@ -1,4 +1,3 @@
-
 // This file was created by the AI.
 // This is the main page for the collaborator view.
 
@@ -111,8 +110,6 @@ function OnboardingSection({
                 
                 let icon = <Circle className="h-5 w-5 text-muted-foreground/30" />;
                 if (isCompleted) icon = <CheckCircle className="h-5 w-5 text-green-500" />;
-                // In the image, the in-progress item has a special icon, a circle with a dash.
-                // We'll use a filled circle for now as a representation.
                 if (isInProgress) icon = <Circle className="h-5 w-5 text-primary fill-current" />;
 
                 return (
@@ -209,6 +206,99 @@ function AssistantCard({ workspaceId }: { workspaceId: string }) {
                 </Link>
             </Button>
             <p className="text-xs text-muted-foreground mt-2 text-center">Tire dúvidas sobre a operação com IA</p>
+        </div>
+    );
+}
+
+// MyTrainingsSection Component
+function MyTrainingsSection({
+  modules,
+  progress,
+  isLoading,
+  workspaceId,
+}: {
+  modules: (TrainingModule & { id: string })[] | null;
+  progress: TrainingProgress[] | null;
+  isLoading: boolean;
+  workspaceId: string;
+}) {
+    const getStatusInfo = (status: TrainingProgressStatus) => {
+        switch (status) {
+            case TrainingProgressStatus.COMPLETED:
+                return {
+                    dotColor: 'bg-green-500',
+                    text: 'Concluído',
+                    icon: <CheckCircle className="h-4 w-4" />,
+                    textColor: 'text-green-500'
+                };
+            case TrainingProgressStatus.IN_PROGRESS:
+                return {
+                    dotColor: 'bg-amber-500',
+                    text: 'Em andamento',
+                    icon: null,
+                    textColor: 'text-muted-foreground'
+                };
+            default:
+                return {
+                    dotColor: 'bg-muted-foreground/30',
+                    text: 'Não iniciado',
+                    icon: null,
+                    textColor: 'text-muted-foreground'
+                };
+        }
+    };
+    
+    if (isLoading) {
+        return (
+            <div>
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">MEUS TREINAMENTOS</h2>
+                <div className="space-y-3">
+                    <Skeleton className="h-20 w-full" />
+                    <Skeleton className="h-20 w-full" />
+                </div>
+            </div>
+        );
+    }
+    
+    const visibleModules = useMemo(() => {
+        if (!modules) return [];
+        const notCompleted = modules.filter(m => getModuleStatus(m.id, progress) !== TrainingProgressStatus.COMPLETED);
+        if (notCompleted.length > 0) return notCompleted.slice(0, 3);
+        return modules.slice(0, 3);
+    }, [modules, progress]);
+
+
+    return (
+        <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">MEUS TREINAMENTOS</h2>
+            <div className="space-y-3">
+                {visibleModules.map(module => {
+                    const status = getModuleStatus(module.id, progress);
+                    const statusInfo = getStatusInfo(status);
+                    return (
+                        <Link href={`/collaborator/${workspaceId}/trainings/${module.id}`} key={module.id} className="block">
+                            <div className="flex items-center justify-between p-4 rounded-lg border bg-card hover:border-primary/30 transition-colors">
+                                <div className="flex items-center gap-4">
+                                    <span className={cn('h-2.5 w-2.5 rounded-full flex-shrink-0', statusInfo.dotColor)}></span>
+                                    <div>
+                                        <p className="font-semibold">{module.titulo}</p>
+                                        <p className="text-sm text-muted-foreground capitalize">{module.formato} &middot; {module.duracao}</p>
+                                    </div>
+                                </div>
+                                <div className={cn("flex items-center gap-2 text-sm font-medium", statusInfo.textColor)}>
+                                    {statusInfo.icon}
+                                    <span>{statusInfo.text}</span>
+                                </div>
+                            </div>
+                        </Link>
+                    )
+                })}
+                 {visibleModules.length === 0 && !isLoading && (
+                     <div className="text-center p-8 border-2 border-dashed rounded-lg">
+                        <p className="text-sm text-muted-foreground">Nenhum treinamento atribuído.</p>
+                     </div>
+                 )}
+            </div>
         </div>
     );
 }
@@ -332,6 +422,9 @@ export default function CollaboratorHomePage() {
             </form>
             <KnowledgePreview knowledge={publishedKnowledge} isLoading={isLoading} workspaceId={workspaceId} />
           </div>
+          
+          <MyTrainingsSection modules={modules} progress={progress} isLoading={isLoading} workspaceId={workspaceId} />
+
         </main>
       </div>
 
