@@ -1,10 +1,9 @@
-
 'use client';
 
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from "@/firebase";
 import { useRouter, usePathname, useParams } from "next/navigation";
-import { useEffect, ReactNode } from "react";
+import { useEffect, ReactNode, useMemo } from "react";
 import { collection, query, where, doc } from 'firebase/firestore';
 import { Workspace } from "@/lib/firestore-types";
 
@@ -28,6 +27,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }, [firestore, workspaceId]);
   const { data: currentWorkspace, isLoading: isCurrentWorkspaceLoading } = useDoc<Workspace>(currentWorkspaceDocRef);
   
+  const userRole = useMemo(() => {
+    if (!user || !currentWorkspace) return null;
+    if (currentWorkspace.ownerId === user.uid) return 'admin';
+    return currentWorkspace.roles?.[user.uid] || 'member';
+  }, [user, currentWorkspace]);
+
   useEffect(() => {
     if (!isUserLoading && !user) {
       router.push('/login');
@@ -38,8 +43,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         console.error('[DashboardLayout] Error fetching workspaces:', workspacesError);
     }
     
-    // Redirect collaborator away from the main dashboard
-    if (user && currentWorkspace && currentWorkspace.roles?.[user.uid] === 'collaborator') {
+    // Redirect collaborator and member away from the main dashboard
+    if (userRole === 'collaborator' || userRole === 'member') {
         router.replace(`/collaborator/${workspaceId}/home`);
         return;
     }
@@ -59,7 +64,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         return;
       }
     }
-  }, [user, isUserLoading, workspaces, isWorkspacesLoading, workspacesError, router, pathname, currentWorkspace, workspaceId]);
+  }, [user, isUserLoading, workspaces, isWorkspacesLoading, workspacesError, router, pathname, workspaceId, userRole]);
 
   const showLoading = isUserLoading || (user && isWorkspacesLoading) || (workspaceId && isCurrentWorkspaceLoading);
   const isNewWorkspacePage = pathname === '/dashboard/new-workspace';
@@ -79,11 +84,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     return null;
   }
   
-  // If user is a collaborator, they are being redirected, so render nothing to avoid flash of content.
-  if (user && currentWorkspace && currentWorkspace.roles?.[user.uid] === 'collaborator') {
+  // If user is a collaborator or member, they are being redirected, so render nothing to avoid flash of content.
+  if (userRole === 'collaborator' || userRole === 'member') {
     return (
         <div className="flex min-h-screen items-center justify-center">
-            <p>Redirecionando para a área do colaborador...</p>
+            <p>Redirecionando...</p>
         </div>
     );
   }
