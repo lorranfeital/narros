@@ -150,7 +150,7 @@ function SourceChip({ workspaceId, batchId }: { workspaceId: string, batchId: st
 
 
 // Editor Components
-function BrandKitEditor({ control }: { control: any }) {
+function BrandKitEditor({ control, workspaceId }: { control: any, workspaceId: string }) {
     const { fields: colorFields, append: appendColor, remove: removeColor } = useFieldArray({ control, name: "brandKit.colorPalette" });
     const { fields: typoFields, append: appendTypo, remove: removeTypo } = useFieldArray({ control, name: "brandKit.typography" });
     const { fields: toneFields, append: appendTone, remove: removeTone } = useFieldArray({ control, name: "brandKit.toneOfVoice" });
@@ -207,7 +207,7 @@ function BrandKitEditor({ control }: { control: any }) {
     );
 }
 
-function OrgChartEditor({ control }: { control: any }) {
+function OrgChartEditor({ control, workspaceId }: { control: any, workspaceId: string }) {
     const { fields, append, remove } = useFieldArray({ control, name: "organizationalChart.nodes" });
 
     return (
@@ -597,15 +597,31 @@ export default function ReviewPage() {
 
                     {(isBrandKitLoading || brandKitDraft) && (
                         <Card>
-                            <CardHeader> <CardTitle>Brand Kit Proposto</CardTitle> <CardDescription>Esta é a identidade visual e verbal que a IA extraiu. Edite ou aprove como está.</CardDescription> </CardHeader>
-                            <CardContent> {isBrandKitLoading ? <Skeleton className="h-48 w-full" /> : <BrandKitEditor control={form.control} />} </CardContent>
+                            <CardHeader>
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <CardTitle>Brand Kit Proposto</CardTitle>
+                                        <CardDescription>Esta é a identidade visual e verbal que a IA extraiu. Edite ou aprove como está.</CardDescription>
+                                    </div>
+                                    {brandKitDraft && <SourceChip workspaceId={workspaceId} batchId={brandKitDraft.sourceBatchId} />}
+                                </div>
+                            </CardHeader>
+                            <CardContent> {isBrandKitLoading ? <Skeleton className="h-48 w-full" /> : <BrandKitEditor control={form.control} workspaceId={workspaceId} />} </CardContent>
                         </Card>
                     )}
 
                     {(isOrgChartLoading || orgChartDraft) && (
                         <Card>
-                            <CardHeader> <CardTitle>Organograma Proposto</CardTitle> <CardDescription>Esta é a estrutura hierárquica que a IA detectou. Ajuste os cargos e relações.</CardDescription> </CardHeader>
-                            <CardContent> {isOrgChartLoading ? <Skeleton className="h-48 w-full" /> : <OrgChartEditor control={form.control} />} </CardContent>
+                            <CardHeader>
+                                 <div className="flex justify-between items-center">
+                                    <div>
+                                        <CardTitle>Organograma Proposto</CardTitle>
+                                        <CardDescription>Esta é a estrutura hierárquica que a IA detectou. Ajuste os cargos e relações.</CardDescription>
+                                    </div>
+                                    {orgChartDraft && <SourceChip workspaceId={workspaceId} batchId={orgChartDraft.sourceBatchId} />}
+                                </div>
+                            </CardHeader>
+                            <CardContent> {isOrgChartLoading ? <Skeleton className="h-48 w-full" /> : <OrgChartEditor control={form.control} workspaceId={workspaceId} />} </CardContent>
                         </Card>
                     )}
                     
