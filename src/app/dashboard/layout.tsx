@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Sidebar } from "@/components/dashboard/sidebar";
@@ -19,53 +18,69 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     return query(collection(firestore, 'workspaces'), where('members', 'array-contains', user.uid));
   }, [user, firestore]);
   const { data: workspaces, isLoading: isWorkspacesLoading } = useCollection<Workspace>(workspacesQuery);
+  
+  const getTimestamp = () => new Date().toLocaleTimeString('en-US', { hour12: false });
 
   useEffect(() => {
+    const timestamp = getTimestamp();
     const isLoading = isUserLoading || isWorkspacesLoading;
     
-    // 1. Wait until all data is loaded before making any decisions.
+    console.log(`[${timestamp}] [DashboardLayout] useEffect triggered.`, {
+        pathname,
+        isUserLoading,
+        isWorkspacesLoading,
+        user: !!user,
+        workspaces: workspaces?.length || 0,
+    });
+
     if (isLoading) {
-      return; // Do nothing until loading is complete.
+        console.log(`[${timestamp}] [DashboardLayout] Waiting for user or workspaces to load...`);
+        return;
     }
+    
+    console.log(`[${timestamp}] [DashboardLayout] Loading finished.`);
 
-    // 2. If user is not logged in, send to login page.
     if (!user) {
-      router.replace('/login');
-      return;
+        console.log(`[${timestamp}] [DashboardLayout] No user found. Redirecting to /login.`);
+        router.replace('/login');
+        return;
     }
 
-    // 3. If user has no workspaces, send them to create one (unless they are already there).
     const isOnNewWorkspacePage = pathname === '/dashboard/new-workspace';
-    if ((!workspaces || workspaces.length === 0)) {
+    if (!workspaces || workspaces.length === 0) {
         if (!isOnNewWorkspacePage) {
+            console.log(`[${timestamp}] [DashboardLayout] No workspaces found for user. Redirecting to /dashboard/new-workspace.`);
             router.replace('/dashboard/new-workspace');
+        } else {
+             console.log(`[${timestamp}] [DashboardLayout] User is correctly on the new-workspace page.`);
         }
         return;
     }
     
-    // 4. If we are on the root dashboard page, decide where the user's "home" is.
     const isOnDashboardRoot = pathname === '/dashboard';
-    if (workspaces && workspaces.length > 0 && isOnDashboardRoot) {
+    if (workspaces.length > 0 && isOnDashboardRoot) {
+        console.log(`[${timestamp}] [DashboardLayout] User is on root. Deciding where to go.`);
         const firstWorkspace = workspaces[0];
-        // Determine the user's role in their first workspace.
         const userRole = firstWorkspace.ownerId === user.uid ? 'admin' : firstWorkspace.roles?.[user.uid];
 
-        // If the user's role is a collaborator type, their home is the collaborator view.
+        let targetPath: string;
         if (userRole && ['member', 'collaborator'].includes(userRole)) {
-            router.replace(`/collaborator/${firstWorkspace.id}/home`);
+            targetPath = `/collaborator/${firstWorkspace.id}/home`;
         } else {
-            // Otherwise, their home is the admin dashboard for that workspace.
-            router.replace(`/dashboard/${firstWorkspace.id}`);
+            targetPath = `/dashboard/${firstWorkspace.id}`;
         }
-        return; // Important: stop execution after redirecting.
+        
+        console.log(`[${timestamp}] [DashboardLayout] User role is '${userRole}'. Redirecting to ${targetPath}.`);
+        router.replace(targetPath);
+        return;
     }
+    
+    console.log(`[${timestamp}] [DashboardLayout] No redirect condition met. Current path is allowed.`);
 
   }, [user, isUserLoading, workspaces, isWorkspacesLoading, pathname, router]);
 
-  // --- Render Logic ---
   const isLoading = isUserLoading || isWorkspacesLoading;
 
-  // While loading, or if a redirect is in progress from the useEffect, show a full-screen loader.
   if (isLoading || pathname === '/dashboard') {
      return (
         <div className="flex h-screen w-screen items-center justify-center">
@@ -74,12 +89,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
      );
   }
   
-  // If user has no workspaces but is on the creation page, allow it.
   if ((!workspaces || workspaces.length === 0) && pathname === '/dashboard/new-workspace') {
       return <>{children}</>;
   }
   
-  // After all checks, if we are not loading and not on a page that should redirect, render the layout.
   const isMapPage = pathname?.includes('/map');
   if (isMapPage) {
     return <div className="h-screen w-screen">{children}</div>;

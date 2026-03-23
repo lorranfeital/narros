@@ -22,53 +22,65 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
   }, [firestore, workspaceId]);
   
   const { data: workspace, isLoading: isWorkspaceLoading, error: workspaceError } = useDoc<Workspace>(workspaceDocRef);
+  
+  const getTimestamp = () => new Date().toLocaleTimeString('en-US', { hour12: false });
 
   useEffect(() => {
-    // 1. NUNCA tomar decisões de redirecionamento se os dados essenciais ainda estiverem carregando.
+    const timestamp = getTimestamp();
+    console.log(`[${timestamp}] [CollaboratorLayout] useEffect triggered.`, {
+        isUserLoading,
+        isWorkspaceLoading,
+        user: !!user,
+        workspace: !!workspace,
+        workspaceId,
+    });
+
     if (isUserLoading || isWorkspaceLoading) {
+      console.log(`[${timestamp}] [CollaboratorLayout] Still loading...`);
       return; 
     }
+    
+    console.log(`[${timestamp}] [CollaboratorLayout] Loading finished.`);
 
-    // 2. Se o carregamento terminou e não há usuário, o lugar dele é na tela de login.
     if (!user) {
+      console.log(`[${timestamp}] [CollaboratorLayout] REDIRECTING to /login because user is not authenticated.`);
       router.replace('/login');
       return;
     }
     
-    // 3. Se o carregamento terminou e o workspace não foi encontrado (seja por permissão ou inexistência),
-    // o acesso é não autorizado. Esta é a guarda crucial para evitar a "race condition".
+    console.log(`[${timestamp}] [CollaboratorLayout] User is authenticated (UID: ${user.uid}).`);
+    
     if (!workspace) {
+        console.error(`[${timestamp}] [CollaboratorLayout] REDIRECTING to /unauthorized because workspace document not found after loading. Error from useDoc: ${workspaceError?.message || 'No error object'}`);
         router.push('/unauthorized');
         return;
     }
 
-    // 4. Só agora, com usuário e workspace confirmados, verificamos as permissões de acesso.
+    console.log(`[${timestamp}] [CollaboratorLayout] Workspace is loaded (ID: ${workspace.id}).`);
+
     const isOwner = workspace.ownerId === user.uid;
     const userRole = workspace.roles?.[user.uid];
     const isMember = isOwner || !!userRole;
 
+    console.log(`[${timestamp}] [CollaboratorLayout] Final permission check:`, { isOwner, hasRole: !!userRole, isMember });
+
     if (!isMember) {
+      console.error(`[${timestamp}] [CollaboratorLayout] REDIRECTING to /unauthorized because user is not a member.`);
       router.push('/unauthorized');
       return;
     }
     
-    // 5. Se o usuário for um administrador ou curador, seu lugar é no dashboard principal, não aqui.
     if (isOwner || userRole === 'admin' || userRole === 'curator') {
+      console.log(`[${timestamp}] [CollaboratorLayout] REDIRECTING to dashboard because user role is '${userRole}'.`);
       router.replace(`/dashboard/${workspaceId}`);
       return;
     }
 
-    // Se passar por todas as verificações, o acesso está correto e o useEffect não faz nada.
+    console.log(`[${timestamp}] [CollaboratorLayout] Access GRANTED. Rendering children.`);
 
-  }, [isUserLoading, isWorkspaceLoading, user, workspace, router, workspaceId]);
+  }, [isUserLoading, isWorkspaceLoading, user, workspace, router, workspaceId, workspaceError]);
 
-
-  // --- Lógica de Renderização ---
-  
-  // Exibe a tela de carregamento enquanto o usuário ou o workspace estão sendo carregados,
-  // E crucialmente, TAMBÉM se o workspace ainda for nulo após o carregamento inicial.
-  // Isso impede a renderização de conteúdo parcial antes que o useEffect possa redirecionar com segurança.
-  if (isUserLoading || isWorkspaceLoading || !workspace) {
+  if (isUserLoading || isWorkspaceLoading) {
      return (
       <div className="flex h-screen items-center justify-center">
         <p>Verificando permissões...</p>
@@ -76,10 +88,16 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
     );
   }
   
-  // Neste ponto, temos certeza que temos um usuário e um workspace.
-  // O useEffect acima já está cuidando de redirecionar quem não deveria estar aqui (e.g., admins).
-  const userRole = workspace.roles?.[user.uid];
-  const isAuthorizedCollaborator = userRole === 'member' || userRole === 'collaborator';
+  // Don't render children until the workspace is confirmed to exist, to avoid flashes of content
+  if (!workspace) {
+      return (
+          <div className="flex h-screen items-center justify-center">
+            <p>Carregando dados do workspace...</p>
+          </div>
+      );
+  }
+  
+  const isAuthorizedCollaborator = workspace.roles?.[user?.uid || ''] === 'member' || workspace.roles?.[user?.uid || ''] === 'collaborator';
      
   if (isAuthorizedCollaborator) {
     return (
@@ -94,8 +112,7 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
     );
   }
 
-  // Caso de borda: O usuário é um membro válido (e.g. admin) mas o useEffect ainda não o redirecionou.
-  // Mostramos uma tela de "Redirecionando..." para evitar qualquer flash de conteúdo indevido.
+  // Fallback for edge cases (e.g. an admin lands here before redirect)
   return (
     <div className="flex min-h-screen items-center justify-center">
       <p>Redirecionando...</p>
