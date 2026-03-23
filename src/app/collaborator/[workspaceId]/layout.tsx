@@ -15,47 +15,53 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
   const params = useParams();
   const workspaceId = params.workspaceId as string;
 
+  // Just get the current workspace. This layout's only job is to protect itself.
   const workspaceDocRef = useMemoFirebase(() => {
       if (!firestore || !workspaceId) return null;
       return doc(firestore, 'workspaces', workspaceId);
   }, [firestore, workspaceId]);
-  const { data: workspace, isLoading: isWorkspaceLoading } = useDoc<Workspace>(workspaceDocRef);
+  const { data: workspace, isLoading: isWorkspaceLoading, error: workspaceError } = useDoc<Workspace>(workspaceDocRef);
   
   useEffect(() => {
-    // Wait until both user and workspace data have finished loading
+    // --- AUTHORIZATION GATE ---
+    // Wait until ALL data is loaded before making any decisions.
     if (isUserLoading || isWorkspaceLoading) {
-      return; 
+      return; // Do nothing until loading is complete.
     }
 
-    // After loading, if there is no user, redirect to login
+    // --- DECISION POINT ---
+    // At this point, all data is settled. We can now make a single, definitive check.
+
+    // 1. Check for authenticated user.
     if (!user) {
       router.push('/login');
       return;
     }
     
-    // After loading, if the workspace doc doesn't exist, user doesn't have permission.
+    // 2. Check if the workspace document was found. If not, access is unauthorized.
+    // This covers both non-existent workspaces and permission errors from useDoc.
     if (!workspace) {
         router.push('/unauthorized');
         return;
     }
-
-    // Final permission check: user must be an owner or have a role.
-    const isOwner = workspace.ownerId === user.uid;
-    const hasRole = workspace.roles && Object.prototype.hasOwnProperty.call(workspace.roles, user.uid);
-    const isMember = isOwner || hasRole;
     
+    // 3. Final check: Is the user actually a member of this workspace?
+    const isMember = workspace.members?.includes(user.uid);
+
     if (!isMember) {
         router.push('/unauthorized');
         return;
     }
+    
+    // All checks passed, user is authorized. The effect is done.
 
   }, [user, isUserLoading, workspace, isWorkspaceLoading, router, workspaceId]);
 
 
-  // This part of the component renders what the user sees.
-  // The logic here is to prevent a "flash" of content before the useEffect can redirect.
+  // --- RENDER LOGIC ---
   const isLoading = isUserLoading || isWorkspaceLoading;
 
+  // Show a loading screen while the useEffect is waiting for data.
   if (isLoading) {
      return (
       <div className="flex min-h-screen items-center justify-center">
@@ -64,11 +70,12 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
     );
   }
 
-  // At this point, loading is finished.
-  // We can do a final check before rendering children.
-  // If the useEffect hasn't redirected yet, this will prevent content from flashing.
-  const isMember = (workspace && user) ? (workspace.ownerId === user.uid || (workspace.roles && Object.prototype.hasOwnProperty.call(workspace.roles, user.uid))) : false;
-  if (!user || !workspace || !isMember) {
+  // The useEffect will handle redirection if needed. We can render the children only 
+  // if we are confident the user is authorized, preventing flashes of content.
+  const isAuthorized = user && workspace && workspace.members?.includes(user.uid);
+
+  if (!isAuthorized) {
+      // While the useEffect handles the redirect, this prevents rendering children if auth fails.
       return (
         <div className="flex min-h-screen items-center justify-center">
             <p>Verificando permissões...</p>
