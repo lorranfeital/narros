@@ -44,7 +44,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     }
     
     // Redirect collaborator and member away from the main dashboard
-    if (userRole === 'collaborator' || userRole === 'member') {
+    if (!isCurrentWorkspaceLoading && userRole && ['collaborator', 'member'].includes(userRole)) {
         router.replace(`/collaborator/${workspaceId}/home`);
         return;
     }
@@ -64,7 +64,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         return;
       }
     }
-  }, [user, isUserLoading, workspaces, isWorkspacesLoading, workspacesError, router, pathname, workspaceId, userRole]);
+  }, [user, isUserLoading, workspaces, isWorkspacesLoading, workspacesError, router, pathname, workspaceId, userRole, isCurrentWorkspaceLoading]);
 
   const showLoading = isUserLoading || (user && isWorkspacesLoading) || (workspaceId && isCurrentWorkspaceLoading);
   const isNewWorkspacePage = pathname === '/dashboard/new-workspace';
@@ -84,11 +84,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     return null;
   }
   
-  // If user is a collaborator or member, they are being redirected, so render nothing to avoid flash of content.
-  if (userRole === 'collaborator' || userRole === 'member') {
+  if (userRole && ['collaborator', 'member'].includes(userRole)) {
     return (
         <div className="flex min-h-screen items-center justify-center">
-            <p>Redirecionando...</p>
+            <p>Redirecionando para a área do colaborador...</p>
         </div>
     );
   }
@@ -130,7 +129,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-screen bg-background">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-a_new_fileto">
         {children}
       </main>
     </div>

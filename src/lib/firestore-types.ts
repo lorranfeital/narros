@@ -1,4 +1,3 @@
-
 import { Timestamp } from 'firebase/firestore';
 
 // ---------
@@ -86,6 +85,7 @@ export interface User {
   email: string;
   plan?: string;
   createdAt?: Timestamp;
+  onboardingProgress?: number;
 }
 
 export interface PlatformAdmin {

@@ -40,6 +40,7 @@ import {
   Playbook,
   TrainingModule,
   TrainingProgressStatus,
+  TrainingProgress,
 } from '@/lib/firestore-types';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage, ref, getBytes } from 'firebase/storage';
@@ -619,7 +620,7 @@ export async function updateTrainingProgress(
     status,
   };
 
-  if (status === TrainingProgressStatus.IN_PROGRESS) {
+  if (status === TrainingProgressStatus.IN_PROGRESS && !progressData.startedAt) {
     progressData.startedAt = timestamp as Timestamp;
   } else if (status === TrainingProgressStatus.COMPLETED) {
     progressData.completedAt = timestamp as Timestamp;
