@@ -189,3 +189,29 @@ export async function removeUserFromWorkspace(
         return { success: false, message: "Ocorreu um erro ao remover o usuário." };
     }
 }
+
+export async function updateUserName(
+  workspaceId: string,
+  targetUserId: string,
+  newName: string,
+  adminId: string
+) {
+    const db = getAdminFirestore();
+    // Throws an error if adminId is not an admin, which is what we want.
+    await verifyAdmin(db, workspaceId, adminId);
+
+    if (!newName || newName.trim().length < 2) {
+        return { success: false, message: 'O nome deve ter pelo menos 2 caracteres.' };
+    }
+
+    try {
+        const userRef = doc(db, 'users', targetUserId);
+        await updateDoc(userRef, {
+            name: newName,
+        });
+        return { success: true, message: 'Nome do usuário atualizado.' };
+    } catch (error) {
+        console.error("Error updating user name:", error);
+        return { success: false, message: "Ocorreu um erro ao atualizar o nome do usuário." };
+    }
+}

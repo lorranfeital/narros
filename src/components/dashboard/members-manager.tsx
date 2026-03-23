@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useTransition, useMemo, useEffect } from 'react';
@@ -18,12 +19,13 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Plus, Trash2, User as UserIcon } from 'lucide-react';
+import { Loader2, Plus, Trash2, User as UserIcon, Pencil } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Label } from '@/components/ui/label';
 
-import { inviteUserToWorkspace, updateUserRole, removeUserFromWorkspace } from '@/lib/actions/members-actions';
+import { inviteUserToWorkspace, updateUserRole, removeUserFromWorkspace, updateUserName } from '@/lib/actions/members-actions';
 
 function UserRow({
     member,
@@ -32,7 +34,9 @@ function UserRow({
     isCurrentUser,
     onRoleChange,
     onRemove,
+    onNameChange,
     isProcessing,
+    isViewingUserAdmin,
 }: {
     member: User;
     role: WorkspaceRole;
@@ -40,8 +44,16 @@ function UserRow({
     isCurrentUser: boolean;
     onRoleChange: (userId: string, newRole: WorkspaceRole) => void;
     onRemove: (userId: string) => void;
+    onNameChange: (userId: string, newName: string) => void;
     isProcessing: boolean;
+    isViewingUserAdmin: boolean;
 }) {
+  const [name, setName] = useState(member.name || '');
+
+  useEffect(() => {
+      setName(member.name || '');
+  }, [member.name]);
+
   return (
     <div className="flex items-center justify-between space-x-4 p-2 rounded-md hover:bg-muted/50">
       <div className="flex items-center space-x-4">
@@ -50,7 +62,41 @@ function UserRow({
           <AvatarFallback>{member.name?.charAt(0) || 'U'}</AvatarFallback>
         </Avatar>
         <div>
-          <p className="text-sm font-medium leading-none">{member.name} {isCurrentUser && '(Você)'}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium leading-none">{member.name} {isCurrentUser && '(Você)'}</p>
+            {isViewingUserAdmin && !isOwner && (
+                 <AlertDialog onOpenChange={(open) => !open && setName(member.name || '')}>
+                    <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" disabled={isProcessing}>
+                            <Pencil className="h-3 w-3" />
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Alterar nome de {member.name}</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Esta alteração será refletida em toda a plataforma para este usuário.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <div className="py-4">
+                            <Label htmlFor="name-input">Nome do membro</Label>
+                            <Input id="name-input" value={name} onChange={(e) => setName(e.target.value)} />
+                        </div>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => {
+                                if (name !== member.name && name?.trim()) {
+                                    onNameChange(member.id, name);
+                                }
+                            }} disabled={isProcessing || name === member.name || !name || !name.trim()}>
+                                {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Salvar
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground">{member.email}</p>
         </div>
       </div>
@@ -71,6 +117,7 @@ function UserRow({
                     <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="curator">Curador</SelectItem>
                     <SelectItem value="member">Membro</SelectItem>
+                    <SelectItem value="collaborator">Colaborador</SelectItem>
                 </SelectContent>
             </Select>
             
@@ -175,6 +222,18 @@ export function MembersManager() {
         });
     };
 
+    const handleNameChange = (userId: string, newName: string) => {
+        if (!currentUser) return;
+        startTransition(async () => {
+            const result = await updateUserName(workspaceId, userId, newName, currentUser.uid);
+            if (result.success) {
+                toast({ title: "Sucesso!", description: result.message });
+            } else {
+                toast({ variant: 'destructive', title: "Erro", description: result.message });
+            }
+        });
+    };
+
     const handleRemoveUser = (userId: string) => {
         if (!currentUser) return;
         startTransition(async () => {
@@ -219,6 +278,7 @@ export function MembersManager() {
                                 <SelectItem value="member">Membro</SelectItem>
                                 <SelectItem value="curator">Curador</SelectItem>
                                 <SelectItem value="admin">Admin</SelectItem>
+                                <SelectItem value="collaborator">Colaborador</SelectItem>
                             </SelectContent>
                         </Select>
                         <Button onClick={handleInviteUser} disabled={isSubmitting || !inviteEmail}>
@@ -246,7 +306,9 @@ export function MembersManager() {
                                 isCurrentUser={currentUser?.uid === member.id}
                                 onRoleChange={handleRoleChange}
                                 onRemove={handleRemoveUser}
+                                onNameChange={handleNameChange}
                                 isProcessing={isSubmitting}
+                                isViewingUserAdmin={isAdmin}
                             />
                         ))}
                          {!isLoading && (!members || members.length === 0) && (
