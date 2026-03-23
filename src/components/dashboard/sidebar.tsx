@@ -26,6 +26,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import React, { useState, useEffect } from "react";
 import { Workspace, WorkspaceStatus, SyncProposal, SyncApprovalStatus } from "@/lib/firestore-types";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function Sidebar({ className }: { className?: string }) {
   const auth = useAuth();
@@ -116,7 +117,7 @@ export function Sidebar({ className }: { className?: string }) {
         <div className="flex-1 p-2 space-y-4">
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="w-full justify-start gap-2 px-2 h-11">
+                    <Button variant="ghost" className="w-full justify-start gap-2 px-2 h-11 overflow-hidden">
                         <Avatar className="h-6 w-6">
                             <AvatarImage src={currentWorkspace?.logoUrl} />
                             <AvatarFallback>{currentWorkspace?.name?.charAt(0) ?? 'N'}</AvatarFallback>
@@ -124,7 +125,16 @@ export function Sidebar({ className }: { className?: string }) {
                         {isWorkspacesLoading || !currentWorkspace ? (
                             <Skeleton className="h-4 w-32" />
                         ) : (
-                            <span className="font-semibold text-sm truncate">{currentWorkspace?.name || 'Sem workspace'}</span>
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <span className="flex-1 font-semibold text-sm truncate text-left">{currentWorkspace?.name || 'Sem workspace'}</span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="right" align="start">
+                                        <p>{currentWorkspace?.name}</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
                         )}
                         <ChevronsUpDown className="ml-auto h-4 w-4 text-muted-foreground" />
                     </Button>
@@ -305,9 +315,27 @@ export function Sidebar({ className }: { className?: string }) {
                                 <AvatarImage src={user?.photoURL ?? undefined} />
                                 <AvatarFallback>{userProfile?.name?.charAt(0) ?? user?.email?.charAt(0) ?? 'U'}</AvatarFallback>
                             </Avatar>
-                            <div className="flex flex-col items-start truncate">
-                                <span className="text-sm font-semibold">{userProfile?.name ?? user?.displayName ?? 'Usuário'}</span>
-                                <span className="text-xs text-muted-foreground truncate">{user?.email}</span>
+                            <div className="flex-1 flex flex-col items-start overflow-hidden">
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <span className="text-sm font-semibold truncate block w-full text-left">{userProfile?.name ?? user?.displayName ?? 'Usuário'}</span>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" align="start">
+                                            <p>{userProfile?.name ?? user?.displayName ?? 'Usuário'}</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <span className="text-xs text-muted-foreground truncate block w-full text-left">{user?.email}</span>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" align="start">
+                                            <p>{user?.email}</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
                             </div>
                         </Button>
                     </DropdownMenuTrigger>
