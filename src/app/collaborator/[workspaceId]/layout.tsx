@@ -19,63 +19,36 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
       if (!firestore || !workspaceId) return null;
       return doc(firestore, 'workspaces', workspaceId);
   }, [firestore, workspaceId]);
-  const { data: workspace, isLoading: isWorkspaceLoading, error: workspaceError } = useDoc<Workspace>(workspaceDocRef);
+  const { data: workspace, isLoading: isWorkspaceLoading } = useDoc<Workspace>(workspaceDocRef);
   
-  const isMember = useMemo(() => {
-    const timestamp = new Date().toLocaleTimeString();
-    console.log(`[${timestamp}] useMemo for isMember is calculating...`);
-
-    if (!user || !workspace) {
-      console.log(`[${timestamp}] isMember -> false (user or workspace is missing)`);
-      return false;
-    }
-
-    console.log(`[${timestamp}] isMember check: User ID: ${user.uid}`);
-    console.log(`[${timestamp}] isMember check: Workspace Owner ID: ${workspace.ownerId}`);
-    console.log(`[${timestamp}] isMember check: Workspace roles:`, workspace.roles ? JSON.parse(JSON.stringify(workspace.roles)) : 'undefined');
-
-    const isOwner = workspace.ownerId === user.uid;
-    const hasRole = workspace.roles && Object.prototype.hasOwnProperty.call(workspace.roles, user.uid);
-    const result = isOwner || hasRole;
-    
-    console.log(`[${timestamp}] isMember result: ${result} (isOwner: ${isOwner}, hasRole: ${hasRole})`);
-    return result;
-  }, [user, workspace]);
-
   useEffect(() => {
-    const timestamp = new Date().toLocaleTimeString();
-    console.log(`[${timestamp}] CollaboratorLayout useEffect triggered.`);
-
     if (isUserLoading || isWorkspaceLoading) {
-        console.log(`[${timestamp}] Still loading... (isUserLoading: ${isUserLoading}, isWorkspaceLoading: ${isWorkspaceLoading})`);
-        return;
+      return; // Wait for both user and workspace data to be loaded.
     }
 
     if (!user) {
-      console.error(`[${timestamp}] Auth loaded, but no user found. Redirecting to /login.`);
       router.push('/login');
       return;
     }
 
+    // After loading, if workspace is still null, it means no access or doesn't exist.
     if (!workspace) {
-        console.error(`[${timestamp}] Data loaded, but workspace document not found. Error: ${workspaceError?.message || 'No error message'}`);
-        // Don't redirect immediately, the next check will handle it.
+      router.push('/unauthorized');
+      return;
     }
-    
-    if (!isMember) {
-        console.error(`[${timestamp}] REDIRECTING to /unauthorized because final 'isMember' check is false.`);
-        router.push('/unauthorized');
-    } else {
-        console.log(`[${timestamp}] Access GRANTED. Final 'isMember' check is true.`);
+
+    // Final check: verify membership from the loaded workspace data.
+    const isOwner = workspace.ownerId === user.uid;
+    const hasRole = workspace.roles && Object.prototype.hasOwnProperty.call(workspace.roles, user.uid);
+
+    if (!isOwner && !hasRole) {
+      router.push('/unauthorized');
     }
-  }, [user, isUserLoading, workspace, isWorkspaceLoading, workspaceError, isMember, router]);
+  }, [user, isUserLoading, workspace, isWorkspaceLoading, router, workspaceId]);
 
 
-  const showLoading = isUserLoading || isWorkspaceLoading;
-  
-  // Important: We still need to block render if isMember is false even while loading, 
-  // to prevent flicker of content before redirect.
-  if (showLoading || !isMember) {
+  // Show loading screen until both hooks are done and we have a definitive workspace object (or not)
+  if (isUserLoading || isWorkspaceLoading) {
      return (
       <div className="flex min-h-screen items-center justify-center">
         <p>Carregando área do colaborador...</p>
@@ -83,12 +56,21 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
     );
   }
 
+  // If loading is done, but there's no workspace, it means access was denied.
+  // The useEffect will handle the redirect, but we show a placeholder to prevent rendering children.
+  if (!workspace) {
+      return (
+        <div className="flex min-h-screen items-center justify-center">
+            <p>Verificando permissões...</p>
+        </div>
+      );
+  }
+
   return (
     <div className="flex h-screen bg-background">
       <CollaboratorSidebar />
       <main className={cn(
         "flex-1 overflow-y-auto transition-all duration-300 ease-in-out"
-        // md:ml-52
         )}>
         {children}
       </main>
