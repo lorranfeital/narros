@@ -23,25 +23,9 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
   
   const isMember = useMemo(() => {
     if (!user || !workspace) return false;
-    // Check against ownerId and the keys of the roles map for membership.
-    return workspace.ownerId === user.uid || (workspace.roles && Object.prototype.hasOwnProperty.call(workspace.roles, user.uid));
+    // Check if user's UID is in the members array.
+    return workspace.members && workspace.members.includes(user.uid);
   }, [user, workspace]);
-
-
-  // --- START DEBUG LOGS ---
-  console.log('[CollaboratorLayout] Debug Info:', {
-      timestamp: new Date().toLocaleTimeString(),
-      isUserLoading,
-      isWorkspaceLoading,
-      userId: user?.uid,
-      workspaceId: workspaceId,
-      workspaceExists: !!workspace,
-      workspaceData: workspace,
-      workspaceError: workspaceError,
-      isMemberResult: isMember,
-  });
-  // --- END DEBUG LOGS ---
-
 
   useEffect(() => {
     if (!isUserLoading && !user) {
