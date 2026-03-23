@@ -16,6 +16,7 @@ import {
   deleteDoc,
   Query,
   setDoc,
+  limit,
 } from 'firebase/firestore';
 import { getApps, initializeApp, getApp } from 'firebase/app';
 import {
@@ -62,6 +63,45 @@ function getAdminStorage() {
     }
     return getStorage(getApp());
 }
+
+export async function resolveSourceName(
+  workspaceId: string,
+  batchId: string
+): Promise<string> {
+  if (!workspaceId || !batchId) {
+    return "Fonte desconhecida";
+  }
+  const db = getAdminFirestore();
+  const sourcesQuery = query(
+    collection(db, `workspaces/${workspaceId}/sources`),
+    where('batchId', '==', batchId),
+    limit(1)
+  );
+
+  try {
+    const querySnapshot = await getDocs(sourcesQuery);
+    if (querySnapshot.empty) {
+      return "Fonte desconhecida";
+    }
+    const source = querySnapshot.docs[0].data() as Source;
+
+    if (source.sourceName) {
+        return source.sourceName;
+    }
+
+    if (source.type === SourceType.TEXT && source.rawText) {
+      const truncatedText = source.rawText.substring(0, 40);
+      return truncatedText.length < (source.rawText.length || 0) ? `${truncatedText}...` : truncatedText;
+    }
+
+    return "Fonte desconhecida";
+
+  } catch (error) {
+    console.error("Error resolving source name:", error);
+    return "Erro ao buscar fonte";
+  }
+}
+
 
 type Proposal = Omit<SyncProposal, 'id' | 'workspaceId' | 'sourceBatchId' | 'approvalStatus' | 'createdAt'>;
 
@@ -328,7 +368,7 @@ export async function processContentBatch(
     // Insights are always created
     aiResult.insights.forEach((insight) => {
       const insightRef = doc(collection(db, `workspaces/${workspaceId}/insights`));
-      finalBatch.set(insightRef, { ...insight, sourceRefs: sourceIds, resolved: false, createdAt: timestamp });
+      finalBatch.set(insightRef, { ...insight, sourceRefs: sourceIds, sourceBatchId: batchId, resolved: false, createdAt: timestamp });
     });
 
     // Update status of sources to 'COMPLETED'

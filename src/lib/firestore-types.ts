@@ -1,3 +1,4 @@
+
 import { Timestamp } from 'firebase/firestore';
 
 // ---------
@@ -273,6 +274,7 @@ export interface Playbook {
   status: 'draft' | 'published';
   createdAt: Timestamp;
   updatedAt?: Timestamp;
+  sourceBatchId?: string;
 }
 
 
@@ -288,6 +290,7 @@ export interface TrainingModule {
   sourceRefs?: string[];
   status: 'draft' | 'published';
   createdAt: Timestamp;
+  sourceBatchId?: string;
 }
 
 
@@ -297,6 +300,7 @@ export interface Insight {
   texto: string;
   tipo: InsightType;
   sourceRefs?: string[];
+  sourceBatchId?: string;
   resolved: boolean;
   createdAt: Timestamp;
 }

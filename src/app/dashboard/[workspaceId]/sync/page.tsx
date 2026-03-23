@@ -1,18 +1,19 @@
+
 'use client';
 
 import { useFirestore, useMemoFirebase, useCollection, useUser } from '@/firebase';
 import { doc, collection, query, where } from 'firebase/firestore';
 import { useParams, useRouter } from 'next/navigation';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Loader2, Sparkles, AlertTriangle, GitCommit, GitPullRequest, Trash2, Plus, ArrowRight, Check, X } from 'lucide-react';
-import React, { useState, useTransition } from 'react';
+import { Loader2, Sparkles, AlertTriangle, GitCommit, GitPullRequest, Trash2, Plus, ArrowRight, Check, X, FileText } from 'lucide-react';
+import React, { useState, useTransition, useEffect } from 'react';
 import { SyncProposal, SyncApprovalStatus, SyncProposalType, WorkspaceStatus } from '@/lib/firestore-types';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { updateSyncProposalStatus, publishSync } from '@/lib/actions/workspace-actions';
+import { updateSyncProposalStatus, publishSync, resolveSourceName } from '@/lib/actions/workspace-actions';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 function getProposalTypeInfo(type: SyncProposalType): { text: string; icon: React.ReactNode, variant: "success" | "default" | "destructive" } {
@@ -27,6 +28,43 @@ function getProposalTypeInfo(type: SyncProposalType): { text: string; icon: Reac
             return { text: 'Desconhecido', icon: <AlertTriangle className="h-4 w-4" />, variant: 'secondary' };
     }
 }
+
+// Reusable component to display the source of a generated item
+function SourceOrigin({ workspaceId, batchId }: { workspaceId: string, batchId: string }) {
+  const [sourceName, setSourceName] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!batchId) {
+        setIsLoading(false);
+        return;
+    }
+    let isMounted = true;
+    resolveSourceName(workspaceId, batchId).then(name => {
+      if (isMounted) {
+        setSourceName(name);
+        setIsLoading(false);
+      }
+    });
+    return () => { isMounted = false; };
+  }, [workspaceId, batchId]);
+
+  if (isLoading) {
+    return <Skeleton className="h-4 w-32 mt-2" />;
+  }
+
+  if (!sourceName) {
+    return null;
+  }
+
+  return (
+    <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+        <FileText className="h-3 w-3" />
+        Originado de: <span className="font-semibold">{sourceName}</span>
+    </p>
+  );
+}
+
 
 function ProposalCard({ proposal }: { proposal: SyncProposal }) {
     const { toast } = useToast();
@@ -90,6 +128,9 @@ function ProposalCard({ proposal }: { proposal: SyncProposal }) {
                     </div>
                 )}
             </CardContent>
+            <CardFooter className="p-4 pt-0 border-t bg-muted/50">
+                 <SourceOrigin workspaceId={proposal.workspaceId} batchId={proposal.sourceBatchId} />
+            </CardFooter>
         </Card>
     );
 }

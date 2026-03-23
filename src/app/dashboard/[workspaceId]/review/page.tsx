@@ -21,7 +21,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Separator } from '@/components/ui/separator';
-import { publishDraft } from '@/lib/actions/workspace-actions';
+import { publishDraft, resolveSourceName } from '@/lib/actions/workspace-actions';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
@@ -53,6 +53,7 @@ const playbookSchema = z.object({
   id: z.string(),
   processo: z.string().min(1, "Nome do processo é obrigatório"),
   passos: z.array(playbookStepSchema),
+  sourceBatchId: z.string().optional(),
 });
 
 const trainingModuleSchema = z.object({
@@ -63,6 +64,7 @@ const trainingModuleSchema = z.object({
   objetivo: z.string().min(1, "Objetivo é obrigatório"),
   topicos: z.array(z.string().min(1, "Tópico não pode ser vazio")),
   formato: z.enum(['presencial', 'vídeo', 'slides', 'prático']),
+  sourceBatchId: z.string().optional(),
 });
 
 const colorSchema = z.object({
@@ -103,6 +105,48 @@ const formSchema = z.object({
 });
 
 type FormValues = z.infer<typeof formSchema>;
+
+
+// Reusable component to display the source of a generated item
+function SourceChip({ workspaceId, batchId }: { workspaceId: string, batchId: string | undefined }) {
+  const [sourceName, setSourceName] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!batchId) {
+      setIsLoading(false);
+      setSourceName('Fonte desconhecida');
+      return;
+    }
+    
+    let isMounted = true;
+    setIsLoading(true);
+    
+    resolveSourceName(workspaceId, batchId).then(name => {
+      if (isMounted) {
+        setSourceName(name);
+        setIsLoading(false);
+      }
+    });
+
+    return () => { isMounted = false; };
+  }, [workspaceId, batchId]);
+
+  if (isLoading) {
+    return <Skeleton className="h-6 w-24" />;
+  }
+
+  if (!sourceName) {
+    return null;
+  }
+
+  return (
+    <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-secondary px-2 py-1 rounded-md w-fit">
+      <FileText className="h-3 w-3" />
+      <span className="truncate">{sourceName}</span>
+    </div>
+  );
+}
 
 
 // Editor Components
@@ -188,8 +232,9 @@ function OrgChartEditor({ control }: { control: any }) {
     );
 }
 
-function PlaybookEditor({ control }: { control: any }) {
+function PlaybookEditor({ control, workspaceId }: { control: any; workspaceId: string }) {
   const { fields } = useFieldArray({ control, name: "playbooks" });
+  const { getValues } = useFormContext();
 
   return (
     <div className="space-y-6">
@@ -208,6 +253,9 @@ function PlaybookEditor({ control }: { control: any }) {
               </FormItem>
             )}
           />
+          <div className="mt-2">
+            <SourceChip workspaceId={workspaceId} batchId={getValues(`playbooks.${playbookIndex}.sourceBatchId`)} />
+          </div>
           <div className="mt-4 space-y-4">
             <PlaybookSteps control={control} playbookIndex={playbookIndex} />
           </div>
@@ -294,7 +342,7 @@ function TrainingModuleTopics({ control, moduleIndex }: { control: any; moduleIn
   );
 }
 
-function TrainingModuleEditor({ control }: { control: any }) {
+function TrainingModuleEditor({ control, workspaceId }: { control: any; workspaceId: string }) {
   const { fields, append, remove } = useFieldArray({ control, name: "trainingModules" });
   const { getValues } = useFormContext();
 
@@ -302,13 +350,16 @@ function TrainingModuleEditor({ control }: { control: any }) {
     <div className="space-y-6">
       {fields.map((moduleField, moduleIndex) => (
         <div key={moduleField.id} className="border p-4 rounded-lg bg-card/50">
-          <div className="flex justify-between items-start mb-4">
+          <div className="flex justify-between items-start mb-2">
             <h3 className="text-xl font-headline font-semibold">
               Módulo {getValues(`trainingModules.${moduleIndex}.modulo`)}
             </h3>
             <Button type="button" variant="ghost" size="icon" onClick={() => remove(moduleIndex)}>
               <Trash2 className="h-4 w-4 text-destructive" />
             </Button>
+          </div>
+          <div className="mb-4">
+            <SourceChip workspaceId={workspaceId} batchId={getValues(`trainingModules.${moduleIndex}.sourceBatchId`)} />
           </div>
           <div className="space-y-4">
             <FormField
@@ -396,6 +447,7 @@ function TrainingModuleEditor({ control }: { control: any }) {
             duracao: '30 min',
             formato: 'slides',
             topicos: [],
+            sourceBatchId: '',
           })
         }
       >
@@ -452,7 +504,7 @@ export default function ReviewPage() {
 
     useEffect(() => {
         if (draft || playbooks || trainingModules || brandKitDraft || orgChartDraft) {
-             const mappedTrainingModules = trainingModules ? trainingModules.map(tm => ({ id: tm.id, modulo: tm.modulo, titulo: tm.titulo, duracao: tm.duracao, objetivo: tm.objetivo, topicos: tm.topicos || [], formato: tm.formato || 'slides' })) : [];
+             const mappedTrainingModules = trainingModules ? trainingModules.map(tm => ({ id: tm.id, modulo: tm.modulo, titulo: tm.titulo, duracao: tm.duracao, objetivo: tm.objetivo, topicos: tm.topicos || [], formato: tm.formato || 'slides', sourceBatchId: tm.sourceBatchId })) : [];
             form.reset({
                 categories: draft?.categories || [],
                 playbooks: playbooks || [],
@@ -516,7 +568,15 @@ export default function ReviewPage() {
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(handleSaveChanges)} className="space-y-8">
                     <Card>
-                        <CardHeader> <CardTitle>Base de Conhecimento</CardTitle> <CardDescription>Edite as categorias e itens gerados.</CardDescription> </CardHeader>
+                        <CardHeader>
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <CardTitle>Base de Conhecimento</CardTitle>
+                                    <CardDescription>Edite as categorias e itens gerados.</CardDescription>
+                                </div>
+                                {draft && <SourceChip workspaceId={workspaceId} batchId={draft.sourceBatchId} />}
+                            </div>
+                        </CardHeader>
                         <CardContent>
                             <Accordion type="multiple" defaultValue={draft?.categories.map(c => c.categoria)} className="w-full">
                                 {categoryFields.map((categoryField, categoryIndex) => (
@@ -552,14 +612,14 @@ export default function ReviewPage() {
                     {(isPlaybooksLoading || (playbooks && playbooks.length > 0)) && (
                         <Card>
                             <CardHeader> <CardTitle>Playbooks Propostos</CardTitle> <CardDescription>Estes são os processos passo a passo identificados pela IA. Você pode editá-los antes de publicar.</CardDescription> </CardHeader>
-                            <CardContent> {isPlaybooksLoading ? <Skeleton className="h-24 w-full" /> : <PlaybookEditor control={form.control} />} </CardContent>
+                            <CardContent> {isPlaybooksLoading ? <Skeleton className="h-24 w-full" /> : <PlaybookEditor control={form.control} workspaceId={workspaceId} />} </CardContent>
                         </Card>
                     )}
 
                     {(isTrainingLoading || (trainingModules && trainingModules.length > 0)) && (
                         <Card>
                             <CardHeader> <CardTitle>Módulos de Treinamento Sugeridos</CardTitle> <CardDescription>Estes são os treinamentos que a IA sugere criar. Agora você pode editá-los antes de publicar.</CardDescription> </CardHeader>
-                            <CardContent> {isTrainingLoading ? <Skeleton className="h-24 w-full" /> : <TrainingModuleEditor control={form.control} />} </CardContent>
+                            <CardContent> {isTrainingLoading ? <Skeleton className="h-24 w-full" /> : <TrainingModuleEditor control={form.control} workspaceId={workspaceId} />} </CardContent>
                         </Card>
                     )}
                     

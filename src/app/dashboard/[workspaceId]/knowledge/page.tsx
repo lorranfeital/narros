@@ -1,7 +1,7 @@
 
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFirestore, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking } from '@/firebase';
 import { doc, collection, query, where, orderBy } from 'firebase/firestore';
 import { useParams } from 'next/navigation';
@@ -13,12 +13,55 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PublishedKnowledge, Playbook, TrainingModule, Insight, Version, Workspace, BrandKit, Color, Typography as TypographyType } from '@/lib/firestore-types';
-import { BookOpen, Lightbulb, Milestone, Palette, Type, Globe, CheckCircle } from 'lucide-react';
+import { BookOpen, Lightbulb, Milestone, Palette, Type, Globe, CheckCircle, FileText } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { resolveSourceName } from '@/lib/actions/workspace-actions';
+
+
+// Reusable component to display the source of a generated item
+function SourceChip({ workspaceId, batchId }: { workspaceId: string, batchId: string | undefined }) {
+  const [sourceName, setSourceName] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!batchId) {
+      setIsLoading(false);
+      setSourceName(null);
+      return;
+    }
+    
+    let isMounted = true;
+    setIsLoading(true);
+    
+    resolveSourceName(workspaceId, batchId).then(name => {
+      if (isMounted) {
+        setSourceName(name);
+        setIsLoading(false);
+      }
+    });
+
+    return () => { isMounted = false; };
+  }, [workspaceId, batchId]);
+
+  if (isLoading) {
+    return <Skeleton className="h-6 w-24 mt-2" />;
+  }
+
+  if (!sourceName) {
+    return null;
+  }
+
+  return (
+    <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground bg-secondary px-2 py-1 rounded-md w-fit">
+      <FileText className="h-3 w-3" />
+      <span className="truncate">{sourceName}</span>
+    </div>
+  );
+}
 
 
 function BrandKitDisplay({ workspace, brandKit, isLoading }: { workspace: Workspace | null, brandKit: BrandKit | null, isLoading: boolean }) {
@@ -341,6 +384,7 @@ export default function KnowledgePage() {
                            {(playbooks && playbooks.length > 0) ? playbooks.map(playbook => (
                                <div key={playbook.id} className="border-b pb-6 last:border-b-0">
                                    <h3 className="text-xl font-headline font-semibold">{playbook.processo}</h3>
+                                   {playbook.sourceBatchId && <div className="mt-2"><SourceChip workspaceId={workspaceId} batchId={playbook.sourceBatchId} /></div>}
                                    <div className="mt-4 space-y-4">
                                        {playbook.passos.map(step => (
                                             <div key={step.numero} className="flex gap-4">
@@ -370,6 +414,7 @@ export default function KnowledgePage() {
                            {(trainingModules && trainingModules.length > 0) ? trainingModules.map(module => (
                                <div key={module.id} className="border p-4 rounded-lg">
                                    <h3 className="text-xl font-headline font-semibold">Módulo {module.modulo}: {module.titulo}</h3>
+                                   {module.sourceBatchId && <div className="mt-2"><SourceChip workspaceId={workspaceId} batchId={module.sourceBatchId} /></div>}
                                    <p className="text-muted-foreground mt-2"><span className="font-semibold">Objetivo:</span> {module.objetivo}</p>
                                    <div className="mt-4 flex gap-4 text-sm">
                                        <Badge variant="secondary">Duração: {module.duracao}</Badge>
@@ -409,6 +454,7 @@ export default function KnowledgePage() {
                                             <AlertDescription>
                                                 {insight.texto}
                                             </AlertDescription>
+                                            <SourceChip workspaceId={workspaceId} batchId={insight.sourceBatchId} />
                                        </div>
                                        <Button variant="ghost" size="sm" onClick={() => handleResolveInsight(insight.id)} className="ml-4 shrink-0">
                                            <CheckCircle className="mr-2 h-4 w-4" />
