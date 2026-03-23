@@ -22,46 +22,28 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
   const { data: workspace, isLoading: isWorkspaceLoading, error: workspaceError } = useDoc<Workspace>(workspaceDocRef);
   
   useEffect(() => {
-    const timestamp = new Date().toLocaleTimeString();
-    console.log(`[${timestamp}] CollaboratorLayout useEffect triggered.`, {
-        isUserLoading,
-        isWorkspaceLoading,
-        user: !!user,
-        workspace: !!workspace,
-        workspaceId,
-        pathname: typeof window !== 'undefined' ? window.location.pathname : '',
-    });
-
+    // 1. Wait until all data fetching is complete.
     if (isUserLoading || isWorkspaceLoading) {
-      console.log(`[${timestamp}] Still loading...`);
-      return;
+      return; // Do nothing until loading is done.
     }
 
+    // 2. Once loading is done, check for an authenticated user.
     if (!user) {
-      console.log(`[${timestamp}] No user found. Redirecting to /login.`);
       router.push('/login');
       return;
     }
 
-    if (!workspace) {
-      console.log(`[${timestamp}] Workspace document not found after loading. Redirecting to /unauthorized. Error: ${workspaceError?.message || 'No error'}`);
+    // 3. Now, check the workspace data and user's role.
+    // If there's no workspace OR the user isn't a member (owner or has a role), redirect.
+    const isOwner = workspace?.ownerId === user.uid;
+    const hasRole = workspace?.roles && Object.prototype.hasOwnProperty.call(workspace.roles, user.uid);
+    
+    if (!workspace || (!isOwner && !hasRole)) {
       router.push('/unauthorized');
-      return;
     }
+    // If we reach here, it means workspace exists and user is a member, so we do nothing and allow rendering.
 
-    // If we have the workspace, perform the final membership check.
-    const isOwner = workspace.ownerId === user.uid;
-    const hasRole = workspace.roles && Object.prototype.hasOwnProperty.call(workspace.roles, user.uid);
-
-    console.log(`[${timestamp}] Final check:`, { isOwner, hasRole, roles: workspace.roles });
-
-    if (!isOwner && !hasRole) {
-        console.log(`[${timestamp}] REDIRECTING to /unauthorized because isOwner is false AND hasRole is false.`);
-        router.push('/unauthorized');
-    } else {
-        console.log(`[${timestamp}] Access GRANTED.`);
-    }
-  }, [user, isUserLoading, workspace, isWorkspaceLoading, router, workspaceId, workspaceError]);
+  }, [user, isUserLoading, workspace, isWorkspaceLoading, router, workspaceId]);
 
 
   // Show a loading screen while auth and workspace data are being fetched.
