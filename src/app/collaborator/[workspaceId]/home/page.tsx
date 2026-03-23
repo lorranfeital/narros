@@ -1,3 +1,4 @@
+
 // This file was created by the AI.
 // This is the main page for the collaborator view.
 
@@ -23,7 +24,6 @@ import {
   query,
   where,
   orderBy,
-  limit,
 } from 'firebase/firestore';
 import { useParams, useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -37,10 +37,10 @@ import {
 } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Circle, ArrowRight, BookOpen } from 'lucide-react';
-import { useMemo } from 'react';
+import { CheckCircle, Circle, ArrowRight, BookOpen, Search, Plus } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 // Helper to determine the status of a module
@@ -64,18 +64,16 @@ function OnboardingSection({
   isLoading: boolean;
   workspaceId: string;
 }) {
-  const totalModules = modules?.length || 0;
-  const completedModules = useMemo(() => {
-    if (!modules || !progress) return 0;
-    return modules.filter(
-      (module) =>
-        getModuleStatus(module.id, progress) ===
-        TrainingProgressStatus.COMPLETED
-    ).length;
-  }, [modules, progress]);
+    const progressPercentage = useMemo(() => {
+        if (!modules || !progress) return 0;
+        const total = modules.length;
+        if (total === 0) return 0;
+        const completed = modules.filter(
+            (module) => getModuleStatus(module.id, progress) === TrainingProgressStatus.COMPLETED
+        ).length;
+        return (completed / total) * 100;
+    }, [modules, progress]);
 
-  const progressPercentage =
-    totalModules > 0 ? (completedModules / totalModules) * 100 : 0;
 
   const nextModule = useMemo(() => {
     return modules?.find(
@@ -86,67 +84,60 @@ function OnboardingSection({
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-1/2" />
-          <Skeleton className="h-4 w-1/3 mt-2" />
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-8 w-full" />
-          <Skeleton className="h-8 w-full" />
-        </CardContent>
-      </Card>
+      <div>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-2">ONBOARDING</h2>
+        <Skeleton className="h-64 w-full" />
+      </div>
     );
   }
 
   return (
-    <Card className="h-full flex flex-col">
-      <CardHeader>
-        <CardTitle>Sua jornada de integração</CardTitle>
-        <CardDescription>
-          Complete os módulos abaixo para finalizar seu onboarding.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex-grow">
-        <div className="flex items-center gap-4 mb-4">
-          <Progress value={progressPercentage} className="h-2" />
-          <span className="text-sm font-medium text-muted-foreground shrink-0">
-            {Math.round(progressPercentage)}%
-          </span>
-        </div>
-        <div className="space-y-3">
-          {modules?.map((module) => {
-            const status = getModuleStatus(module.id, progress);
-            const isCompleted = status === TrainingProgressStatus.COMPLETED;
-            return (
-              <div key={module.id} className="flex items-center gap-3">
-                {isCompleted ? (
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                ) : (
-                  <Circle className="h-5 w-5 text-muted-foreground" />
-                )}
-                <span
-                  className={cn(isCompleted && 'text-muted-foreground line-through')}
-                >
-                  {module.titulo}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </CardContent>
-       {nextModule && (
-        <CardFooter>
-          <Button asChild className="w-full md:w-auto" variant="default">
-            <Link href={`/collaborator/${workspaceId}/trainings/${nextModule.id}`}>
-              Continuar onboarding
-              <ArrowRight className="ml-2" />
-            </Link>
-          </Button>
-        </CardFooter>
-      )}
-    </Card>
+    <div>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-2">ONBOARDING</h2>
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+                <CardTitle>Sua jornada de integração</CardTitle>
+                <span className="text-sm font-medium text-muted-foreground">{Math.round(progressPercentage)}% concluído</span>
+            </div>
+            <Progress value={progressPercentage} className="h-2 mt-2" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {modules?.map((module) => {
+                const status = getModuleStatus(module.id, progress);
+                const isCompleted = status === TrainingProgressStatus.COMPLETED;
+                const isInProgress = status === TrainingProgressStatus.IN_PROGRESS;
+                
+                let icon = <Circle className="h-5 w-5 text-muted-foreground/30" />;
+                if (isCompleted) icon = <CheckCircle className="h-5 w-5 text-green-500" />;
+                // In the image, the in-progress item has a special icon, a circle with a dash.
+                // We'll use a filled circle for now as a representation.
+                if (isInProgress) icon = <Circle className="h-5 w-5 text-primary fill-current" />;
+
+                return (
+                  <div key={module.id} className="flex items-center gap-3">
+                    {icon}
+                    <span className={cn('font-medium', isCompleted && 'text-muted-foreground line-through')}>
+                      {module.titulo}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+           {nextModule && (
+            <CardFooter>
+              <Button asChild className="w-auto" variant="default">
+                <Link href={`/collaborator/${workspaceId}/trainings/${nextModule.id}`}>
+                  Continuar onboarding
+                  <ArrowRight className="ml-2" />
+                </Link>
+              </Button>
+            </CardFooter>
+          )}
+        </Card>
+    </div>
   );
 }
 
@@ -154,54 +145,72 @@ function OnboardingSection({
 function KnowledgePreview({
   knowledge,
   isLoading,
+  workspaceId
 }: {
   knowledge: PublishedKnowledge | null;
   isLoading: boolean;
+  workspaceId: string;
 }) {
   if (isLoading) {
     return (
-        <Card>
-            <CardHeader>
-                <Skeleton className="h-6 w-3/4" />
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4">
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-24 w-full" />
-            </CardContent>
-      </Card>
+        <div className="grid grid-cols-2 gap-4">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+        </div>
     );
   }
 
   return (
-    <Card>
-        <CardHeader>
-            <CardTitle className="text-lg">Base de Conhecimento</CardTitle>
-             <CardDescription>Principais categorias para você explorar.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {knowledge?.categories.slice(0, 4).map((cat) => (
-            <Card key={cat.categoria} className="hover:bg-muted/50 transition-colors">
-                <CardContent className="p-4 flex flex-col items-center justify-center text-center h-full">
-                <span className="text-3xl">{cat.icone}</span>
-                <p className="font-semibold mt-2 text-sm">{cat.categoria}</p>
-                <p className="text-xs text-muted-foreground">
-                    {cat.itens.length} itens
-                </p>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {knowledge?.categories.slice(0, 4).map((cat) => (
+        <Card key={cat.categoria} className="hover:border-primary/50 transition-colors">
+             <Link href={`/collaborator/${workspaceId}/knowledge`} className='h-full block'>
+                <CardContent className="p-4 flex items-center gap-4 h-full">
+                    <span className="text-3xl">{cat.icone}</span>
+                    <div>
+                        <p className="font-semibold text-sm">{cat.categoria}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {cat.itens.length} documentos
+                        </p>
+                    </div>
                 </CardContent>
-            </Card>
-            ))}
+             </Link>
+        </Card>
+        ))}
+    </div>
+  );
+}
+
+// New component for the right sidebar stat cards
+function ProgressStatCard({ value, label, isLoading }: { value: string; label: string; isLoading: boolean; }) {
+  if (isLoading) {
+    return <Skeleton className="h-20 w-full" />;
+  }
+  return (
+    <Card>
+      <CardContent className="p-4 text-center">
+        <p className="text-4xl font-bold">{value}</p>
+        <p className="text-sm text-muted-foreground">{label}</p>
       </CardContent>
-       <CardFooter>
-            <Button variant="outline" asChild>
-                <Link href="./knowledge">
-                    Ver toda a base <ArrowRight className="ml-2" />
-                </Link>
-            </Button>
-       </CardFooter>
     </Card>
   );
+}
+
+// New component for the right sidebar assistant card
+function AssistantCard({ workspaceId }: { workspaceId: string }) {
+    return (
+        <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Assistente</h3>
+            <Button asChild className="w-full">
+                <Link href={`/collaborator/${workspaceId}/assistant`}>
+                    <Plus className="mr-2 h-4 w-4" /> Nova conversa
+                </Link>
+            </Button>
+            <p className="text-xs text-muted-foreground mt-2 text-center">Tire dúvidas sobre a operação com IA</p>
+        </div>
+    );
 }
 
 export default function CollaboratorHomePage() {
@@ -209,6 +218,7 @@ export default function CollaboratorHomePage() {
   const firestore = useFirestore();
   const params = useParams();
   const workspaceId = params.workspaceId as string;
+  const router = useRouter();
 
   // Fetch workspace data
   const workspaceDocRef = useMemoFirebase(
@@ -264,56 +274,86 @@ export default function CollaboratorHomePage() {
   );
   const { data: publishedKnowledge, isLoading: isKnowledgeLoading } = useDoc<PublishedKnowledge>(knowledgeDocRef);
 
+  const { onboardingPercentage, completedTrainings, totalTrainings } = useMemo(() => {
+    if (!modules || !progress) return { onboardingPercentage: 0, completedTrainings: 0, totalTrainings: 0 };
+    const total = modules.length;
+    const completed = modules.filter(
+      (module) => getModuleStatus(module.id, progress) === TrainingProgressStatus.COMPLETED
+    ).length;
+    const percentage = total > 0 ? (completed / total) * 100 : 0;
+    return { onboardingPercentage: Math.round(percentage), completedTrainings: completed, totalTrainings: total };
+  }, [modules, progress]);
+
+
   const isLoading = isUserLoading || isWorkspaceLoading || isProfileLoading || areModulesLoading || isProgressLoading || isKnowledgeLoading;
+  
+  const [searchQuery, setSearchQuery] = useState('');
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+    router.push(`/collaborator/${workspaceId}/assistant?initial_message=${encodeURIComponent(searchQuery)}`);
+  };
 
   return (
-     <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 p-8 items-start">
+     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 p-8 items-start">
       {/* Main Content - Left and Center Columns */}
-      <main className="xl:col-span-2 space-y-8">
+      <main className="lg:col-span-2 space-y-8">
         <div>
             {isLoading ? (
             <>
+                <Skeleton className="h-5 w-1/4 mb-2" />
                 <Skeleton className="h-8 w-1/3 mb-2" />
                 <Skeleton className="h-5 w-1/2" />
             </>
             ) : (
             <>
-                <h1 className="text-3xl font-bold">Bom dia, {userProfile?.name.split(' ')[0]}</h1>
+                <p className="text-sm font-medium text-muted-foreground">{workspace?.name || 'Workspace'}</p>
+                <h1 className="text-3xl font-bold mt-1">Bom dia, {userProfile?.name.split(' ')[0]}</h1>
                 <p className="text-muted-foreground">
-                    Bem-vindo à sua central de colaborador.
+                    {completedTrainings} de {totalTrainings || 0} etapas de onboarding concluídas
                 </p>
             </>
             )}
         </div>
-        <KnowledgePreview knowledge={publishedKnowledge} isLoading={isLoading} />
+        
+        <OnboardingSection modules={modules} progress={progress} isLoading={isLoading} workspaceId={workspaceId} />
+
+        <div className="space-y-4">
+             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Base de conhecimento</h2>
+             <form onSubmit={handleSearch} className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                placeholder="Pergunte qualquer coisa sobre a operação..."
+                className="h-11 text-base pl-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                />
+            </form>
+            <KnowledgePreview knowledge={publishedKnowledge} isLoading={isLoading} workspaceId={workspaceId} />
+        </div>
       </main>
 
       {/* Progress Sidebar - Right Column */}
-      <aside className="xl:col-span-1 space-y-6">
-        <h2 className="text-xl font-semibold tracking-tight">Meu Progresso</h2>
-        <OnboardingSection modules={modules} progress={progress} isLoading={isLoading} workspaceId={workspaceId} />
-        <Card>
-            <CardHeader>
-                <CardTitle className="text-lg">Meus Treinamentos</CardTitle>
-            </CardHeader>
-            <CardContent>
-                {isLoading ? <Skeleton className="h-20 w-full" /> : (
-                <Table>
-                  <TableBody>
-                      {modules?.slice(0,3).map(module => (
-                          <TableRow key={module.id}>
-                              <TableCell className="font-medium p-2">{module.titulo}</TableCell>
-                              <TableCell className="text-right text-muted-foreground p-2">{getModuleStatus(module.id, progress) === 'completed' ? 'Concluído' : 'Pendente'}</TableCell>
-                          </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
-                )}
-                <Button variant="link" asChild className="p-0 mt-4 text-primary">
-                    <Link href={`/collaborator/${workspaceId}/trainings`}>Ver todos</Link>
-                </Button>
-            </CardContent>
-        </Card>
+      <aside className="lg:col-span-1 space-y-6">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Meu Progresso</h2>
+        <div className="grid grid-cols-1 gap-4">
+            <ProgressStatCard
+                label="Onboarding"
+                value={`${onboardingPercentage}%`}
+                isLoading={isLoading}
+            />
+            <ProgressStatCard
+                label="Treinamentos"
+                value={`${completedTrainings}/${totalTrainings}`}
+                isLoading={isLoading}
+            />
+            <ProgressStatCard
+                label="Docs acessados"
+                value="16"
+                isLoading={isLoading}
+            />
+        </div>
+        <AssistantCard workspaceId={workspaceId} />
       </aside>
     </div>
   );
