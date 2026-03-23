@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Sidebar } from "@/components/dashboard/sidebar";
@@ -20,8 +21,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { data: workspaces, isLoading: isWorkspacesLoading } = useCollection<Workspace>(workspacesQuery);
 
   useEffect(() => {
+    const isLoading = isUserLoading || isWorkspacesLoading;
+    
     // 1. Wait until all data is loaded before making any decisions.
-    if (isUserLoading || isWorkspacesLoading) {
+    if (isLoading) {
       return; // Do nothing until loading is complete.
     }
 
@@ -63,7 +66,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const isLoading = isUserLoading || isWorkspacesLoading;
 
   // While loading, or if a redirect is in progress from the useEffect, show a full-screen loader.
-  // This prevents any "flash" of content.
   if (isLoading || pathname === '/dashboard') {
      return (
         <div className="flex h-screen w-screen items-center justify-center">
