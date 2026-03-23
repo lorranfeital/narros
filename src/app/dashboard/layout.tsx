@@ -19,29 +19,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }, [user, firestore]);
   const { data: workspaces, isLoading: isWorkspacesLoading } = useCollection<Workspace>(workspacesQuery);
   
-  const getTimestamp = () => new Date().toLocaleTimeString('en-US', { hour12: false });
-
   useEffect(() => {
-    const timestamp = getTimestamp();
     const isLoading = isUserLoading || isWorkspacesLoading;
     
-    console.log(`[${timestamp}] [DashboardLayout] useEffect triggered.`, {
-        pathname,
-        isUserLoading,
-        isWorkspacesLoading,
-        user: !!user,
-        workspaces: workspaces?.length || 0,
-    });
-
     if (isLoading) {
-        console.log(`[${timestamp}] [DashboardLayout] Waiting for user or workspaces to load...`);
         return;
     }
     
-    console.log(`[${timestamp}] [DashboardLayout] Loading finished.`);
-
     if (!user) {
-        console.log(`[${timestamp}] [DashboardLayout] No user found. Redirecting to /login.`);
         router.replace('/login');
         return;
     }
@@ -49,17 +34,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     const isOnNewWorkspacePage = pathname === '/dashboard/new-workspace';
     if (!workspaces || workspaces.length === 0) {
         if (!isOnNewWorkspacePage) {
-            console.log(`[${timestamp}] [DashboardLayout] No workspaces found for user. Redirecting to /dashboard/new-workspace.`);
             router.replace('/dashboard/new-workspace');
-        } else {
-             console.log(`[${timestamp}] [DashboardLayout] User is correctly on the new-workspace page.`);
         }
         return;
     }
     
     const isOnDashboardRoot = pathname === '/dashboard';
     if (workspaces.length > 0 && isOnDashboardRoot) {
-        console.log(`[${timestamp}] [DashboardLayout] User is on root. Deciding where to go.`);
         const firstWorkspace = workspaces[0];
         const userRole = firstWorkspace.ownerId === user.uid ? 'admin' : firstWorkspace.roles?.[user.uid];
 
@@ -70,12 +51,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             targetPath = `/dashboard/${firstWorkspace.id}`;
         }
         
-        console.log(`[${timestamp}] [DashboardLayout] User role is '${userRole}'. Redirecting to ${targetPath}.`);
         router.replace(targetPath);
         return;
     }
-    
-    console.log(`[${timestamp}] [DashboardLayout] No redirect condition met. Current path is allowed.`);
 
   }, [user, isUserLoading, workspaces, isWorkspacesLoading, pathname, router]);
 
