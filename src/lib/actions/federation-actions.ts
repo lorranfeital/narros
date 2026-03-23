@@ -5,7 +5,7 @@ import { collection, getDocs, query, where, doc, getDoc, or, and, Timestamp } fr
 import { getApps, initializeApp, getApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { firebaseConfig } from '@/firebase/config';
-import { Workspace, WorkspaceLink, PublishedKnowledge, Playbook } from '@/lib/firestore-types';
+import { Workspace, WorkspaceLink, PublishedKnowledge, Playbook, OrgChart } from '@/lib/firestore-types';
 
 function getAdminFirestore() {
   if (getApps().length === 0) { initializeApp(firebaseConfig); }
@@ -40,6 +40,7 @@ export interface FederatedMapData {
     workspace: Workspace & { id: string };
     knowledge: PublishedKnowledge | null;
     playbooks: (Playbook & { id: string })[];
+    orgChart: (OrgChart & { id: string }) | null;
 }
 
 export async function getFederatedMapData(
@@ -73,18 +74,21 @@ export async function getFederatedMapData(
         const workspaceRef = doc(db, 'workspaces', id);
         const knowledgeRef = doc(db, `workspaces/${id}/published_knowledge`, id);
         const playbooksQuery = query(collection(db, `workspaces/${id}/playbooks`), where('status', '==', 'published'));
+        const orgChartRef = doc(db, `workspaces/${id}/org_charts`, 'live');
         
-        const [wsSnap, knowledgeSnap, playbooksSnap] = await Promise.all([
+        const [wsSnap, knowledgeSnap, playbooksSnap, orgChartSnap] = await Promise.all([
             getDoc(workspaceRef),
             getDoc(knowledgeRef),
-            getDocs(playbooksQuery)
+            getDocs(playbooksQuery),
+            getDoc(orgChartRef)
         ]);
 
         if (wsSnap.exists()) {
             const dataToSerialize: FederatedMapData = {
                 workspace: { ...(wsSnap.data() as Workspace), id: wsSnap.id },
                 knowledge: knowledgeSnap.exists() ? (knowledgeSnap.data() as PublishedKnowledge) : null,
-                playbooks: playbooksSnap.docs.map(d => ({ ...(d.data() as Playbook), id: d.id }))
+                playbooks: playbooksSnap.docs.map(d => ({ ...(d.data() as Playbook), id: d.id })),
+                orgChart: orgChartSnap.exists() ? { ...(orgChartSnap.data() as OrgChart), id: orgChartSnap.id } : null,
             };
             federatedData[id] = serializeData(dataToSerialize);
         }

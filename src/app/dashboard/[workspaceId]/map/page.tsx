@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, doc, getDoc, writeBatch, serverTimestamp, getDocs } from 'firebase/firestore';
 import { useParams } from 'next/navigation';
@@ -164,7 +164,7 @@ export default function OperationalMapPage() {
   const { data: insights, isLoading: isInsightsLoading } = useCollection<Insight>(insightsQuery);
 
   const nodeRelationsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, `workspaces/${workspaceId}/nodeRelations`)) : null, [firestore, workspaceId]);
-  const { data: nodeRelations, isLoading: areRelationsLoading } = useCollection<NodeRelation>(nodeRelationsQuery);
+  const { data: nodeRelations, isLoading: areRelationsLoading, error: relationsError } = useCollection<NodeRelation>(nodeRelationsQuery);
   
   useEffect(() => {
     const fetchData = async () => {
@@ -280,6 +280,47 @@ export default function OperationalMapPage() {
             });
             defaultIntraWorkspaceEdges.push({ id: `e-${wsId}-play-${index}`, source: workspaceNodeId, target: playbookId, type: 'smoothstep' });
         });
+
+        const orgChartRadius = 850;
+        const orgChart = data.orgChart;
+        if (orgChart && orgChart.nodes) {
+            orgChart.nodes.forEach((node, index) => {
+                const angle = (index / (orgChart.nodes.length || 1)) * 2 * Math.PI - Math.PI / 3;
+                const nodeId = `${wsId}-org-${node.id}`;
+                newNodes.push({
+                    id: nodeId,
+                    type: 'custom',
+                    position: { x: workspaceCenterX + orgChartRadius * Math.cos(angle) - 128, y: workspaceCenterY + orgChartRadius * Math.sin(angle) - 70 },
+                    data: {
+                        label: node.name,
+                        type: 'orgchart',
+                        icon: <Users className="h-5 w-5" />,
+                        subtext: node.title,
+                        raw_data: node,
+                        isFederated: !isCurrentWs,
+                        workspaceName: wsName,
+                    },
+                });
+
+                // Add edge from parent or from workspace
+                if (node.parentId) {
+                    defaultIntraWorkspaceEdges.push({
+                        id: `e-org-${wsId}-${node.id}`,
+                        source: `${wsId}-org-${node.parentId}`,
+                        target: nodeId,
+                        type: 'smoothstep',
+                        markerEnd: { type: MarkerType.ArrowClosed }
+                    });
+                } else {
+                    defaultIntraWorkspaceEdges.push({
+                        id: `e-ws-org-${wsId}-${node.id}`,
+                        source: workspaceNodeId,
+                        target: nodeId,
+                        type: 'smoothstep',
+                    });
+                }
+            });
+        }
       }
 
       const layoutRef = doc(firestore, `workspaces/${workspaceId}/layouts`, 'map');
@@ -291,7 +332,6 @@ export default function OperationalMapPage() {
       const relationsInitialized = layoutSnap.exists() && layoutSnap.data()?.relations_initialized;
 
       if (relationsInitialized && nodeRelations) {
-        // User has saved a layout, so we use their saved relations
         const savedEdges = nodeRelations.map(rel => ({
           id: rel.id,
           source: rel.fromNodeId,
@@ -302,11 +342,9 @@ export default function OperationalMapPage() {
         }));
         finalEdges = [...savedEdges, ...federatedEdges];
       } else {
-        // First load, use default generated edges
         finalEdges = [...defaultIntraWorkspaceEdges, ...federatedEdges];
       }
-
-      // Apply saved node positions if they exist
+      
       if (layoutSnap.exists()) {
         const layoutData = layoutSnap.data();
         if (Array.isArray(layoutData.nodePositions)) {
@@ -336,11 +374,14 @@ export default function OperationalMapPage() {
   const onEdgesChange = useCallback((changes: EdgeChange[]) => setEdges((eds) => applyEdgeChanges(changes, eds)), []);
   const onConnect = useCallback((connection: Connection) => setEdges((eds) => addEdge(connection, eds)), []);
   const handleNodeClick = (_event: React.MouseEvent, node: Node<MapNodeData>) => setSelectedNode(node);
-  const handleEdgeClick = (_event: React.MouseEvent, edge: Edge) => setEdgeToDelete(edge);
+  const handleEdgeClick = (_event: React.MouseEvent, edge: Edge) => {
+      if(edge.id.startsWith('e-fed-')) return; // Don't allow deleting federated edges
+      setEdgeToDelete(edge);
+  }
   
   const confirmDeleteEdge = () => {
     if (edgeToDelete) {
-      onEdgesChange([{ type: 'remove', id: edgeToDelete.id }]);
+      setEdges((eds) => eds.filter((e) => e.id !== edgeToDelete.id));
       setEdgeToDelete(null);
       toast({ title: "Conexão removida", description: "Clique em 'Salvar Layout' para tornar a exclusão permanente." });
     }
@@ -410,7 +451,7 @@ export default function OperationalMapPage() {
     );
   }
   
-  const noContent = !federatedData || Object.keys(federatedData).every(wsId => !federatedData[wsId].knowledge && federatedData[wsId].playbooks.length === 0);
+  const noContent = !federatedData || Object.keys(federatedData).every(wsId => !federatedData[wsId].knowledge && federatedData[wsId].playbooks.length === 0 && !federatedData[wsId].orgChart);
 
   return (
     <div className="w-full h-full relative">
