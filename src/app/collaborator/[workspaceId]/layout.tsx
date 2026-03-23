@@ -21,47 +21,56 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
     return doc(firestore, 'workspaces', workspaceId);
   }, [firestore, workspaceId]);
   
-  const { data: workspace, isLoading: isWorkspaceLoading, error: workspaceError } = useDoc<Workspace>(workspaceDocRef);
+  const { data: workspace, isLoading: isWorkspaceLoading } = useDoc<Workspace>(workspaceDocRef);
   
   useEffect(() => {
-    // NUNCA redirecionar se ainda estiver carregando
+    // Guard: Wait for all data sources to finish their initial load.
     if (isUserLoading || isWorkspaceLoading) {
       return; 
     }
     
-    // Após o carregamento, verificar o usuário primeiro
+    // Guard: If there's no authenticated user after loading, redirect to login.
     if (!user) {
       router.replace('/login');
       return;
     }
     
-    // Se o carregamento terminou e o workspace ainda é nulo, significa que não foi encontrado ou houve um erro.
-    if (!workspace) {
-        router.push('/unauthorized');
-        return;
-    }
+    // At this point, loading is done and we have a user.
+    // Now, we can make decisions based on the workspace data.
 
-    // Só agora verificar permissões
-    const isOwner = workspace.ownerId === user.uid;
-    const userRole = workspace.roles?.[user.uid];
-    const isMember = isOwner || !!userRole;
+    // Scenario 1: Workspace data exists. We can check permissions.
+    if (workspace) {
+        const isOwner = workspace.ownerId === user.uid;
+        const userRole = workspace.roles?.[user.uid];
+        const isMember = isOwner || !!userRole;
 
-    if (!isMember) {
+        // If the user is NOT a member of this workspace, it's an unauthorized access.
+        if (!isMember) {
+          router.push('/unauthorized');
+          return;
+        }
+        
+        // If the user IS a member, but has a role that should be in the dashboard, redirect them there.
+        if (isOwner || userRole === 'admin' || userRole === 'curator') {
+          router.replace(`/dashboard/${workspaceId}`);
+          return;
+        }
+
+        // If none of the above, the user is an authorized collaborator. Do nothing, allow render.
+
+    } else {
+      // Scenario 2: Loading is finished, but the workspace document is null.
+      // This means the document doesn't exist or was not found for other reasons (like permissions).
+      // This is a definitive "not found" state AFTER the initial load.
       router.push('/unauthorized');
       return;
     }
-    
-    // Redirecionar admins/curadores para fora da visão de colaborador
-    if (isOwner || userRole === 'admin' || userRole === 'curator') {
-      router.replace(`/dashboard/${workspaceId}`);
-      return;
-    }
 
-  }, [isUserLoading, isWorkspaceLoading, user, workspace, router, workspaceId, workspaceError]);
+  }, [isUserLoading, isWorkspaceLoading, user, workspace, router, workspaceId]);
 
-  // Lidar com o estado de carregamento de forma robusta.
-  // A chave é esperar que AMBOS terminem de carregar E que o workspace seja confirmado.
-  // Isso previne a renderização prematura de 'children'.
+  // This is the main protection. It shows a loading screen until we are CERTAIN that
+  // both the user and the workspace data are loaded. If the workspace data flickers
+  // to null later, this will also re-activate, preventing render with incomplete data.
   if (isUserLoading || isWorkspaceLoading || !workspace) {
      return (
       <div className="flex h-screen items-center justify-center">
@@ -70,7 +79,7 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
     );
   }
   
-  // Verificação final antes de renderizar, para ter certeza absoluta.
+  // Final check before rendering, just to be absolutely sure.
   const isAuthorizedCollaborator = workspace.roles?.[user?.uid || ''] === 'member' || workspace.roles?.[user?.uid || ''] === 'collaborator';
      
   if (isAuthorizedCollaborator) {
@@ -86,8 +95,8 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
     );
   }
 
-  // Se o usuário não for um colaborador autorizado mas passou pelas verificações do useEffect (ex: admin),
-  // mostrar uma mensagem de redirecionamento enquanto o useEffect trata do redirecionamento.
+  // If the user is not an authorized collaborator but somehow passed the useEffect checks 
+  // (e.g., an admin being redirected), show a generic message while the redirect happens.
   return (
     <div className="flex min-h-screen items-center justify-center">
       <p>Redirecionando...</p>
