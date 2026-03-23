@@ -1,3 +1,4 @@
+
 'use server';
 
 import {
@@ -15,7 +16,7 @@ import {
   setDoc,
   serverTimestamp,
 } from 'firebase/firestore';
-import { getApps, initializeApp, getApp } from 'firebase/app';
+import { getApps, initializeApp, getApp, deleteApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { firebaseConfig } from '@/firebase/config';
@@ -27,14 +28,6 @@ function getAdminFirestore() {
   }
   return getFirestore(getApp());
 }
-
-function getAdminAuth() {
-    if (getApps().length === 0) {
-        initializeApp(firebaseConfig);
-    }
-    return getAuth(getApp());
-}
-
 
 async function verifyAdmin(
   db: any,
@@ -66,7 +59,6 @@ export async function inviteUserToWorkspace(
   inviterId: string
 ) {
     const db = getAdminFirestore();
-    const auth = getAdminAuth();
     const workspace = await verifyAdmin(db, workspaceId, inviterId);
 
     if (!email) {
@@ -80,15 +72,18 @@ export async function inviteUserToWorkspace(
     let isNewUser = false;
 
     if (userSnap.empty) {
-        // User does not exist, create them.
         isNewUser = true;
+        // Use a temporary app instance to create the user to avoid auth state pollution on the server.
+        const tempAppName = `temp-user-creation-${Date.now()}`;
+        const tempApp = initializeApp(firebaseConfig, tempAppName);
+        const tempAuth = getAuth(tempApp);
+
         try {
-            // Generate a random temporary password. User will need to reset it.
             const tempPassword = Math.random().toString(36).slice(-8) + 'A1b2c3!';
-            const userCredential = await createUserWithEmailAndPassword(auth, email, tempPassword);
+            const userCredential = await createUserWithEmailAndPassword(tempAuth, email, tempPassword);
             userId = userCredential.user.uid;
 
-            // Create a user document in Firestore
+            // Create a user document in Firestore for the new user.
             const newUserRef = doc(db, 'users', userId);
             await setDoc(newUserRef, {
                 id: userId,
@@ -100,16 +95,18 @@ export async function inviteUserToWorkspace(
 
         } catch (error: any) {
              if (error.code === 'auth/email-already-in-use') {
-                return { success: false, message: 'Este e-mail já está em uso pelo sistema de autenticação, mas não foi encontrado em nosso banco de dados. Contate o suporte.' };
+                return { success: false, message: 'Este e-mail já está em uso. Peça para o usuário acessar a plataforma e ele poderá ser convidado.' };
             }
              if (error.code === 'auth/invalid-email') {
                 return { success: false, message: 'O formato do e-mail fornecido é inválido.' };
             }
             console.error("Error creating user:", error);
             return { success: false, message: `Ocorreu um erro ao criar o novo usuário: ${error.message}` };
+        } finally {
+            // Clean up the temporary app instance.
+            await deleteApp(tempApp);
         }
     } else {
-        // User exists, get their ID.
         const userDoc = userSnap.docs[0];
         userId = userDoc.id;
         if (workspace.members.includes(userId)) {
@@ -117,7 +114,6 @@ export async function inviteUserToWorkspace(
         }
     }
 
-    // Add user to the workspace
     try {
         const workspaceRef = doc(db, 'workspaces', workspaceId);
         await updateDoc(workspaceRef, {
