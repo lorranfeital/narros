@@ -141,6 +141,7 @@ function OnboardingSection({
           <Button asChild className="w-full md:w-auto" variant="default">
             <Link href={`/collaborator/${workspaceId}/trainings/${nextModule.id}`}>
               Continuar onboarding
+              <ArrowRight className="ml-2" />
             </Link>
           </Button>
         </CardFooter>
@@ -177,10 +178,11 @@ function KnowledgePreview({
     <Card>
         <CardHeader>
             <CardTitle className="text-lg">Base de Conhecimento</CardTitle>
+             <CardDescription>Principais categorias para você explorar.</CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4">
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {knowledge?.categories.slice(0, 4).map((cat) => (
-            <Card key={cat.categoria} className="hover:bg-muted/50">
+            <Card key={cat.categoria} className="hover:bg-muted/50 transition-colors">
                 <CardContent className="p-4 flex flex-col items-center justify-center text-center h-full">
                 <span className="text-3xl">{cat.icone}</span>
                 <p className="font-semibold mt-2 text-sm">{cat.categoria}</p>
@@ -191,6 +193,13 @@ function KnowledgePreview({
             </Card>
             ))}
       </CardContent>
+       <CardFooter>
+            <Button variant="outline" asChild>
+                <Link href="./knowledge">
+                    Ver toda a base <ArrowRight className="ml-2" />
+                </Link>
+            </Button>
+       </CardFooter>
     </Card>
   );
 }
@@ -256,63 +265,56 @@ export default function CollaboratorHomePage() {
   const { data: publishedKnowledge, isLoading: isKnowledgeLoading } = useDoc<PublishedKnowledge>(knowledgeDocRef);
 
   const isLoading = isUserLoading || isWorkspaceLoading || isProfileLoading || areModulesLoading || isProgressLoading || isKnowledgeLoading;
-  
-  const completedModules = useMemo(() => {
-    if (!modules || !progress) return 0;
-    return modules.filter(
-      (module) =>
-        getModuleStatus(module.id, progress) ===
-        TrainingProgressStatus.COMPLETED
-    ).length;
-  }, [modules, progress]);
-
 
   return (
-    <div className="p-8 space-y-8">
-      <div>
-        {isLoading ? (
-          <>
-            <Skeleton className="h-8 w-1/3 mb-2" />
-            <Skeleton className="h-5 w-1/2" />
-          </>
-        ) : (
-          <>
-            <h1 className="text-3xl font-bold">Bom dia, {userProfile?.name.split(' ')[0]}</h1>
-            <p className="text-muted-foreground">
-              {completedModules} de {modules?.length || 0} etapas de onboarding concluídas.
-            </p>
-          </>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-        <OnboardingSection modules={modules} progress={progress} isLoading={isLoading} workspaceId={workspaceId} />
-        <div className="space-y-8">
-          <KnowledgePreview knowledge={publishedKnowledge} isLoading={isLoading} />
-           <Card>
-              <CardHeader>
-                  <CardTitle className="text-lg">Meus Treinamentos</CardTitle>
-              </CardHeader>
-              <CardContent>
-                  {isLoading ? <Skeleton className="h-20 w-full" /> : (
-                  <Table>
-                    <TableBody>
-                        {modules?.slice(0,3).map(module => (
-                            <TableRow key={module.id}>
-                                <TableCell className="font-medium p-2">{module.titulo}</TableCell>
-                                <TableCell className="text-right text-muted-foreground p-2">{getModuleStatus(module.id, progress) === 'completed' ? 'Concluído' : 'Pendente'}</TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                  </Table>
-                  )}
-                  <Button variant="link" asChild className="p-0 mt-4 text-primary">
-                      <Link href={`/collaborator/${workspaceId}/trainings`}>Ver todos</Link>
-                  </Button>
-              </CardContent>
-          </Card>
+     <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 p-8 items-start">
+      {/* Main Content - Left and Center Columns */}
+      <main className="xl:col-span-2 space-y-8">
+        <div>
+            {isLoading ? (
+            <>
+                <Skeleton className="h-8 w-1/3 mb-2" />
+                <Skeleton className="h-5 w-1/2" />
+            </>
+            ) : (
+            <>
+                <h1 className="text-3xl font-bold">Bom dia, {userProfile?.name.split(' ')[0]}</h1>
+                <p className="text-muted-foreground">
+                    Bem-vindo à sua central de colaborador.
+                </p>
+            </>
+            )}
         </div>
-      </div>
+        <KnowledgePreview knowledge={publishedKnowledge} isLoading={isLoading} />
+      </main>
+
+      {/* Progress Sidebar - Right Column */}
+      <aside className="xl:col-span-1 space-y-6">
+        <h2 className="text-xl font-semibold tracking-tight">Meu Progresso</h2>
+        <OnboardingSection modules={modules} progress={progress} isLoading={isLoading} workspaceId={workspaceId} />
+        <Card>
+            <CardHeader>
+                <CardTitle className="text-lg">Meus Treinamentos</CardTitle>
+            </CardHeader>
+            <CardContent>
+                {isLoading ? <Skeleton className="h-20 w-full" /> : (
+                <Table>
+                  <TableBody>
+                      {modules?.slice(0,3).map(module => (
+                          <TableRow key={module.id}>
+                              <TableCell className="font-medium p-2">{module.titulo}</TableCell>
+                              <TableCell className="text-right text-muted-foreground p-2">{getModuleStatus(module.id, progress) === 'completed' ? 'Concluído' : 'Pendente'}</TableCell>
+                          </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+                )}
+                <Button variant="link" asChild className="p-0 mt-4 text-primary">
+                    <Link href={`/collaborator/${workspaceId}/trainings`}>Ver todos</Link>
+                </Button>
+            </CardContent>
+        </Card>
+      </aside>
     </div>
   );
 }
