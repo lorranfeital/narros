@@ -1,103 +1,85 @@
-
 'use client';
 
 import { Sidebar } from "@/components/dashboard/sidebar";
-import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from "@/firebase";
+import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
 import { useRouter, usePathname, useParams } from "next/navigation";
 import { useEffect, ReactNode } from "react";
-import { collection, query, where, doc } from 'firebase/firestore';
+import { collection, query, where } from 'firebase/firestore';
 import { Workspace } from "@/lib/firestore-types";
+import { useWorkspaceAuthorization } from "@/hooks/use-workspace-auth";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
-  const { user, isUserLoading } = useUser();
-  const firestore = useFirestore();
   const router = useRouter();
   const pathname = usePathname();
   const params = useParams();
   const workspaceId = params.workspaceId as string;
-
+  const { status, user } = useWorkspaceAuthorization();
+  
+  // We need to list all user's workspaces for the root dashboard redirect logic.
+  const firestore = useFirestore();
   const workspacesQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return query(collection(firestore, 'workspaces'), where('members', 'array-contains', user.uid));
   }, [user, firestore]);
   const { data: workspaces, isLoading: isWorkspacesLoading } = useCollection<Workspace>(workspacesQuery);
-  
-  const currentWorkspaceDocRef = useMemoFirebase(() => {
-      if (!firestore || !workspaceId) return null;
-      return doc(firestore, 'workspaces', workspaceId);
-  }, [firestore, workspaceId]);
-  const { data: currentWorkspace, isLoading: isCurrentWorkspaceLoading } = useDoc<Workspace>(currentWorkspaceDocRef);
 
   useEffect(() => {
-    if (isUserLoading || isWorkspacesLoading) {
+    if (status === 'loading' || isWorkspacesLoading) {
       return; 
     }
-
-    if (!user) {
+    if (status === 'unauthorized') {
       router.push('/login');
       return;
     }
-
-    const hasWorkspaces = workspaces && workspaces.length > 0;
-    const isOnNewWorkspacePage = pathname === '/dashboard/new-workspace';
-    const isOnDashboardRoot = pathname === '/dashboard';
-
-    if (!hasWorkspaces && !isOnNewWorkspacePage) {
-        router.push('/dashboard/new-workspace');
-        return;
+    if (status === 'authorized_collaborator' && workspaceId) {
+      router.replace(`/collaborator/${workspaceId}/home`);
+      return;
     }
 
-    if (hasWorkspaces && isOnDashboardRoot) {
+    const isOnNewWorkspacePage = pathname === '/dashboard/new-workspace';
+    if ((!workspaces || workspaces.length === 0) && !isOnNewWorkspacePage) {
+      router.push('/dashboard/new-workspace');
+      return;
+    }
+    
+    const isOnDashboardRoot = pathname === '/dashboard';
+    if (workspaces && workspaces.length > 0 && isOnDashboardRoot) {
         const firstWorkspace = workspaces[0];
-        const userRole = firstWorkspace.ownerId === user.uid ? 'admin' : firstWorkspace.roles?.[user.uid];
+        // The role check is now inside the hook, but we need to re-check for the specific case of root redirect
+        const userRole = firstWorkspace.ownerId === user?.uid ? 'admin' : firstWorkspace.roles?.[user!.uid];
         const targetPath = (userRole && ['member', 'collaborator'].includes(userRole))
             ? `/collaborator/${firstWorkspace.id}/home`
             : `/dashboard/${firstWorkspace.id}`;
-        
         router.replace(targetPath);
         return;
     }
-    
-    if (workspaceId && !isCurrentWorkspaceLoading && currentWorkspace) {
-        const userRole = currentWorkspace.ownerId === user.uid ? 'admin' : currentWorkspace.roles?.[user.uid];
-        const isCollaboratorPath = pathname.startsWith('/collaborator');
 
-        if (userRole && ['member', 'collaborator'].includes(userRole) && !isCollaboratorPath) {
-            const targetPath = `/collaborator/${workspaceId}/home`;
-            router.replace(targetPath);
-            return;
-        }
-    }
+  }, [status, router, pathname, workspaceId, user, workspaces, isWorkspacesLoading]);
 
-  }, [
-    user, isUserLoading, 
-    workspaces, isWorkspacesLoading,
-    currentWorkspace, isCurrentWorkspaceLoading,
-    workspaceId, pathname, router
-  ]);
-
-  const isLoading = isUserLoading || isWorkspacesLoading;
-
-  if (isLoading) {
+  // Show a loading screen while the authorization hook is running.
+  if (status === 'loading' || (user && isWorkspacesLoading)) {
      return <div className="flex min-h-screen items-center justify-center"><p>Carregando Dashboard...</p></div>;
   }
-  
-  if (!user) {
-    return null;
+
+  // A final guard before rendering anything.
+  if (status === 'unauthorized') {
+     return <div className="flex min-h-screen items-center justify-center"><p>Redirecionando para login...</p></div>;
   }
-  
+
   const isCreatingWorkspace = pathname === '/dashboard/new-workspace';
-  if ((!workspaces || workspaces.length === 0) && !isCreatingWorkspace) {
-    return <div className="flex min-h-screen items-center justify-center"><p>Redirecionando para criação de workspace...</p></div>;
+  if ((!workspaces || workspaces.length === 0) && isCreatingWorkspace) {
+      return <>{children}</>;
   }
-  
+
   const isMapPage = pathname?.includes('/map');
   if (isMapPage) {
     return <div className="h-screen w-screen">{children}</div>;
   }
-
-  if ((!workspaces || workspaces.length === 0) && isCreatingWorkspace) {
-      return <>{children}</>;
+  
+  // If the user is a collaborator, the useEffect should have already redirected them.
+  // This prevents rendering the admin sidebar for them.
+  if (status === 'authorized_collaborator') {
+    return <div className="flex min-h-screen items-center justify-center"><p>Redirecionando para área do colaborador...</p></div>;
   }
 
   return (
