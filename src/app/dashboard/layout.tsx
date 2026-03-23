@@ -2,21 +2,17 @@
 
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import { useRouter, usePathname, useParams } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect, ReactNode } from "react";
 import { collection, query, where } from 'firebase/firestore';
 import { Workspace } from "@/lib/firestore-types";
-import { useWorkspaceAuthorization } from "@/hooks/use-workspace-auth";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const params = useParams();
-  const workspaceId = params.workspaceId as string;
-  const { status, user } = useWorkspaceAuthorization();
-  
-  // We need to list all user's workspaces for the root dashboard redirect logic.
+  const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
+
   const workspacesQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return query(collection(firestore, 'workspaces'), where('members', 'array-contains', user.uid));
@@ -24,62 +20,60 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { data: workspaces, isLoading: isWorkspacesLoading } = useCollection<Workspace>(workspacesQuery);
 
   useEffect(() => {
-    if (status === 'loading' || isWorkspacesLoading) {
-      return; 
-    }
-    if (status === 'unauthorized') {
-      router.push('/login');
-      return;
-    }
-    if (status === 'authorized_collaborator' && workspaceId) {
-      router.replace(`/collaborator/${workspaceId}/home`);
+    // Wait until both user and their workspaces have been loaded
+    if (isUserLoading || isWorkspacesLoading) {
       return;
     }
 
+    // If user is not logged in, send to login page
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    // If user has no workspaces, send them to create one (unless they are already there)
     const isOnNewWorkspacePage = pathname === '/dashboard/new-workspace';
     if ((!workspaces || workspaces.length === 0) && !isOnNewWorkspacePage) {
       router.push('/dashboard/new-workspace');
       return;
     }
     
+    // If user is on the root dashboard page, decide where they should go.
     const isOnDashboardRoot = pathname === '/dashboard';
     if (workspaces && workspaces.length > 0 && isOnDashboardRoot) {
         const firstWorkspace = workspaces[0];
-        // The role check is now inside the hook, but we need to re-check for the specific case of root redirect
-        const userRole = firstWorkspace.ownerId === user?.uid ? 'admin' : firstWorkspace.roles?.[user!.uid];
-        const targetPath = (userRole && ['member', 'collaborator'].includes(userRole))
-            ? `/collaborator/${firstWorkspace.id}/home`
-            : `/dashboard/${firstWorkspace.id}`;
-        router.replace(targetPath);
+        const userRole = firstWorkspace.ownerId === user.uid ? 'admin' : firstWorkspace.roles?.[user!.uid];
+
+        // If the user's role is a collaborator type, redirect to the collaborator view
+        if (userRole && ['member', 'collaborator'].includes(userRole)) {
+            router.replace(`/collaborator/${firstWorkspace.id}/home`);
+        } else {
+            // Otherwise, redirect to their first workspace's admin dashboard
+            router.replace(`/dashboard/${firstWorkspace.id}`);
+        }
         return;
     }
 
-  }, [status, router, pathname, workspaceId, user, workspaces, isWorkspacesLoading]);
+  }, [user, isUserLoading, workspaces, isWorkspacesLoading, pathname, router]);
 
-  // Show a loading screen while the authorization hook is running.
-  if (status === 'loading' || (user && isWorkspacesLoading)) {
+  // Render a loading state while we wait for auth and data
+  if (isUserLoading || (user && isWorkspacesLoading && pathname === '/dashboard')) {
      return <div className="flex min-h-screen items-center justify-center"><p>Carregando Dashboard...</p></div>;
   }
-
-  // A final guard before rendering anything.
-  if (status === 'unauthorized') {
-     return <div className="flex min-h-screen items-center justify-center"><p>Redirecionando para login...</p></div>;
+  
+  // If user is not logged in, show nothing while redirecting
+  if (!user) {
+    return null;
   }
-
-  const isCreatingWorkspace = pathname === '/dashboard/new-workspace';
-  if ((!workspaces || workspaces.length === 0) && isCreatingWorkspace) {
-      return <>{children}</>;
+  
+  // If user has no workspaces and is not on the creation page, show nothing while redirecting
+  if ((!workspaces || workspaces.length === 0) && pathname !== '/dashboard/new-workspace') {
+      return null;
   }
 
   const isMapPage = pathname?.includes('/map');
   if (isMapPage) {
     return <div className="h-screen w-screen">{children}</div>;
-  }
-  
-  // If the user is a collaborator, the useEffect should have already redirected them.
-  // This prevents rendering the admin sidebar for them.
-  if (status === 'authorized_collaborator') {
-    return <div className="flex min-h-screen items-center justify-center"><p>Redirecionando para área do colaborador...</p></div>;
   }
 
   return (
