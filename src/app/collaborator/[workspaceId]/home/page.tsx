@@ -128,7 +128,7 @@ function OnboardingSection({
           </CardContent>
            {nextModule && (
             <CardFooter>
-              <Button asChild className="w-auto" variant="default">
+              <Button asChild className="w-auto clip-primary" variant="default">
                 <Link href={`/collaborator/${workspaceId}/trainings/${nextModule.id}`}>
                   Continuar onboarding
                   <ArrowRight className="ml-2" />
@@ -295,32 +295,33 @@ export default function CollaboratorHomePage() {
   };
 
   return (
-     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 p-8 items-start">
-      {/* Main Content - Left and Center Columns */}
-      <main className="lg:col-span-2 space-y-8">
-        <div>
+    <div className="flex h-full">
+      {/* Scrollable Main Content */}
+      <div className="flex-1 overflow-y-auto">
+        <main className="mx-auto max-w-4xl p-8 space-y-8">
+          <div>
             {isLoading ? (
-            <>
+              <>
                 <Skeleton className="h-5 w-1/4 mb-2" />
                 <Skeleton className="h-8 w-1/3 mb-2" />
                 <Skeleton className="h-5 w-1/2" />
-            </>
+              </>
             ) : (
-            <>
+              <>
                 <p className="text-sm font-medium text-muted-foreground">{workspace?.name || 'Workspace'}</p>
                 <h1 className="text-3xl font-bold mt-1">Bom dia, {userProfile?.name.split(' ')[0]}</h1>
                 <p className="text-muted-foreground">
                     {completedTrainings} de {totalTrainings || 0} etapas de onboarding concluídas
                 </p>
-            </>
+              </>
             )}
-        </div>
-        
-        <OnboardingSection modules={modules} progress={progress} isLoading={isLoading} workspaceId={workspaceId} />
+          </div>
+          
+          <OnboardingSection modules={modules} progress={progress} isLoading={isLoading} workspaceId={workspaceId} />
 
-        <div className="space-y-4">
-             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Base de conhecimento</h2>
-             <form onSubmit={handleSearch} className="relative">
+          <div className="space-y-4">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Base de conhecimento</h2>
+              <form onSubmit={handleSearch} className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
                 placeholder="Pergunte qualquer coisa sobre a operação..."
@@ -330,11 +331,12 @@ export default function CollaboratorHomePage() {
                 />
             </form>
             <KnowledgePreview knowledge={publishedKnowledge} isLoading={isLoading} workspaceId={workspaceId} />
-        </div>
-      </main>
+          </div>
+        </main>
+      </div>
 
-      {/* Progress Sidebar - Right Column */}
-      <aside className="lg:col-span-1 space-y-6">
+      {/* Fixed Right Sidebar */}
+      <aside className="w-80 border-l bg-secondary/30 p-6 space-y-6 hidden lg:block">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Meu Progresso</h2>
         <div className="grid grid-cols-1 gap-4">
             <ProgressStatCard
