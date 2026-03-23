@@ -42,7 +42,7 @@
           "description": "Map of user IDs to their roles within the workspace.",
           "additionalProperties": {
             "type": "string",
-            "enum": ["admin", "curator", "member"]
+            "enum": ["admin", "curator", "member", "collaborator"]
           }
         },
         "status": { "type": "string", "enum": ["never_published", "draft_ready", "published", "sync_pending", "archived"] },
@@ -169,6 +169,19 @@
         "status": { "type": "string", "enum": ["draft", "published"] }
       },
       "required": ["modulo", "titulo", "objetivo", "formato", "status"]
+    },
+    "TrainingProgress": {
+      "title": "Training Progress",
+      "type": "object",
+      "description": "Tracks a user's progress on a specific training module.",
+      "properties": {
+        "userId": { "type": "string" },
+        "moduleId": { "type": "string" },
+        "status": { "type": "string", "enum": ["not_started", "in_progress", "completed"] },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "completedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "moduleId", "status"]
     },
     "Insight": {
         "title": "Insight",
@@ -363,6 +376,10 @@
       {
         "path": "/workspaces/{workspaceId}/training_modules/{moduleId}",
         "definition": { "schema": { "$ref": "#/backend/entities/TrainingModule" } }
+      },
+       {
+        "path": "/workspaces/{workspaceId}/trainingProgress/{progressId}",
+        "definition": { "schema": { "$ref": "#/backend/entities/TrainingProgress" } }
       },
       {
         "path": "/workspaces/{workspaceId}/insights/{insightId}",

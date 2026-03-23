@@ -102,7 +102,7 @@ export function Sidebar({ className }: { className?: string }) {
     return currentWorkspace.roles?.[user.uid] || 'member';
   }, [user, currentWorkspace]);
 
-  const isAdmin = userRole === 'admin';
+  const canManage = userRole === 'admin' || userRole === 'curator';
   const isReviewReady = currentWorkspace?.status === WorkspaceStatus.DRAFT_READY;
   const isSyncPending = currentWorkspace?.status === WorkspaceStatus.SYNC_PENDING;
 
@@ -176,7 +176,7 @@ export function Sidebar({ className }: { className?: string }) {
                         </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild disabled={!isAdmin}>
+                    <DropdownMenuItem asChild disabled={!canManage}>
                          <Link href={currentWorkspace?.id ? `/dashboard/${currentWorkspace.id}/settings` : '/dashboard/settings'}>
                             <Settings className="mr-2 h-4 w-4" />
                             <span>Configurações do Workspace</span>
@@ -202,10 +202,10 @@ export function Sidebar({ className }: { className?: string }) {
                     className={cn(
                         "flex items-center gap-3 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground",
                         pathname === `/dashboard/${currentWorkspace?.id}/content` && 'bg-muted/50 text-foreground',
-                        !isAdmin && 'pointer-events-none text-muted-foreground/50'
+                        !canManage && 'pointer-events-none text-muted-foreground/50'
                     )}
-                     aria-disabled={!isAdmin}
-                    tabIndex={!isAdmin ? -1 : undefined}
+                     aria-disabled={!canManage}
+                    tabIndex={!canManage ? -1 : undefined}
                 >
                     <Upload className="h-4 w-4" />
                     <span>Conteúdo</span>
@@ -216,12 +216,12 @@ export function Sidebar({ className }: { className?: string }) {
                     className={cn(
                         "flex items-center gap-3 rounded-md px-2 py-1.5 text-sm",
                         !isReviewReady && "pointer-events-none text-muted-foreground/50",
-                         isReviewReady && isAdmin && "text-amber-600 dark:text-amber-400 font-medium animate-pulse",
+                         isReviewReady && canManage && "text-amber-600 dark:text-amber-400 font-medium animate-pulse",
                          pathname?.includes('/review') && "bg-amber-400/20",
-                         !isAdmin && 'pointer-events-none text-muted-foreground/50'
+                         !canManage && 'pointer-events-none text-muted-foreground/50'
                     )}
-                    aria-disabled={!isReviewReady || !isAdmin}
-                    tabIndex={!isReviewReady || !isAdmin ? -1 : undefined}
+                    aria-disabled={!isReviewReady || !canManage}
+                    tabIndex={!isReviewReady || !canManage ? -1 : undefined}
                 >
                     <FileCheck className="h-4 w-4" />
                     <span>Revisão de Rascunho</span>
@@ -232,12 +232,12 @@ export function Sidebar({ className }: { className?: string }) {
                     className={cn(
                         "flex items-center gap-3 rounded-md px-2 py-1.5 text-sm",
                         !isSyncPending && "pointer-events-none text-muted-foreground/50",
-                         isSyncPending && isAdmin && "text-blue-600 dark:text-blue-400 font-medium animate-pulse",
+                         isSyncPending && canManage && "text-blue-600 dark:text-blue-400 font-medium animate-pulse",
                          pathname?.includes('/sync') && "bg-blue-400/20",
-                         !isAdmin && 'pointer-events-none text-muted-foreground/50'
+                         !canManage && 'pointer-events-none text-muted-foreground/50'
                     )}
-                    aria-disabled={!isSyncPending || !isAdmin}
-                    tabIndex={!isSyncPending || !isAdmin ? -1 : undefined}
+                    aria-disabled={!isSyncPending || !canManage}
+                    tabIndex={!isSyncPending || !canManage ? -1 : undefined}
                 >
                     <GitPullRequest className="h-4 w-4" />
                     <span>Sincronização</span>
@@ -277,10 +277,10 @@ export function Sidebar({ className }: { className?: string }) {
                     className={cn(
                         "flex items-center gap-3 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground",
                         pathname?.includes('/map') && "bg-muted/50 text-foreground",
-                        !currentWorkspace && "pointer-events-none opacity-50"
+                        !canManage && 'pointer-events-none text-muted-foreground/50'
                     )}
-                    aria-disabled={!currentWorkspace}
-                    tabIndex={!currentWorkspace ? -1 : undefined}
+                    aria-disabled={!canManage}
+                    tabIndex={!canManage ? -1 : undefined}
                 >
                     <Waypoints className="h-4 w-4" />
                     <span>Mapa Operacional</span>

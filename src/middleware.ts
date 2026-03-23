@@ -18,9 +18,9 @@ export function middleware(req: NextRequest) {
 
   // Current host is the marketing domain (or www)
   if (hostname === mainDomain || hostname === `www.${mainDomain}`) {
-    // If trying to access an app page (/login, /dashboard/*) on the marketing domain,
+    // If trying to access an app page (/login, /dashboard/*, /collaborator/*) on the marketing domain,
     // redirect to the app domain with the same path.
-    if (pathname.startsWith('/login') || pathname.startsWith('/dashboard')) {
+    if (pathname.startsWith('/login') || pathname.startsWith('/dashboard') || pathname.startsWith('/collaborator')) {
       url.host = appDomain;
       return NextResponse.redirect(url);
     }

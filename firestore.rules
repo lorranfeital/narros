@@ -108,6 +108,7 @@ service cloud.firestore {
         allow update, delete: if isAdmin(workspaceId) || isServerProcess();
       }
       match /published_knowledge/{publishedId} {
+        // Collaborators can only read published knowledge
         allow read, list: if isWorkspaceMember(workspaceId) || isServerProcess();
         allow create, update, delete: if isAdmin(workspaceId) || isServerProcess();
       }
@@ -134,9 +135,19 @@ service cloud.firestore {
 
       // --- Training Modules Subcollection ---
       match /training_modules/{moduleId} {
+        // Collaborators can only read published modules
         allow read, list: if isWorkspaceMember(workspaceId) || isServerProcess();
         allow create, update: if isServerProcess() || isAdmin(workspaceId);
         allow delete: if isAdmin(workspaceId) || isServerProcess();
+      }
+      
+      // --- Training Progress Subcollection ---
+      match /trainingProgress/{progressId} {
+          allow read: if isWorkspaceMember(workspaceId);
+          // Only the user themselves or an admin can update their progress
+          allow create, update: if isOwner(request.resource.data.userId) || isAdmin(workspaceId) || isServerProcess();
+          allow delete: if isAdmin(workspaceId) || isServerProcess();
+          allow list: if isWorkspaceMember(workspaceId);
       }
 
       // --- Insights Subcollection ---

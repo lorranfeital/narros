@@ -15,6 +15,7 @@ import {
   addDoc,
   deleteDoc,
   Query,
+  setDoc,
 } from 'firebase/firestore';
 import { getApps, initializeApp, getApp } from 'firebase/app';
 import {
@@ -38,6 +39,7 @@ import {
   OrgChart,
   Playbook,
   TrainingModule,
+  TrainingProgressStatus,
 } from '@/lib/firestore-types';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage, ref, getBytes } from 'firebase/storage';
@@ -593,4 +595,49 @@ export async function publishSync(workspaceId: string, userId: string) {
         console.error("Error committing sync batch:", e);
         throw new Error(`Falha na permissão do Firestore ao publicar a sincronização. Verifique as regras para 'published_knowledge', 'sync_proposals', 'versions' e 'workspaces'. Detalhe: ${e.message}`);
     }
+}
+
+export async function updateTrainingProgress(
+  workspaceId: string,
+  userId: string,
+  moduleId: string,
+  status: TrainingProgressStatus
+) {
+  const db = getAdminFirestore();
+
+  const progressColRef = collection(db, `workspaces/${workspaceId}/trainingProgress`);
+  const q = query(
+    progressColRef,
+    where('userId', '==', userId),
+    where('moduleId', '==', moduleId)
+  );
+
+  const timestamp = serverTimestamp();
+  const progressData: Partial<TrainingProgress> = {
+    userId,
+    moduleId,
+    status,
+  };
+
+  if (status === TrainingProgressStatus.IN_PROGRESS) {
+    progressData.startedAt = timestamp as Timestamp;
+  } else if (status === TrainingProgressStatus.COMPLETED) {
+    progressData.completedAt = timestamp as Timestamp;
+  }
+
+  try {
+    const querySnapshot = await getDocs(q);
+    if (querySnapshot.empty) {
+      // No existing document, create a new one
+      const newDocRef = doc(progressColRef);
+      await setDoc(newDocRef, { ...progressData, id: newDocRef.id });
+    } else {
+      // Document exists, update it
+      const docToUpdateRef = querySnapshot.docs[0].ref;
+      await updateDoc(docToUpdateRef, progressData);
+    }
+  } catch (error) {
+    console.error("Error updating training progress:", error);
+    throw new Error("Falha ao atualizar o progresso do treinamento.");
+  }
 }

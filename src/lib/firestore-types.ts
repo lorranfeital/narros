@@ -65,7 +65,13 @@ export enum WorkspaceLinkStatus {
     DISABLED = 'disabled'
 }
 
-export type WorkspaceRole = 'admin' | 'curator' | 'member';
+export enum TrainingProgressStatus {
+    NOT_STARTED = 'not_started',
+    IN_PROGRESS = 'in_progress',
+    COMPLETED = 'completed'
+}
+
+export type WorkspaceRole = 'admin' | 'curator' | 'member' | 'collaborator';
 
 export type PlatformAdminRole = 'platform_super_admin' | 'platform_ops_admin' | 'platform_support' | 'platform_billing_admin' | 'platform_readonly';
 
@@ -130,6 +136,15 @@ export interface WorkspaceLink {
 // ---------
 // Subcollection Interfaces
 // ---------
+
+export interface TrainingProgress {
+    id: string;
+    userId: string;
+    moduleId: string;
+    status: TrainingProgressStatus;
+    startedAt?: Timestamp;
+    completedAt?: Timestamp;
+}
 
 export interface NodeRelation {
   id: string;
