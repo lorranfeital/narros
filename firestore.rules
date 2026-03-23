@@ -61,7 +61,7 @@ service cloud.firestore {
     // ------------------------------------------------------------------------
     match /users/{userId} {
       allow get: if isSignedIn();
-      allow write: if isOwner(userId);
+      allow write: if isOwner(userId) || isServerProcess();
       allow list: if isPlatformAdmin() || isServerProcess();
     }
     
