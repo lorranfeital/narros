@@ -21,57 +21,70 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
     return doc(firestore, 'workspaces', workspaceId);
   }, [firestore, workspaceId]);
   
-  const { data: workspace, isLoading: isWorkspaceLoading } = useDoc<Workspace>(workspaceDocRef);
+  const { data: workspace, isLoading: isWorkspaceLoading, error: workspaceError } = useDoc<Workspace>(workspaceDocRef);
   
   useEffect(() => {
+    const timestamp = new Date().toLocaleTimeString();
+    console.log(`[${timestamp}] [CollaboratorLayout] useEffect triggered.`, { isUserLoading, isWorkspaceLoading, user: !!user, workspace: !!workspace, workspaceId });
+
     // Guard: Wait for all data sources to finish their initial load.
     if (isUserLoading || isWorkspaceLoading) {
+      console.log(`[${timestamp}] [CollaboratorLayout] Still loading...`, { isUserLoading, isWorkspaceLoading });
       return; 
     }
     
+    console.log(`[${timestamp}] [CollaboratorLayout] Loading finished.`);
+    
     // Guard: If there's no authenticated user after loading, redirect to login.
     if (!user) {
+      console.log(`[${timestamp}] [CollaboratorLayout] No authenticated user. Redirecting to /login.`);
       router.replace('/login');
       return;
     }
+    console.log(`[${timestamp}] [CollaboratorLayout] User is authenticated (UID: ${user.uid}).`);
     
     // At this point, loading is done and we have a user.
     // Now, we can make decisions based on the workspace data.
 
-    // Scenario 1: Workspace data exists. We can check permissions.
-    if (workspace) {
-        const isOwner = workspace.ownerId === user.uid;
-        const userRole = workspace.roles?.[user.uid];
-        const isMember = isOwner || !!userRole;
+    // Scenario 1: Workspace data is missing AFTER loading has finished.
+    if (!workspace) {
+        console.error(`[${timestamp}] [CollaboratorLayout] REDIRECTING to /unauthorized because workspace document not found after loading. Error from useDoc: ${workspaceError?.message || 'No error object'}`);
+        router.push('/unauthorized');
+        return;
+    }
+    console.log(`[${timestamp}] [CollaboratorLayout] Workspace is loaded (ID: ${workspace.id}).`);
 
-        // If the user is NOT a member of this workspace, it's an unauthorized access.
-        if (!isMember) {
-          router.push('/unauthorized');
-          return;
-        }
-        
-        // If the user IS a member, but has a role that should be in the dashboard, redirect them there.
-        if (isOwner || userRole === 'admin' || userRole === 'curator') {
-          router.replace(`/dashboard/${workspaceId}`);
-          return;
-        }
+    // Scenario 2: Workspace exists. Check permissions.
+    const isOwner = workspace.ownerId === user.uid;
+    const userRole = workspace.roles?.[user.uid];
+    const hasRole = !!userRole;
+    const isMember = isOwner || hasRole;
+    
+    console.log(`[${timestamp}] [CollaboratorLayout] Final permission check:`, { isOwner, hasRole, isMember });
 
-        // If none of the above, the user is an authorized collaborator. Do nothing, allow render.
-
-    } else {
-      // Scenario 2: Loading is finished, but the workspace document is null.
-      // This means the document doesn't exist or was not found for other reasons (like permissions).
-      // This is a definitive "not found" state AFTER the initial load.
+    // If the user is NOT a member of this workspace, it's an unauthorized access.
+    if (!isMember) {
+      console.warn(`[${timestamp}] [CollaboratorLayout] REDIRECTING to /unauthorized because user is not a member.`);
       router.push('/unauthorized');
       return;
     }
+    
+    // If the user IS a member, but has a role that should be in the dashboard, redirect them there.
+    if (isOwner || userRole === 'admin' || userRole === 'curator') {
+      console.log(`[${timestamp}] [CollaboratorLayout] User is an admin/curator. Redirecting to dashboard.`);
+      router.replace(`/dashboard/${workspaceId}`);
+      return;
+    }
+    
+    // If we reach here, user is an authorized collaborator.
+    console.log(`[${timestamp}] [CollaboratorLayout] Access GRANTED. Rendering children.`);
 
-  }, [isUserLoading, isWorkspaceLoading, user, workspace, router, workspaceId]);
+  }, [isUserLoading, isWorkspaceLoading, user, workspace, router, workspaceId, workspaceError]);
 
-  // This is the main protection. It shows a loading screen until we are CERTAIN that
-  // both the user and the workspace data are loaded. If the workspace data flickers
-  // to null later, this will also re-activate, preventing render with incomplete data.
-  if (isUserLoading || isWorkspaceLoading || !workspace) {
+  const timestamp = new Date().toLocaleTimeString();
+  const isLoading = isUserLoading || isWorkspaceLoading;
+  if (isLoading) {
+    console.log(`[${timestamp}] [CollaboratorLayout] Render: Showing loading screen.`);
      return (
       <div className="flex h-screen items-center justify-center">
         <p>Verificando permissões...</p>
@@ -79,10 +92,30 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
     );
   }
   
+  if (!user) {
+    console.log(`[${timestamp}] [CollaboratorLayout] Render: No user found, showing redirecting message.`);
+    return (
+        <div className="flex h-screen items-center justify-center">
+            <p>Redirecionando para login...</p>
+        </div>
+    );
+  }
+
+  // After loading, if workspace is still null, it's an error state.
+  if (!workspace) {
+    console.log(`[${timestamp}] [CollaboratorLayout] Render: No workspace found after loading, showing redirecting message.`);
+     return (
+      <div className="flex h-screen items-center justify-center">
+        <p>Redirecionando...</p>
+      </div>
+    );
+  }
+
   // Final check before rendering, just to be absolutely sure.
-  const isAuthorizedCollaborator = workspace.roles?.[user?.uid || ''] === 'member' || workspace.roles?.[user?.uid || ''] === 'collaborator';
+  const isAuthorizedCollaborator = workspace.roles?.[user.uid] === 'member' || workspace.roles?.[user.uid] === 'collaborator';
      
   if (isAuthorizedCollaborator) {
+    console.log(`[${timestamp}] [CollaboratorLayout] Render: Authorized. Rendering content.`);
     return (
       <div className="flex h-screen bg-background">
         <CollaboratorSidebar />
@@ -97,6 +130,7 @@ export default function CollaboratorLayout({ children }: { children: ReactNode }
 
   // If the user is not an authorized collaborator but somehow passed the useEffect checks 
   // (e.g., an admin being redirected), show a generic message while the redirect happens.
+  console.log(`[${timestamp}] [CollaboratorLayout] Render: Not an authorized collaborator, showing redirecting message.`);
   return (
     <div className="flex min-h-screen items-center justify-center">
       <p>Redirecionando...</p>
