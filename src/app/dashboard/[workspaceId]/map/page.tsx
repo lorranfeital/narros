@@ -167,7 +167,6 @@ export default function OperationalMapPage() {
       setIsLoading(true);
 
       try {
-        // Step 1: Fetch all required data in one go.
         const federatedData = await getFederatedMapData(workspaceId);
         
         const relationsQuery = query(collection(firestore, `workspaces/${workspaceId}/nodeRelations`));
@@ -181,7 +180,6 @@ export default function OperationalMapPage() {
         const insightsSnap = await getDocs(insightsQuery);
         const insights = insightsSnap.docs.map(doc => doc.data() as Insight);
 
-        // Step 2: Process data and build nodes & edges.
         const newNodes: Node<MapNodeData>[] = [];
         const newEdges: Edge[] = [];
 
@@ -335,12 +333,30 @@ export default function OperationalMapPage() {
     generateFullLayout();
   }, [firestore, workspaceId, toast]);
 
-  const onNodesChange = useCallback((changes: NodeChange[]) => setNodes((nds) => applyNodeChanges(changes, nds)), []);
-  const onEdgesChange = useCallback((changes: EdgeChange[]) => setEdges((eds) => applyEdgeChanges(changes, eds)), []);
-  const onConnect = useCallback((connection: Connection) => {
-     const newEdge = { ...connection, type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed, color: '#aaa'} };
-     setEdges((eds) => addEdge(newEdge, eds))
-    }, []);
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => setNodes((nds) => applyNodeChanges(changes, nds)),
+    [setNodes]
+  );
+
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange[]) => setEdges((eds) => applyEdgeChanges(changes, eds)),
+    [setEdges]
+  );
+
+  const onConnect = useCallback(
+    (connection: Connection) => {
+      const newEdge = {
+        id: `custom-${connection.source}-${connection.target}-${Date.now()}`,
+        ...connection,
+        type: 'smoothstep',
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#aaa' },
+      };
+      setEdges((eds) => addEdge(newEdge, eds));
+    },
+    [setEdges]
+  );
+
+
   const handleNodeClick = (_event: React.MouseEvent, node: Node<MapNodeData>) => setSelectedNode(node);
   const handleEdgeClick = (_event: React.MouseEvent, edge: Edge) => {
       if(edge.id.startsWith('e-')) return;
@@ -481,3 +497,5 @@ export default function OperationalMapPage() {
     </div>
   );
 }
+
+    
