@@ -19,6 +19,7 @@ import ReactFlow, {
   Handle,
   Position,
   MarkerType,
+  ConnectionMode,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import {
@@ -72,9 +73,12 @@ import {
   NodeRelation,
   Playbook,
   OrgChart,
+  OrgChartNode,
+  Workspace as WorkspaceType,
 } from '@/lib/firestore-types';
 
 import { getFederatedMapData, FederatedMapData } from '@/lib/actions/federation-actions';
+import { applyMapStructure } from '@/lib/actions/workspace-actions';
 import { cn } from '@/lib/utils';
 
 // Type definitions for our nodes
@@ -88,7 +92,7 @@ type MapNodeData = {
     gap: number;
     oportunidade: number;
   };
-  raw_data: any;
+  raw_data: KnowledgeCategory | KnowledgeItem | Playbook | OrgChartNode | WorkspaceType | Record<string, never>;
   isFederated: boolean;
   workspaceName?: string;
 };
@@ -99,10 +103,10 @@ const CustomNode = ({ data }: { data: MapNodeData }) => {
   const isOrgChart = data.type === 'orgchart';
   return (
     <div className="relative group transition-all duration-300">
-      <Handle type="both" position={Position.Left} id="left" className="!bg-primary !w-3 !h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-      <Handle type="both" position={Position.Top} id="top" className="!bg-primary !w-3 !h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-      <Handle type="both" position={Position.Right} id="right" className="!bg-primary !w-3 !h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-      <Handle type="both" position={Position.Bottom} id="bottom" className="!bg-primary !w-3 !h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+      <Handle type="source" position={Position.Left} id="left" className="!bg-primary !w-3 !h-3 opacity-20 group-hover:opacity-100 transition-opacity cursor-crosshair" />
+      <Handle type="source" position={Position.Top} id="top" className="!bg-primary !w-3 !h-3 opacity-20 group-hover:opacity-100 transition-opacity cursor-crosshair" />
+      <Handle type="source" position={Position.Right} id="right" className="!bg-primary !w-3 !h-3 opacity-20 group-hover:opacity-100 transition-opacity cursor-crosshair" />
+      <Handle type="source" position={Position.Bottom} id="bottom" className="!bg-primary !w-3 !h-3 opacity-20 group-hover:opacity-100 transition-opacity cursor-crosshair" />
       
       <Card className={cn(
         "w-64 border-2 shadow-lg rounded-xl group-hover:border-primary/50 transition-colors",
@@ -152,6 +156,7 @@ export default function OperationalMapPage() {
   const [edges, setEdges] = useState<Edge[]>([]);
   const [selectedNode, setSelectedNode] = useState<Node<MapNodeData> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isApplyingStructure, setIsApplyingStructure] = useState(false);
   const [edgeToDelete, setEdgeToDelete] = useState<Edge | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -413,16 +418,42 @@ export default function OperationalMapPage() {
       
       edgesToSave.forEach(edge => {
           const newRelationRef = doc(relationsCollectionRef);
-          batch.set(newRelationRef, { fromNodeId: edge.source, toNodeId: edge.target, sourceHandle: edge.sourceHandle || null, targetHandle: edge.targetHandle || null, relationType: 'related_to', createdBy: user.uid, createdAt: serverTimestamp() });
+          // Auto-detect relation type: if source is a content item and target is a category → 'parent_of'
+          const sourceNode = nodes.find(n => n.id === edge.source);
+          const targetNode = nodes.find(n => n.id === edge.target);
+          let relationType: NodeRelation['relationType'] = 'related_to';
+          if (sourceNode?.data.type === 'content' && targetNode?.data.type === 'category') {
+            relationType = 'parent_of';
+          } else if (sourceNode?.data.type === 'category' && targetNode?.data.type === 'content') {
+            relationType = 'parent_of';
+          }
+          batch.set(newRelationRef, { fromNodeId: edge.source, toNodeId: edge.target, sourceHandle: edge.sourceHandle || null, targetHandle: edge.targetHandle || null, relationType, createdBy: user.uid, createdAt: serverTimestamp() });
       });
-      
+
       await batch.commit();
-      toast({ title: "Layout e Relações Salvos!" });
+      toast({ title: "Layout e Relações Salvos!", description: "Use 'Aplicar Estrutura' para reorganizar o conhecimento com base nas conexões." });
     } catch (error) {
       console.error("Error saving layout:", error);
       toast({ variant: "destructive", title: "Erro ao salvar layout.", description: (error as Error).message });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleApplyStructure = async () => {
+    if (!workspaceId || !user) return;
+    setIsApplyingStructure(true);
+    try {
+      const result = await applyMapStructure(workspaceId, user.uid);
+      if (result.success) {
+        toast({ title: "Estrutura Aplicada!", description: result.message });
+      } else {
+        toast({ variant: "destructive", title: "Erro ao aplicar estrutura.", description: result.message });
+      }
+    } catch (error) {
+      toast({ variant: "destructive", title: "Erro ao aplicar estrutura.", description: (error as Error).message });
+    } finally {
+      setIsApplyingStructure(false);
     }
   };
 
@@ -442,27 +473,35 @@ export default function OperationalMapPage() {
 
   return (
     <div className="w-full h-full relative">
-       <div className="absolute top-6 left-6 z-10 flex items-center gap-2">
+       <div className="absolute top-6 left-6 z-10 flex items-center gap-2 flex-wrap">
             <Button onClick={handleSaveLayout} disabled={isSaving || nodes.length === 0}>
-                {isSaving ? <Loader2 className="mr-2" /> : <Save className="mr-2" />}
+                {isSaving ? <Loader2 className="mr-2 animate-spin h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />}
                 Salvar Layout
             </Button>
+            <Button variant="outline" className="bg-background" onClick={handleApplyStructure} disabled={isApplyingStructure || nodes.length === 0}>
+                {isApplyingStructure ? <Loader2 className="mr-2 animate-spin h-4 w-4" /> : <Network className="mr-2 h-4 w-4" />}
+                Aplicar Estrutura
+            </Button>
             <DropdownMenu>
-                <DropdownMenuTrigger asChild><Button variant="outline" className="bg-background"><Plus className="mr-2" />Adicionar Nó</Button></DropdownMenuTrigger>
+                <DropdownMenuTrigger asChild><Button variant="outline" className="bg-background"><Plus className="mr-2 h-4 w-4" />Adicionar Nó</Button></DropdownMenuTrigger>
                 <DropdownMenuContent>
-                    <DropdownMenuItem onSelect={() => handleAddNode('category')}><Folder className="mr-2" /> Categoria</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => handleAddNode('playbook')}><BookOpen className="mr-2" /> Playbook</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => handleAddNode('content')}><FileText className="mr-2" /> Conteúdo</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => handleAddNode('orgchart')}><Users className="mr-2" /> Organograma</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => handleAddNode('category')}><Folder className="mr-2 h-4 w-4" /> Categoria</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => handleAddNode('playbook')}><BookOpen className="mr-2 h-4 w-4" /> Playbook</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => handleAddNode('content')}><FileText className="mr-2 h-4 w-4" /> Conteúdo</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => handleAddNode('orgchart')}><Users className="mr-2 h-4 w-4" /> Organograma</DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
        </div>
+       {/* Help hint */}
+       <div className="absolute bottom-6 left-6 z-10 flex items-center gap-2 bg-background/80 border rounded-lg px-3 py-2 text-xs text-muted-foreground shadow-sm">
+         <span className="font-medium">Dica:</span> Passe o mouse sobre um nó e arraste as bolinhas para conectar. Conecte itens a categorias e clique em &quot;Aplicar Estrutura&quot; para reorganizar o conhecimento.
+       </div>
        <Button asChild variant="outline" className="absolute top-6 right-6 z-10 h-12 w-12 rounded-full p-0 bg-background/80 hover:bg-background"><Link href={`/dashboard/${workspaceId}`}><X className="h-6 w-6" /></Link></Button>
-      
+
         {noNodes ? (
              <div className="flex h-full items-center justify-center"><Alert className="max-w-md"><Network className="h-4 w-4" /><AlertTitle>Mapa Vazio</AlertTitle><AlertDescription>Nenhum conhecimento publicado para gerar o mapa.</AlertDescription></Alert></div>
         ) : (
-            <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect} onNodeClick={handleNodeClick} onEdgeClick={handleEdgeClick} nodeTypes={nodeTypes} fitView className="bg-muted/30"><Controls /><Background /></ReactFlow>
+            <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect} onNodeClick={handleNodeClick} onEdgeClick={handleEdgeClick} nodeTypes={nodeTypes} connectionMode={ConnectionMode.Loose} fitView className="bg-muted/30"><Controls /><Background /></ReactFlow>
         )}
       
       <Sheet open={!!selectedNode} onOpenChange={(isOpen) => !isOpen && setSelectedNode(null)}>

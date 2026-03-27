@@ -21,6 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { BrandKit, Workspace } from '@/lib/firestore-types';
 import { ConnectionsManager } from '@/components/dashboard/connections-manager';
 import { MembersManager } from '@/components/dashboard/members-manager';
@@ -71,6 +72,12 @@ export default function SettingsPage() {
   const [logoNegativoFile, setLogoNegativoFile] = React.useState<File | null>(null);
   const [isUploadingNegativo, setIsUploadingNegativo] = React.useState(false);
 
+  // Onboarding settings state
+  const [onboardingWelcome, setOnboardingWelcome] = React.useState('');
+  const [onboardingMission, setOnboardingMission] = React.useState('');
+  const [onboardingValues, setOnboardingValues] = React.useState('');
+  const [isSavingOnboarding, setIsSavingOnboarding] = React.useState(false);
+
   // Workspace Form
   const workspaceDocRef = useMemoFirebase(() => {
     if (!firestore || !workspaceId) return null;
@@ -99,8 +106,33 @@ export default function SettingsPage() {
         type: currentWorkspace.type || 'empresa',
         sector: currentWorkspace.sector || 'Alimentação',
       });
+      setOnboardingWelcome(currentWorkspace.onboarding?.welcomeMessage || '');
+      setOnboardingMission(currentWorkspace.onboarding?.missionStatement || '');
+      setOnboardingValues((currentWorkspace.onboarding?.values || []).join(', '));
     }
   }, [currentWorkspace, workspaceForm]);
+
+  async function handleSaveOnboarding() {
+    if (!firestore || !workspaceDocRef || !isAdmin) return;
+    setIsSavingOnboarding(true);
+    try {
+      const values = onboardingValues
+        .split(',')
+        .map((v) => v.trim())
+        .filter(Boolean);
+      await updateDoc(workspaceDocRef, {
+        'onboarding.welcomeMessage': onboardingWelcome.trim() || null,
+        'onboarding.missionStatement': onboardingMission.trim() || null,
+        'onboarding.values': values,
+      });
+      toast({ title: 'Onboarding atualizado!', description: 'As configurações de onboarding foram salvas.' });
+    } catch (error) {
+      console.error('Error saving onboarding settings:', error);
+      toast({ variant: 'destructive', title: 'Erro ao salvar configurações de onboarding.' });
+    } finally {
+      setIsSavingOnboarding(false);
+    }
+  }
 
   async function onWorkspaceSubmit(data: WorkspaceFormValues) {
     if (!firestore || !workspaceDocRef || !isAdmin) return;
@@ -209,8 +241,9 @@ export default function SettingsPage() {
       <p className="text-muted-foreground mt-2">Gerencie as configurações deste workspace, membros e suas conexões.</p>
 
       <Tabs defaultValue="workspace" className="mt-10 max-w-2xl">
-        <TabsList className={cn("grid w-full", isAdmin ? "grid-cols-3" : "grid-cols-1")}>
+        <TabsList className={cn("grid w-full", isAdmin ? "grid-cols-4" : "grid-cols-1")}>
             <TabsTrigger value="workspace">Workspace</TabsTrigger>
+            {isAdmin && <TabsTrigger value="onboarding">Onboarding</TabsTrigger>}
             {isAdmin && <TabsTrigger value="connections">Conexões</TabsTrigger>}
             {isAdmin && <TabsTrigger value="members">Membros</TabsTrigger>}
         </TabsList>
@@ -376,6 +409,54 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+        {isAdmin && (
+          <TabsContent value="onboarding">
+            <Card>
+              <CardHeader>
+                <CardTitle>Onboarding do Colaborador</CardTitle>
+                <CardDescription>
+                  Configure a experiência de primeiro acesso dos colaboradores. Estas informações são exibidas no fluxo de onboarding.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="welcome-msg">Mensagem de boas-vindas</Label>
+                  <Textarea
+                    id="welcome-msg"
+                    placeholder="Ex: Seja bem-vindo! Estamos felizes em ter você no nosso time..."
+                    value={onboardingWelcome}
+                    onChange={(e) => setOnboardingWelcome(e.target.value)}
+                    rows={3}
+                  />
+                  <p className="text-xs text-muted-foreground">Exibida na primeira tela do onboarding.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="mission">Missão da empresa</Label>
+                  <Textarea
+                    id="mission"
+                    placeholder="Ex: Transformar a forma como as empresas organizam e disseminam conhecimento."
+                    value={onboardingMission}
+                    onChange={(e) => setOnboardingMission(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="values">Valores da empresa</Label>
+                  <Input
+                    id="values"
+                    placeholder="Ex: Inovação, Transparência, Colaboração (separados por vírgula)"
+                    value={onboardingValues}
+                    onChange={(e) => setOnboardingValues(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">Separe os valores com vírgula.</p>
+                </div>
+                <Button onClick={handleSaveOnboarding} disabled={isSavingOnboarding}>
+                  {isSavingOnboarding ? 'Salvando...' : 'Salvar configurações de onboarding'}
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
         {isAdmin && (
             <TabsContent value="connections">
                 <ConnectionsManager />

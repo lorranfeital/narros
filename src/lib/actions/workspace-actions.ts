@@ -17,6 +17,8 @@ import {
   Query,
   setDoc,
   limit,
+  arrayUnion,
+  getFirestore,
 } from 'firebase/firestore';
 import { getApps, initializeApp, getApp } from 'firebase/app';
 import {
@@ -42,8 +44,8 @@ import {
   TrainingModule,
   TrainingProgressStatus,
   TrainingProgress,
+  NodeRelation,
 } from '@/lib/firestore-types';
-import { getFirestore } from 'firebase/firestore';
 import { getStorage, ref, getBytes } from 'firebase/storage';
 import { firebaseConfig } from '@/firebase/config';
 import pdf from 'pdf-parse';
@@ -681,4 +683,146 @@ export async function updateTrainingProgress(
     console.error("Error updating training progress:", error);
     throw new Error("Falha ao atualizar o progresso do treinamento.");
   }
+}
+
+// ─── Apply Map Structure ──────────────────────────────────────────────────────
+// Reads nodeRelations saved in the map and reorganizes published_knowledge
+// categories based on explicit parent_of connections between items and categories.
+export async function applyMapStructure(
+  workspaceId: string,
+  userId: string
+): Promise<{ success: boolean; message: string }> {
+  const db = getAdminFirestore();
+
+  try {
+    // 1. Read all nodeRelations for this workspace
+    const relationsSnap = await getDocs(
+      collection(db, `workspaces/${workspaceId}/nodeRelations`)
+    );
+    const relations = relationsSnap.docs.map(
+      (d) => ({ ...d.data(), id: d.id } as NodeRelation & { id: string })
+    );
+
+    // 2. Read current published_knowledge
+    const pkRef = doc(db, `workspaces/${workspaceId}/published_knowledge`, workspaceId);
+    const pkSnap = await getDoc(pkRef);
+    if (!pkSnap.exists()) {
+      return { success: false, message: 'Nenhum conhecimento publicado encontrado.' };
+    }
+    const pk = pkSnap.data() as PublishedKnowledge;
+    const currentCategories: KnowledgeCategory[] = pk.categories || [];
+
+    // 3. Build a lookup: itemTitle → KnowledgeItem (from all categories)
+    const itemLookup = new Map<string, { item: KnowledgeCategory['itens'][number]; originalCat: string }>();
+    for (const cat of currentCategories) {
+      for (const item of cat.itens) {
+        const encodedItemKey = `${workspaceId}-cat-${encodeURIComponent(cat.categoria)}-item-${encodeURIComponent(item.titulo)}`;
+        itemLookup.set(encodedItemKey, { item, originalCat: cat.categoria });
+      }
+    }
+
+    // 4. Build a lookup: categoryName by encoded node id
+    const categoryLookup = new Map<string, KnowledgeCategory>();
+    for (const cat of currentCategories) {
+      const encodedCatKey = `${workspaceId}-cat-${encodeURIComponent(cat.categoria)}`;
+      categoryLookup.set(encodedCatKey, cat);
+    }
+
+    // 5. Process parent_of relations to determine item → new category mappings
+    const itemReassignments = new Map<string, string>(); // encodedItemKey → new category name
+    for (const rel of relations) {
+      if (rel.relationType !== 'parent_of') continue;
+
+      // Case 1: source is item, target is category
+      if (itemLookup.has(rel.fromNodeId) && categoryLookup.has(rel.toNodeId)) {
+        const newCat = categoryLookup.get(rel.toNodeId)!;
+        itemReassignments.set(rel.fromNodeId, newCat.categoria);
+      }
+      // Case 2: source is category, target is item (reversed direction)
+      if (itemLookup.has(rel.toNodeId) && categoryLookup.has(rel.fromNodeId)) {
+        const newCat = categoryLookup.get(rel.fromNodeId)!;
+        itemReassignments.set(rel.toNodeId, newCat.categoria);
+      }
+    }
+
+    if (itemReassignments.size === 0) {
+      return {
+        success: false,
+        message: 'Nenhuma reassociação de itens detectada. Conecte itens de conteúdo a categorias no mapa e salve o layout antes de aplicar a estrutura.',
+      };
+    }
+
+    // 6. Rebuild categories with reassigned items
+    const newCategoryMap = new Map<string, KnowledgeCategory>();
+    // Initialize with existing categories (empty itens first)
+    for (const cat of currentCategories) {
+      newCategoryMap.set(cat.categoria, { ...cat, itens: [] });
+    }
+
+    // Place items into their new categories
+    for (const [encodedItemKey, { item, originalCat }] of itemLookup.entries()) {
+      const newCatName = itemReassignments.get(encodedItemKey) || originalCat;
+      const targetCat = newCategoryMap.get(newCatName);
+      if (targetCat) {
+        targetCat.itens.push(item);
+      } else {
+        // Fallback to original category if target not found
+        newCategoryMap.get(originalCat)?.itens.push(item);
+      }
+    }
+
+    // 7. Write updated published_knowledge (remove empty categories)
+    const updatedCategories = Array.from(newCategoryMap.values()).filter(
+      (cat) => cat.itens.length > 0
+    );
+
+    const batch = writeBatch(db);
+    batch.update(pkRef, { categories: updatedCategories });
+
+    // Record a version entry
+    const versionsRef = collection(db, `workspaces/${workspaceId}/versions`);
+    const workspaceSnap = await getDoc(doc(db, 'workspaces', workspaceId));
+    const currentVersion = workspaceSnap.exists() ? (workspaceSnap.data().version || 1) : 1;
+    const newVersionRef = doc(versionsRef);
+    batch.set(newVersionRef, {
+      id: newVersionRef.id,
+      workspaceId,
+      type: VersionEventType.MANUAL_EDIT,
+      summary: `Estrutura reorganizada via mapa de nós (${itemReassignments.size} item(s) movido(s))`,
+      version: currentVersion,
+      createdAt: serverTimestamp(),
+      createdBy: userId,
+    });
+
+    await batch.commit();
+
+    return {
+      success: true,
+      message: `${itemReassignments.size} item(s) reorganizado(s) com sucesso!`,
+    };
+  } catch (error) {
+    console.error('Error applying map structure:', error);
+    return { success: false, message: (error as Error).message };
+  }
+}
+
+// ─── Complete Onboarding ──────────────────────────────────────────────────────
+// Marks onboarding as completed for a user in a given workspace and saves their profile.
+export async function completeOnboarding(
+  workspaceId: string,
+  userId: string,
+  profile?: { role?: string; sector?: string }
+): Promise<void> {
+  const db = getAdminFirestore();
+  const userRef = doc(db, 'users', userId);
+
+  const updateData: Record<string, unknown> = {
+    onboardingCompletedWorkspaces: arrayUnion(workspaceId),
+  };
+
+  if (profile && (profile.role || profile.sector)) {
+    updateData.onboardingProfile = profile;
+  }
+
+  await updateDoc(userRef, updateData);
 }
