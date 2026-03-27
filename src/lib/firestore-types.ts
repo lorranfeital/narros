@@ -87,6 +87,11 @@ export interface User {
   plan?: string;
   createdAt?: Timestamp;
   onboardingProgress?: number;
+  onboardingCompletedWorkspaces?: string[];
+  onboardingProfile?: {
+    role?: string;
+    sector?: string;
+  };
 }
 
 export interface PlatformAdmin {
@@ -117,6 +122,11 @@ export interface Workspace {
   pendingSyncCount?: number;
   visibility?: 'public' | 'private';
   version?: number;
+  onboarding?: {
+    welcomeMessage?: string;
+    missionStatement?: string;
+    values?: string[];
+  };
 }
 
 export interface WorkspaceLink {

@@ -37,7 +37,7 @@ import {
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, Circle, ArrowRight, BookOpen, Search, Plus } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -248,6 +248,13 @@ function MyTrainingsSection({
         }
     };
     
+    const visibleModules = useMemo(() => {
+        if (!modules) return [];
+        const notCompleted = modules.filter(m => getModuleStatus(m.id, progress) !== TrainingProgressStatus.COMPLETED);
+        if (notCompleted.length > 0) return notCompleted.slice(0, 3);
+        return modules.slice(0, 3);
+    }, [modules, progress]);
+
     if (isLoading) {
         return (
             <div>
@@ -259,13 +266,6 @@ function MyTrainingsSection({
             </div>
         );
     }
-    
-    const visibleModules = useMemo(() => {
-        if (!modules) return [];
-        const notCompleted = modules.filter(m => getModuleStatus(m.id, progress) !== TrainingProgressStatus.COMPLETED);
-        if (notCompleted.length > 0) return notCompleted.slice(0, 3);
-        return modules.slice(0, 3);
-    }, [modules, progress]);
 
 
     return (
@@ -376,7 +376,16 @@ export default function CollaboratorHomePage() {
 
 
   const isLoading = isUserLoading || isWorkspaceLoading || isProfileLoading || areModulesLoading || isProgressLoading || isKnowledgeLoading;
-  
+
+  // Redirect to onboarding if user hasn't completed it for this workspace
+  useEffect(() => {
+    if (!isLoading && userProfile && workspaceId) {
+      if (!userProfile.onboardingCompletedWorkspaces?.includes(workspaceId)) {
+        router.replace(`/collaborator/${workspaceId}/onboarding`);
+      }
+    }
+  }, [isLoading, userProfile, workspaceId, router]);
+
   const [searchQuery, setSearchQuery] = useState('');
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -443,8 +452,8 @@ export default function CollaboratorHomePage() {
                 isLoading={isLoading}
             />
             <ProgressStatCard
-                label="Docs acessados"
-                value="16"
+                label="Categorias disponíveis"
+                value={String(publishedKnowledge?.categories?.length ?? '—')}
                 isLoading={isLoading}
             />
         </div>
